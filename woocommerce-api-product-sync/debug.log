@@ -1,0 +1,75 @@
+errorCode: term_exists
+message: Un terme avec ce nom existe déjà pour ce parent.
+API Call: addCategory
+Date: 2025-03-31 13:20:40
+
+errorCode: term_exists
+message: Un terme avec ce nom existe déjà pour ce parent.
+API Call: addCategory
+Date: 2025-03-31 13:22:19
+
+errorCode: term_exists
+message: Un terme avec ce nom existe déjà pour ce parent.
+API Call: addCategory
+Date: 2025-03-31 13:22:40
+
+errorCode: term_exists
+message: Un terme avec ce nom existe déjà pour ce parent.
+API Call: addCategory
+Date: 2025-03-31 13:23:00
+
+errorCode: term_exists
+message: Un terme avec ce nom existe déjà pour ce parent.
+API Call: addCategory
+Date: 2025-03-31 13:23:10
+
+errorCode: term_exists
+message: Un terme avec ce nom existe déjà pour ce parent.
+API Call: addCategory
+Date: 2025-03-31 13:23:42
+
+errorCode: term_exists
+message: Un terme avec ce nom existe déjà pour ce parent.
+API Call: addCategory
+Date: 2025-03-31 13:25:45
+
+errorCode: woocommerce_rest_cannot_create
+message: L’identifiant « marques » est déjà utilisé. Veuillez le changer.
+API Call: addAttribute
+Date: 2025-03-31 13:26:27
+
+errorCode: term_exists
+message: Un terme avec ce nom et cet identifiant existe déjà dans cette taxonomie.
+API Call: addTag
+Date: 2025-03-31 13:28:34
+
+errorCode: term_exists
+message: Un terme avec ce nom et cet identifiant existe déjà dans cette taxonomie.
+API Call: addTag
+Date: 2025-03-31 13:28:48
+
+errorCode: woocommerce_rest_cannot_create
+message: L’identifiant « marques » est déjà utilisé. Veuillez le changer.
+API Call: addAttribute
+Date: 2025-03-31 13:31:12
+
+errorCode: term_exists
+message: Un terme avec ce nom existe déjà pour ce parent.
+API Call: addCategory
+Date: 2025-03-31 13:33:06
+
+errorCode: term_exists
+message: Un terme avec ce nom existe déjà pour ce parent.
+API Call: addCategory
+Date: 2025-03-31 13:33:33
+
+errorCode: woocommerce_rest_cannot_create
+message: L’identifiant « marques » est déjà utilisé. Veuillez le changer.
+API Call: addAttribute
+Date: 2025-03-31 13:33:46
+
+errorCode: term_exists
+message: Un terme avec ce nom existe déjà pour ce parent.
+API Call: addCategory
+Date: 2025-04-01 06:08:33
+
