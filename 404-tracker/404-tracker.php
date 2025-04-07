@@ -3,7 +3,7 @@
 Plugin Name: Custom 404 Tracker
 Description: Tracks all 404 page visits with detailed logging
 Version: 1.1
-Author: Zahmoul Med Yassine
+Author: Med Yassine Zahmoul
 */
 
 // Security check

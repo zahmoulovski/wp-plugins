@@ -260,8 +260,8 @@ function add_my_currency_symbol( $currency_symbol, $currency ) {
 }
 
 
-/**
- * Enqueue script and styles for child theme
+/*
+ // Enqueue script and styles for child theme
  
 function woodmart_child_enqueue_styles() {
 	wp_enqueue_style( 'child-style', get_stylesheet_directory_uri() . '/style.css', array( 'woodmart-style' ), woodmart_get_theme_info( 'Version' ) );
@@ -276,7 +276,7 @@ function zahmoul_variations_per_page() {
 */
 
 
-/**
+/*
  * alphabetical order
  
 
