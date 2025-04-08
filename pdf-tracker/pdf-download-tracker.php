@@ -1,8 +1,8 @@
 <?php
 /*
 Plugin Name: PDF Download Tracker
-Description: Tracks PDF downloads from specific directories
-Version: 1.0
+Description: Tracks PDF views and downloads from specific directories
+Version: 1.5
 Author: Med Yassine Zahmoul
 */
 
@@ -15,10 +15,12 @@ class PDF_Download_Tracker {
 
     public function __construct() {
         global $wpdb;
-        $this->table_name = $wpdb->prefix . 'pdf_downloads';
+        $this->table_name = $wpdb->prefix . 'pdf_tracking';
 
         register_activation_hook(__FILE__, [$this, 'create_table']);
-        add_action('init', [$this, 'track_downloads']);
+        
+        // Move to template_redirect to work better with 404 tracker
+        add_action('template_redirect', [$this, 'track_pdf_access'], 5);
         add_action('admin_menu', [$this, 'add_admin_menu']);
     }
 
@@ -27,94 +29,121 @@ class PDF_Download_Tracker {
         
         $charset_collate = $wpdb->get_charset_collate();
         
-        $sql = "CREATE TABLE {$this->table_name} (
+        $sql = "CREATE TABLE IF NOT EXISTS {$this->table_name} (
             id bigint(20) NOT NULL AUTO_INCREMENT,
             file_path varchar(255) NOT NULL,
             file_name varchar(255) NOT NULL,
-            file_size bigint(20) DEFAULT 0,
+            access_type varchar(10) NOT NULL COMMENT 'view or download',
             ip_address varchar(45) DEFAULT NULL,
             user_agent text DEFAULT NULL,
             user_id bigint(20) DEFAULT 0,
-            download_date datetime NOT NULL,
-            download_count int(11) DEFAULT 1,
+            access_time datetime NOT NULL,
             PRIMARY KEY (id),
             KEY file_path (file_path(191)),
-            KEY download_date (download_date)
+            KEY access_time (access_time),
+            KEY access_type (access_type)
         ) {$charset_collate};";
         
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
     }
 
-    public function track_downloads() {
-        if (!isset($_SERVER['REQUEST_URI'])) {
+    public function track_pdf_access() {
+        global $wpdb;
+        
+        $request_uri = $_SERVER['REQUEST_URI'];
+        $current_url = $this->get_current_url();
+        
+        error_log('PDF Tracker - Starting check for PDF access');
+        error_log('PDF Tracker - Request URI: ' . $request_uri);
+        error_log('PDF Tracker - Current URL: ' . $current_url);
+        
+        // First check if this is a PDF request
+        if (!preg_match('/\.pdf$/i', $request_uri)) {
+            error_log('PDF Tracker - Not a PDF request');
             return;
         }
-
-        $request_uri = $_SERVER['REQUEST_URI'];
-        $is_pdf = pathinfo($request_uri, PATHINFO_EXTENSION) === 'pdf';
         
-        // Check if request is for a PDF in our tracked folders
-        $should_track = false;
+        error_log('PDF Tracker - PDF request detected');
+        
+        // Check if it's in one of our tracked folders
+        $is_tracked = false;
+        $matched_folder = '';
         foreach ($this->tracked_folders as $folder) {
-            if (strpos($request_uri, $folder) !== false && $is_pdf) {
-                $should_track = true;
+            if (strpos($request_uri, $folder) !== false) {
+                $is_tracked = true;
+                $matched_folder = $folder;
+                error_log('PDF Tracker - Matched folder: ' . $folder);
                 break;
             }
         }
-
-        if (!$should_track) {
+        
+        if (!$is_tracked) {
+            error_log('PDF Tracker - PDF not in tracked folders');
             return;
         }
 
-        global $wpdb;
-        
+        // Check if file exists
         $file_path = ABSPATH . ltrim($request_uri, '/');
-        $file_name = basename($request_uri);
-        $file_size = file_exists($file_path) ? filesize($file_path) : 0;
-        $ip = $this->get_client_ip();
-        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-        $user_id = get_current_user_id();
-        $current_time = current_time('mysql');
-
-        // Check if this file+IP combo exists in last 24 hours
-        $existing = $wpdb->get_row($wpdb->prepare(
-            "SELECT id, download_count FROM {$this->table_name} 
-             WHERE file_path = %s AND ip_address = %s 
-             AND download_date > DATE_SUB(NOW(), INTERVAL 1 DAY) 
-             ORDER BY download_date DESC LIMIT 1",
-            $request_uri, $ip
-        ));
-
-        if ($existing) {
-            // Update count for existing record
-            $wpdb->update(
-                $this->table_name,
-                ['download_count' => $existing->download_count + 1],
-                ['id' => $existing->id],
-                ['%d'],
-                ['%d']
-            );
-        } else {
-            // Insert new record
-            $wpdb->insert($this->table_name, [
-                'file_path' => $request_uri,
-                'file_name' => $file_name,
-                'file_size' => $file_size,
-                'ip_address' => $ip,
-                'user_agent' => $user_agent,
-                'user_id' => $user_id,
-                'download_date' => $current_time,
-            ]);
+        if (!file_exists($file_path)) {
+            error_log('PDF Tracker - File does not exist: ' . $file_path);
+            // Let the 404 tracker handle this
+            return;
         }
+        
+        // Get file details
+        $file_path = $request_uri;
+        $file_name = basename($file_path);
+        
+        error_log('PDF Tracker - Processing file: ' . $file_name);
+        error_log('PDF Tracker - Full path: ' . $file_path);
+        
+        // Determine access type
+        $access_type = 'view';
+        if (isset($_SERVER['HTTP_RANGE']) || 
+            isset($_GET['download']) || 
+            strpos(strtolower($_SERVER['HTTP_USER_AGENT'] ?? ''), 'download') !== false) {
+            $access_type = 'download';
+        }
+        
+        error_log('PDF Tracker - Access type: ' . $access_type);
+        
+        // Prepare data for insertion
+        $data = [
+            'file_path' => $file_path,
+            'file_name' => $file_name,
+            'access_type' => $access_type,
+            'ip_address' => $this->get_client_ip(),
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
+            'user_id' => get_current_user_id(),
+            'access_time' => current_time('mysql'),
+        ];
+        
+        error_log('PDF Tracker - Attempting to insert data: ' . print_r($data, true));
+        
+        // Insert the record
+        $result = $wpdb->insert($this->table_name, $data);
+        
+        if ($result === false) {
+            error_log('PDF Tracker - ERROR: Failed to insert record: ' . $wpdb->last_error);
+        } else {
+            error_log('PDF Tracker - SUCCESS: Inserted record with ID: ' . $wpdb->insert_id);
+        }
+    }
+
+    private function get_current_url() {
+        $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://';
+        $host = $_SERVER['HTTP_HOST'];
+        $uri = $_SERVER['REQUEST_URI'];
+        return $protocol . $host . $uri;
     }
 
     public function add_admin_menu() {
         add_menu_page(
-            'PDF Downloads',
-            'PDF Downloads',
+            'PDF Tracking',
+            'PDF Tracking',
             'manage_options',
-            'pdf-downloads',
+            'pdf-tracking',
             [$this, 'render_admin_page'],
             'dashicons-media-document',
             81
@@ -124,81 +153,142 @@ class PDF_Download_Tracker {
     public function render_admin_page() {
         global $wpdb;
         
+        // Setup filters
+        $current_filter = $_GET['filter'] ?? 'all';
+        $valid_filters = ['all', 'view', 'download'];
+        $filter = in_array($current_filter, $valid_filters) ? $current_filter : 'all';
+        
         // Setup pagination
         $per_page = 20;
         $current_page = max(1, isset($_GET['paged']) ? absint($_GET['paged']) : 1);
         $offset = ($current_page - 1) * $per_page;
         
+        // Base query
+        $query = "FROM {$this->table_name}";
+        $where = [];
+        
+        if ($filter !== 'all') {
+            $where[] = $wpdb->prepare("access_type = %s", $filter);
+        }
+        
+        if (!empty($where)) {
+            $query .= " WHERE " . implode(' AND ', $where);
+        }
+        
         // Get total count
-        $total_items = $wpdb->get_var("SELECT COUNT(*) FROM {$this->table_name}");
+        $total_items = $wpdb->get_var("SELECT COUNT(*) $query");
         
         // Get records
-        $downloads = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$this->table_name} 
-             ORDER BY download_date DESC 
-             LIMIT %d OFFSET %d",
-            $per_page, $offset
-        ));
+        $records = $wpdb->get_results(
+            "SELECT * $query 
+             ORDER BY access_time DESC 
+             LIMIT $per_page OFFSET $offset"
+        );
         
-        // Get summary stats
-        $popular_files = $wpdb->get_results(
-            "SELECT file_path, file_name, SUM(download_count) as total_downloads
+        // Get statistics
+        $stats = $wpdb->get_results(
+            "SELECT 
+                file_name, 
+                file_path,
+                COUNT(*) as total_access,
+                SUM(access_type = 'view') as views,
+                SUM(access_type = 'download') as downloads
              FROM {$this->table_name}
              GROUP BY file_path
-             ORDER BY total_downloads DESC
-             LIMIT 5"
+             ORDER BY total_access DESC"
         );
         ?>
         <div class="wrap">
-            <h1>PDF Download Statistics</h1>
+            <h1>PDF Access Statistics</h1>
             
             <div class="postbox" style="padding: 20px; margin-bottom: 20px;">
-                <h2>Most Popular Files</h2>
-                <ul>
-                    <?php foreach ($popular_files as $file): ?>
-                        <li>
-                            <strong><?php echo esc_html($file->file_name); ?></strong> - 
-                            <?php echo esc_html($file->total_downloads); ?> downloads
-                            <small>(<?php echo esc_html($file->file_path); ?>)</small>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
+                <h2>File Statistics</h2>
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Total Access</th>
+                            <th>Views</th>
+                            <th>Downloads</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($stats as $stat): ?>
+                            <tr>
+                                <td>
+                                    <strong><?php echo esc_html($stat->file_name); ?></strong><br>
+                                    <small><?php echo esc_html($stat->file_path); ?></small>
+                                </td>
+                                <td><?php echo esc_html($stat->total_access); ?></td>
+                                <td><?php echo esc_html($stat->views); ?></td>
+                                <td><?php echo esc_html($stat->downloads); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
+            
+            <h2>Access Log</h2>
+            
+            <ul class="subsubsub">
+                <li>
+                    <a href="<?php echo esc_url(add_query_arg('filter', 'all')); ?>" 
+                       class="<?php echo $filter === 'all' ? 'current' : ''; ?>">
+                        All <span class="count">(<?php echo $total_items; ?>)</span>
+                    </a> |
+                </li>
+                <li>
+                    <a href="<?php echo esc_url(add_query_arg('filter', 'view')); ?>" 
+                       class="<?php echo $filter === 'view' ? 'current' : ''; ?>">
+                        Views <span class="count">(<?php echo $this->get_count_for_type('view'); ?>)</span>
+                    </a> |
+                </li>
+                <li>
+                    <a href="<?php echo esc_url(add_query_arg('filter', 'download')); ?>" 
+                       class="<?php echo $filter === 'download' ? 'current' : ''; ?>">
+                        Downloads <span class="count">(<?php echo $this->get_count_for_type('download'); ?>)</span>
+                    </a>
+                </li>
+            </ul>
             
             <table class="wp-list-table widefat fixed striped">
                 <thead>
                     <tr>
-                        <th>File Name</th>
-                        <th>File Path</th>
-                        <th>Size</th>
+                        <th>File</th>
+                        <th>Type</th>
                         <th>User</th>
                         <th>IP Address</th>
-                        <th>Downloads</th>
-                        <th>Last Downloaded</th>
+                        <th>User Agent</th>
+                        <th>Time</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (empty($downloads)): ?>
+                    <?php if (empty($records)): ?>
                         <tr>
-                            <td colspan="7">No downloads recorded yet.</td>
+                            <td colspan="6">No access recorded yet.</td>
                         </tr>
                     <?php else: ?>
-                        <?php foreach ($downloads as $download): ?>
+                        <?php foreach ($records as $record): ?>
                             <tr>
-                                <td><?php echo esc_html($download->file_name); ?></td>
-                                <td><?php echo esc_html($download->file_path); ?></td>
-                                <td><?php echo size_format($download->file_size); ?></td>
                                 <td>
-                                    <?php if ($download->user_id): ?>
-                                        <?php $user = get_user_by('id', $download->user_id); ?>
-                                        <?php echo esc_html($user->display_name); ?>
+                                    <strong><?php echo esc_html($record->file_name); ?></strong><br>
+                                    <small><?php echo esc_html($record->file_path); ?></small>
+                                </td>
+                                <td>
+                                    <span class="dashicons dashicons-<?php echo $record->access_type === 'download' ? 'download' : 'visibility'; ?>"></span>
+                                    <?php echo ucfirst($record->access_type); ?>
+                                </td>
+                                <td>
+                                    <?php if ($record->user_id): ?>
+                                        <?php $user = get_user_by('id', $record->user_id); ?>
+                                        <?php echo $user ? esc_html($user->display_name) : 'Unknown User'; ?>
                                     <?php else: ?>
                                         Guest
                                     <?php endif; ?>
                                 </td>
-                                <td><?php echo esc_html($download->ip_address); ?></td>
-                                <td><?php echo esc_html($download->download_count); ?></td>
-                                <td><?php echo date_i18n('M j, Y @ H:i', strtotime($download->download_date)); ?></td>
+                                <td><?php echo esc_html($record->ip_address); ?></td>
+                                <td><?php echo esc_html(substr($record->user_agent, 0, 50)); ?>...</td>
+                                <td><?php echo date_i18n('M j, Y @ H:i', strtotime($record->access_time)); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -224,13 +314,24 @@ class PDF_Download_Tracker {
         <?php
     }
 
+    private function get_count_for_type($type) {
+        global $wpdb;
+        return $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$this->table_name} WHERE access_type = %s",
+            $type
+        ));
+    }
+
     private function get_client_ip() {
+        $ip = '';
         if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-            return $_SERVER['HTTP_CLIENT_IP'];
+            $ip = $_SERVER['HTTP_CLIENT_IP'];
         } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            return $_SERVER['HTTP_X_FORWARDED_FOR'];
+            $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+        } else {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? '';
         }
-        return $_SERVER['REMOTE_ADDR'];
+        return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '';
     }
 }
 
