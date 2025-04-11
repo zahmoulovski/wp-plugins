@@ -246,4 +246,33 @@ add_action('wp_ajax_fdt_save_and_fetch_tracking', function(){
 });
 
 
+add_action('init', function() {
+    add_rewrite_endpoint('track-order', EP_ROOT | EP_PAGES);
+});
+
+add_filter('woocommerce_account_menu_items', function($items) {
+    $new_items = [];
+
+    foreach ($items as $key => $label) {
+        // 🛠 Replace dashboard icon
+        if ($key === 'dashboard') {
+            $label = 'Tableau de bord';
+        }
+
+        $new_items[$key] = $label;
+
+        // 🎯 Inject "Suivi de commande" just after "orders" (commandes)
+        if ($key === 'orders') {
+            $new_items['track-order'] = '🚚 Suivi de commande';
+        }
+    }
+
+    return $new_items;
+});
+
+
+add_action('woocommerce_account_track-order_endpoint', function() {
+    echo '<h2>📦 Suivi de votre commande</h2>';
+    echo do_shortcode('[first_delivery_tracker]');
+});
 ?>
