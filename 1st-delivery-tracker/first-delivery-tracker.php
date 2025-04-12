@@ -62,39 +62,47 @@ add_shortcode('first_delivery_tracker', function() {
     ?>
     <form method="post">
         <label for="fdt_barcode">Entrez le code-barres de la commande:</label>
-        <input type="text" name="fdt_barcode" required />
-        <input type="submit" value="Suivi votre commande" />
+        <input type="text" name="fdt_barcode" id="fdt_barcode" value="<?php echo isset($_GET['bar_code']) ? esc_attr($_GET['bar_code']) : (isset($_GET['order_id']) ? esc_attr($_GET['order_id']) : ''); ?>" required />
+        <input type="submit" value="Suivi de votre commande" />
     </form>
     <?php
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['fdt_barcode'])) {
-        $input = sanitize_text_field($_POST['fdt_barcode']);
-$barcode = $input;
-
-// If it's a numeric WooCommerce Order ID, use the saved barcode
-if (is_numeric($input)) {
-    $order = wc_get_order($input);
-    if ($order) {
-        $saved_barcode = get_post_meta($order->get_id(), '_first_delivery_barcode', true);
-        if ($saved_barcode) {
-            $barcode = $saved_barcode;
+    if (($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['fdt_barcode'])) || isset($_GET['order_id']) || isset($_GET['bar_code'])) {
+        $input = '';
+        
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['fdt_barcode'])) {
+            $input = sanitize_text_field($_POST['fdt_barcode']);
+        } elseif (isset($_GET['bar_code'])) {
+            $input = sanitize_text_field($_GET['bar_code']);
+        } elseif (isset($_GET['order_id'])) {
+            $input = sanitize_text_field($_GET['order_id']);
         }
-    }
-}
+        
+        $barcode = $input;
+
+        // If it's a numeric WooCommerce Order ID, use the saved barcode
+        if (is_numeric($input)) {
+            $order = wc_get_order($input);
+            if ($order) {
+                $saved_barcode = get_post_meta($order->get_id(), '_first_delivery_barcode', true);
+                if ($saved_barcode) {
+                    $barcode = $saved_barcode;
+                }
+            }
+        }
 
         $token = get_option(FDT_OPTION_NAME);
         $response = fdt_fetch_order_status($barcode, $token);
 
         if ($response && !$response['isError']) {
-    $data = $response['result'];
+            $data = $response['result'];
 
-    echo "<div style='margin-top:20px; padding:20px; border:1px solid #ccc; border-radius:10px; max-width:50%; background:#f9f9f9;margin: 0 auto'>";
-    echo "<h3 style='margin-top:0;'>🚚 Résultat du suivi de la commande</h3>";
-    echo "<p><strong>Barcode:</strong> " . esc_html($data['barCode']) . "</p>";
-    echo "<p><strong>Status:</strong> <span style='color:green; font-weight:bold'>" . esc_html($data['state']) . "</span></p>";
-    echo "</div>";
-}
-
+            echo "<div style='margin-top:20px; padding:20px; border:1px solid #ccc; border-radius:10px; max-width:50%; background:#f9f9f9;margin: 0 auto'>";
+            echo "<h3 style='margin-top:0;'>🚚 Résultat du suivi de la commande</h3>";
+            echo "<p><strong>Barcode:</strong> " . esc_html($data['barCode']) . "</p>";
+            echo "<p><strong>Status:</strong> <span style='color:green; font-weight:bold'>" . esc_html($data['state']) . "</span></p>";
+            echo "</div>";
+        }
     }
 
     return ob_get_clean();
@@ -149,8 +157,6 @@ add_action('woocommerce_order_details_after_order_table', function($order){
         echo "</div>";
     }
 });
-
-
 
 add_action('woocommerce_admin_order_data_after_order_details', function($order){
     $order_id = $order->get_id();
@@ -245,7 +251,6 @@ add_action('wp_ajax_fdt_save_and_fetch_tracking', function(){
     wp_send_json_success(['html' => $html]);
 });
 
-
 add_action('init', function() {
     add_rewrite_endpoint('track-order', EP_ROOT | EP_PAGES);
 });
@@ -270,9 +275,54 @@ add_filter('woocommerce_account_menu_items', function($items) {
     return $new_items;
 });
 
-
 add_action('woocommerce_account_track-order_endpoint', function() {
     echo '<h2>📦 Suivi de votre commande</h2>';
     echo do_shortcode('[first_delivery_tracker]');
 });
-?>
+
+// mailing 
+add_action('updated_post_meta', function($meta_id, $post_id, $meta_key, $meta_value){
+    // Trigger only when the barcode is updated
+    if ($meta_key === '_first_delivery_barcode') {
+        // Send custom email
+        fdt_send_tracking_email_to_customer($post_id, $meta_value);
+    }
+}, 10, 4);
+
+function fdt_send_tracking_email_to_customer($order_id, $barcode) {
+    $order = wc_get_order($order_id);
+    if (!$order || !$barcode) return;
+
+    $to = $order->get_billing_email();
+    $subject = '📦 Votre numéro de suivi est disponible – Commande #' . $order->get_order_number();
+
+    // Tracking link (using our my-account endpoint)
+    $tracking_url = site_url('/mon-compte/track-order/?bar_code=' . urlencode($barcode));
+
+    ob_start();
+    ?>
+    <p>Bonjour <?php echo esc_html($order->get_billing_first_name()); ?>,</p>
+
+    <p>Nous vous informons que votre commande <strong>#<?php echo $order->get_order_number(); ?></strong> est en cours de traitement et un numéro de suivi vient d'être ajouté.</p>
+
+    <ul>
+        <li><strong>Commande :</strong> #<?php echo $order->get_order_number(); ?></li>
+        <li><strong>Total :</strong> <?php echo $order->get_formatted_order_total(); ?></li>
+        <li><strong>Numéro de suivi :</strong> <?php echo esc_html($barcode); ?></li>
+    </ul>
+
+    <p>👉 Vous pouvez suivre votre commande ici :<br>
+    <a href="<?php echo esc_url($tracking_url); ?>"><?php echo esc_html($tracking_url); ?></a></p>
+
+    <p>Merci pour votre achat,<br>L'équipe Klarrion</p>
+    <?php
+    $message = ob_get_clean();
+
+    // WooCommerce mailer
+    $mailer = WC()->mailer();
+    $email = $mailer->wrap_message($subject, $message);
+
+    $headers = ["Content-Type: text/html; charset=UTF-8"];
+
+    wp_mail($to, $subject, $email, $headers);
+}
