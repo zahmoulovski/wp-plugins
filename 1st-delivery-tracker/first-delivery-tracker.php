@@ -313,6 +313,12 @@ function fdt_send_tracking_email_to_customer($order_id, $barcode) {
 
     <p>👉 Vous pouvez suivre votre commande ici :<br>
     <a href="<?php echo esc_url($tracking_url); ?>"><?php echo esc_html($tracking_url); ?></a></p>
+    
+    <div style="text-align: center; margin: 15px 0;">
+        <a href="https://api.whatsapp.com/send?phone=21698134873" style="display: inline-block;">
+            <img src="https://klarrion.com/signature/whatsapp-button.png" alt="Contactez-nous sur WhatsApp" style="max-width: 200px; height: auto;">
+        </a>
+    </div>
 
     <p>Merci pour votre achat,<br>L'équipe Klarrion</p>
     <?php
