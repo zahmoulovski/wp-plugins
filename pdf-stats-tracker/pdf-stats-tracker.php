@@ -18,7 +18,7 @@ class PDF_Stats_Tracker {
     const VERSION = '2.0.0';
     
     // Debug mode
-    private $debug = true;
+    private $debug = false;
     
     // Tracked folders configuration
     private $folders = array(
@@ -55,11 +55,6 @@ class PDF_Stats_Tracker {
         
         // Handle export requests
         add_action('admin_init', array($this, 'handle_export'));
-        
-        // Debug logging
-        if ($this->debug) {
-            error_log('PDF Stats Tracker v2 initialized');
-        }
     }
     
     /**
