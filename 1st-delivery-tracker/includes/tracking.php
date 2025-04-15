@@ -42,73 +42,113 @@ add_shortcode('first_delivery_tracker', function () {
         cursor: pointer;
     }
     .fdt-tracker-bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin: 30px auto;
-        max-width: 800px;
-        padding: 20px;
-        background: #f9f9f9;
-        border-radius: 10px;
-        box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    display: flex;
+    justify-content: space-between;
+    margin: 30px auto;
+    max-width: 800px;
+    padding: 20px 0;
+    position: relative;
+}
+
+.fdt-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    z-index: 2;
+    padding: 40px 30px 20px 30px;
+}
+    /* Progress line */
+.fdt-tracker-bar::before {
+    content: '';
+    position: absolute;
+    top: 25px;
+    left: 50px;
+    right: 50px;
+    height: 4px;
+    background: #ccc;
+    z-index: 1;
+}
+
+/* Progress line fill */
+.fdt-tracker-bar .progress-fill {
+    position: absolute;
+    top: 25px;
+    left: 50px;
+    height: 4px;
+    background: #28a745;
+    z-index: 2;
+    transition: width 0.3s ease;
+}
+
+/* Step circles */
+.fdt-step::before {
+    content: '';
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ccc;
+    z-index: 3;
+}
+
+.fdt-step.done::before {
+    background: #28a745;
+}
+
+.fdt-step.current::before {
+    background: #fff;
+    border: 3px solid #28a745;
+    box-sizing: border-box;
+}
+
+/* Mobile Version */
+@media screen and (max-width: 600px) {
+    .fdt-tracker-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 0 20px;
     }
+
+    .fdt-tracker-bar::before,
+    .fdt-tracker-bar .progress-fill {
+        display: none;
+    }
+
     .fdt-step {
-        flex: 1;
-        text-align: center;
-        position: relative;
+        width: 100%;
+        text-align: left;
+        padding: 0 0 30px 30px;
+        margin-bottom: 15px;
+        border-left: 2px solid #ccc;
     }
+
+    .fdt-step:last-child {
+        border-left: 0;
+        padding-bottom: 0;
+    }
+
     .fdt-step::before {
-        content: '';
-        position: absolute;
-        top: 15px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        background: #ccc;
-        z-index: 2;
-        margin-top: 5px;
+        left: -11px;
+        top: 0;
+        transform: none;
     }
+
+    .fdt-step.done {
+        border-left-color: #28a745;
+    }
+
     .fdt-step.done::before {
         background: #28a745;
-        margin-top: 5px;
     }
-    .fdt-step.red::before {
-        background: #dc3545;
-        margin-top: 5px;
+
+    .fdt-step.current {
+        border-left-color: #ccc;
     }
-    .fdt-step:not(:last-child)::after {
-        content: '';
-        position: absolute;
-        top: 24px;
-        left: 50%;
-        height: 4px;
-        width: 100%;
-        background: #ccc;
-        z-index: 1;
-        margin-top: 5px;
-    }
-    .fdt-step.done:not(:last-child)::after {
-        background: #28a745;
-        margin-top: 5px;
-    }
-    .fdt-step.red:not(:last-child)::after {
-        background: #dc3545;
-        margin-top: 5px;
-    }
-    @media screen and (max-width: 600px) {
-        .fdt-tracker-bar {
-            flex-direction: column;
-        }
-        .fdt-step {
-            margin-bottom: 15px;
-        }
-        .fdt-step::after {
-            display: absolute;
-        }
-    }
-    </style>
+}
+</style>
 
     <div class="fdt-form-container">
         <form method="post">
@@ -150,14 +190,26 @@ add_shortcode('first_delivery_tracker', function () {
             ];
 
             echo '<div class="fdt-tracker-bar">';
-            for ($i = 0; $i < 5; $i++) {
-                $class = '';
-                if ($progress == -1) $class = 'red';
-                elseif ($i < $progress) $class = 'done';
+$current_step = isset($state_map[$state]) ? $state_map[$state] : 0;
+$total_steps = count($labels);
 
-                echo "<div class='fdt-step $class'><small>{$labels[$i]}</small></div>";
-            }
-            echo '</div>';
+// Calculate progress fill width
+$progress_width = ($current_step / ($total_steps - 1)) * 100;
+echo '<div class="progress-fill" style="width: calc('.$progress_width.'% - 100px)"></div>';
+
+foreach ($labels as $index => $label) {
+    $class = '';
+    if ($current_step == -1) {
+        $class = 'red';
+    } elseif ($index < $current_step) {
+        $class = 'done';
+    } elseif ($index == $current_step) {
+        $class = 'current';
+    }
+    
+    echo "<div class='fdt-step $class'><small>$label</small></div>";
+}
+echo '</div>';
 
             // Display additional order info
             echo '<div style="max-width: 800px; margin: auto; padding: 20px;">';
