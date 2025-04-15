@@ -1,6 +1,15 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+
+// Helper function to get barcode from order ID
+function fdt_get_barcode_from_order($order_id) {
+    if (!function_exists('wc_get_order')) return false;
+    $order = wc_get_order($order_id);
+    return $order ? $order->get_meta('barcode') : false; // Change 'barcode' to your actual meta key
+}
+
+
 function fdt_fetch_order_status($barcode, $token) {
     $url = 'https://www.firstdeliverygroup.com/api/v2/filter';
     $args = [
@@ -150,17 +159,30 @@ add_shortcode('first_delivery_tracker', function () {
 }
 </style>
 
-    <div class="fdt-form-container">
+<div class="fdt-form-container">
         <form method="post">
-            <input type="text" name="fdt_barcode" placeholder="Entrez votre code-barres" required />
+            <input type="text" name="fdt_barcode" placeholder="Entrez votre code-barres ou numéro de commande" required />
             <input type="submit" value="Suivre la commande" />
         </form>
     </div>
 
     <?php
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['fdt_barcode'])) {
-        $barcode = sanitize_text_field($_POST['fdt_barcode']);
+        $search_term = sanitize_text_field($_POST['fdt_barcode']);
+        $barcode = $search_term;
         $token = get_option(FDT_OPTION_NAME);
+
+        // Check if search term is an order ID with associated barcode
+        if (is_numeric($search_term)) {
+            $order_id = absint($search_term);
+            if ('shop_order' === get_post_type($order_id)) {
+                $stored_barcode = fdt_get_barcode_from_order($order_id);
+                if ($stored_barcode) {
+                    $barcode = $stored_barcode;
+                }
+            }
+        }
+
         $response = fdt_fetch_order_status($barcode, $token);
 
         if ($response && !$response['isError']) {
@@ -172,8 +194,7 @@ add_shortcode('first_delivery_tracker', function () {
                 'En attente' => 1,
                 'Au magasin' => 2,
                 'En cours' => 3,
-                'En cours d’enlèvement' => 4,
-                'Livré' => 5,
+                'Livré' => 4,
                 'Supprimé' => -1,
                 'Retour Expéditeur' => -1,
                 'Rtn définitif' => -1,
@@ -182,11 +203,10 @@ add_shortcode('first_delivery_tracker', function () {
             $progress = isset($state_map[$state]) ? $state_map[$state] : 0;
 
             $labels = [
-                'Commande en attente',
-                'Au magasin',
-                'Traitement en cours',
-                'Enlèvement',
-                'Livrée'
+                '📦 Expédié à FIRST DELIVERY',
+                '🏪 Au dépôt / Magasin',
+                '🚚 En cours de livraison',
+                '✅Livrée '
             ];
 
             echo '<div class="fdt-tracker-bar">';
@@ -194,7 +214,7 @@ $current_step = isset($state_map[$state]) ? $state_map[$state] : 0;
 $total_steps = count($labels);
 
 // Calculate progress fill width
-$progress_width = ($current_step / ($total_steps - 1)) * 100;
+$progress_width = ($current_step / ($total_steps - 1)) * 80;
 echo '<div class="progress-fill" style="width: calc('.$progress_width.'% - 100px)"></div>';
 
 foreach ($labels as $index => $label) {
@@ -250,7 +270,7 @@ echo '</div>';
 
             echo '</div>';
         } else {
-            echo "<p style='text-align:center;color:red;'>❌ Aucune commande trouvée pour ce code-barres.</p>";
+            echo "<p style='text-align:center;color:red;'>❌ Aucune commande trouvée pour ce code-barres ou numéro de commande.</p>";
         }
     }
 
