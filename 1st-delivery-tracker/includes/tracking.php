@@ -271,7 +271,7 @@ add_shortcode('first_delivery_tracker', function() {
                 $progress = isset($state_map[$state]) ? $state_map[$state] : 0;
 
                 $labels = [
-                    '<a href="https://klarrion.com/mon-compte/voir-l-order/'.$order_id.'">🛍️ Préparation de commande</a>',
+                    '<a href="https://klarrion.com/mon-compte/ordres/">🛍️ Préparation de commande</a>',
                     '📦 Expédié à FIRST DELIVERY',
                     '🏪 Au dépôt / Magasin',
                     '🚚 En cours de livraison',

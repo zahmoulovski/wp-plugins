@@ -444,12 +444,30 @@ function add_chemical_product_warning_message( $method, $index ) {
 // Hook the function to display the message next to "Retrait en Showroom"
 add_action( 'woocommerce_after_shipping_rate', 'add_chemical_product_warning_message', 10, 2 );
 
-/*
-
-// 1. Automatically create an account for all customers on checkout
+// 1. Automatically create an account for new customers only
 function force_account_creation_on_checkout($checkout) {
-    // Set the 'create account' checkbox to true
-    $_POST['createaccount'] = 1;
+    if (!empty($_POST['billing_email']) && !email_exists($_POST['billing_email'])) {
+        // Get the billing first name
+        $billing_first_name = !empty($_POST['billing_first_name']) ? sanitize_user($_POST['billing_first_name']) : '';
+        
+        if (!empty($billing_first_name)) {
+            // Create base username from first name (lowercase and remove special chars)
+            $base_username = sanitize_user(strtolower($billing_first_name), true);
+            $username = $base_username;
+            $counter = 1;
+
+            // Keep trying until we find an available username
+            while (username_exists($username)) {
+                $username = $base_username . $counter;
+                $counter++;
+            }
+
+            // Set the username in the POST data
+            $_POST['account_username'] = $username;
+        }
+        
+        $_POST['createaccount'] = 1;
+    }
 }
 add_action('woocommerce_checkout_process', 'force_account_creation_on_checkout');
 
@@ -464,8 +482,42 @@ function hide_create_account_checkbox_css() {
 add_action('wp_head', 'hide_create_account_checkbox_css');
 
 
-*/
+/**
+ * Add custom thank you message below breadcrumb but above other thank you content
+ */
+function klarrion_custom_thank_you_after_breadcrumb($order_id) {
+    if (!$order_id) return;
+    
+    // Get the order object
+    $order = wc_get_order($order_id);
+    
+    // Custom message HTML with centered alignment
+    echo '<div style="text-align: center; margin: 20px 0 30px;">';
+    echo '<h3 style="margin-bottom: 10px;">' . __('Merci d\'avoir fait vos achats chez nous.', 'klarrion') . '</h3>';
+    echo '<h5 style="margin-bottom: 15px;">' . __('Votre commande a été reçue avec succès.', 'klarrion') . '</h5>';
+    echo '<p style="font-weight: bold; margin: 0;">Commande numéro <span style="font-size: 35px; color: #85B951;">#' . $order->get_order_number() . '</span></p>';    echo '</div>';
+}
+// Hook with priority 9 to place it right after breadcrumb (which typically uses priority 10)
+add_action('woocommerce_before_thankyou', 'klarrion_custom_thank_you_after_breadcrumb', 9);
 
+
+/**
+ * Add custom order tracking button to WooCommerce thank you page (for all order statuses)
+ */
+function klarrion_add_order_tracking_button_all_statuses($order_id) {
+    if (!$order_id) return;
+
+    // Build the tracking URL with order ID
+    $tracking_url = esc_url(add_query_arg('order_id', $order_id, 'https://klarrion.com/suivi-de-commande/'));
+    
+    // Output the button with the same style as the theme
+    echo '<div class="woocommerce-order" style="margin-bottom: 2em;">';
+    echo '<p class="woocommerce-notice woocommerce-notice--success woocommerce-thankyou-order-received">' . __('Suivez votre commande', 'klarrion') . '</p>';
+    echo '<p class="woocommerce-notice woocommerce-notice--error woocommerce-thankyou-order-failed">Votre commande a bien été reçue, un de nos agents commerciaux prendra contact avec vous pour la confirmer dans les 24 à 48 heures.</p>';
+    echo '<a href="' . $tracking_url . '" class="woocommerce-button button pay order-actions-button" style="background-color: #1D7EAA; color: white; border-radius: 10px;">' . __('Suivi de commande', 'klarrion') . '</a>';
+    echo '</div>';
+}
+add_action('woocommerce_thankyou', 'klarrion_add_order_tracking_button_all_statuses', 20);
 
 // Add total savings line in the cart totals with unique classes
 function display_cart_total_savings() {
