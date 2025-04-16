@@ -1,3 +1,148 @@
+/* Form Container Styles */
+.fdt-form-container {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.fdt-form-container input[type="text"] {
+  padding: 10px;
+  width: 300px;
+  max-width: 100%;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  margin-right: 10px;
+}
+
+.fdt-form-container input[type="submit"] {
+  padding: 10px 20px;
+  background-color: #0073aa;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+/* Tracker Bar Styles */
+.fdt-tracker-bar {
+  display: flex;
+  justify-content: space-between;
+  margin: 30px auto;
+  max-width: 800px;
+  padding: 20px 0;
+  position: relative;
+}
+
+.fdt-step {
+  flex: 1;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+  padding: 40px 30px 20px 30px;
+}
+
+/* Progress line */
+.fdt-tracker-bar::before {
+  content: '';
+  position: absolute;
+  top: 25px;
+  left: 50px;
+  right: 50px;
+  height: 4px;
+  background: #ccc;
+  z-index: 1;
+}
+
+/* Progress line fill */
+.fdt-tracker-bar .progress-fill {
+  position: absolute;
+  top: 25px;
+  left: 50px;
+  height: 4px;
+  background: #28a745;
+  z-index: 2;
+  transition: width 0.3s ease;
+}
+
+/* Step circles */
+.fdt-step::before {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ccc;
+  z-index: 3;
+}
+
+.fdt-step.done::before {
+  background: #28a745;
+}
+
+.fdt-step.current::before {
+  background: #fff;
+  border: 3px solid #28a745;
+  box-sizing: border-box;
+}
+
+.fdt-step.red::before {
+  background: #dc3545;
+}
+
+/* Error Messages */
+.fdt-error {
+  color: red;
+  margin: 10px 0;
+  text-align: center;
+}
+
+/* Mobile Version */
+@media screen and (max-width: 600px) {
+  .fdt-tracker-bar {
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 0 20px;
+  }
+
+  .fdt-tracker-bar::before,
+  .fdt-tracker-bar .progress-fill {
+      display: none;
+  }
+
+  .fdt-step {
+      width: 100%;
+      text-align: left;
+      padding: 0 0 30px 30px;
+      margin-bottom: 15px;
+      border-left: 2px solid #ccc;
+  }
+
+  .fdt-step:last-child {
+      border-left: 0;
+      padding-bottom: 0;
+  }
+
+  .fdt-step::before {
+      left: -11px;
+      top: 0;
+      transform: none;
+  }
+
+  .fdt-step.done {
+      border-left-color: #28a745;
+  }
+
+  .fdt-step.done::before {
+      background: #28a745;
+  }
+
+  .fdt-step.current {
+      border-left-color: #ccc;
+  }
+}
+
 .fdt-tracking-box {
   background: #fff;
   border: 1px solid #ddd;

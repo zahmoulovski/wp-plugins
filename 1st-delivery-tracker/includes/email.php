@@ -25,7 +25,9 @@ function fdt_send_tracking_email_to_customer($order_id, $barcode) {
 
     // Prepare email content
     $subject = '📦 Votre numéro de suivi est disponible – Commande #' . $order->get_order_number();
-    $tracking_url = site_url('/suivi-de-commande/?bar_code=' . urlencode($barcode));
+    $tracking_url = site_url('/suivi-de-commande/?barcode=' . urlencode($barcode));
+    $order_tracking_url = site_url('/suivi-de-commande/?order_id=' . $order_id);
+    
 
     // Initialize WooCommerce mailer
     $mailer = WC()->mailer();
@@ -54,8 +56,9 @@ function fdt_send_tracking_email_to_customer($order_id, $barcode) {
         <li><strong>Total :</strong> <?php echo $order->get_formatted_order_total(); ?></li>
         <li><strong>Numéro de suivi :</strong> <?php echo esc_html($barcode); ?></li>
     </ul>
-    <p>👉 Vous pouvez traquer votre commande ici :<br>
-    <a href="<?php echo esc_url($tracking_url); ?>"><?php echo esc_html($tracking_url); ?></a></p>
+    <p>👉 Vous pouvez traquer votre commande avec :<br>
+    • Votre numéro de commande : <a href="<?php echo esc_url($order_tracking_url); ?>"><?php echo esc_html($order_tracking_url); ?></a><br>
+    • Votre code-barres : <a href="<?php echo esc_url($tracking_url); ?>"><?php echo esc_html($tracking_url); ?></a></p>
     <div style="text-align: center; margin: 15px 0;">
         <a href="https://api.whatsapp.com/send?phone=<?php echo esc_attr($whatsapp_number); ?>" style="display: inline-block;">
             <img src="<?php echo esc_url(FDT_PLUGIN_URL . 'assets/whatsapp-button.png'); ?>" alt="Contactez-nous sur WhatsApp" style="max-width: 200px; height: auto;">
