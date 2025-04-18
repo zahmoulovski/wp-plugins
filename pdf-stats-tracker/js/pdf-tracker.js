@@ -17,21 +17,19 @@
      * Track PDF links on the page
      */
     function trackPdfLinks() {
-        console.log('Searching for PDF links...');
-        
+
         // Get all links on the page
         $('a').each(function() {
             var href = $(this).attr('href');
             
             // Additional check for PDFs with relative URLs
             if (href && href.toLowerCase().endsWith('.pdf')) {
-                console.log('Found PDF link:', href);
+                
                 
                 // For relative URLs, try to determine if they're in our tracked folders
                 if (href.startsWith('/')) {
                     // This is a relative URL, check if it contains our folders
                     if (href.indexOf('/catalogue/') !== -1 || href.indexOf('/fichtech/') !== -1) {
-                        console.log('Found relative PDF in tracked folder:', href);
                         if (!$(this).hasClass('pdf-tracked')) {
                             addTracking($(this));
                         }
@@ -49,7 +47,6 @@
             }
         });
         
-        console.log('PDF link search complete');
     }
     
     /**
@@ -97,24 +94,20 @@
         }
         
         // Log for debugging
-        console.log('PDF link found:', url);
-        
+
         // More flexible check for folder paths
         if (url.indexOf('/catalogue/') !== -1 || url.indexOf('/fichtech/') !== -1) {
-            console.log('Tracking PDF using relative path:', url);
             return true;
         }
         
         // Check if it's in one of our tracked folders 
         for (var i = 0; i < pdfStatsTracker.folders.length; i++) {
             if (url.indexOf(pdfStatsTracker.folders[i]) !== -1) {
-                console.log('Tracking PDF using folder path:', url);
                 return true;
             }
         }
         
         // Not in tracked folders
-        console.log('PDF not in tracked folders:', url);
         return false;
     }
     
@@ -123,10 +116,7 @@
      */
     function addTracking(linkElement) {
         var href = linkElement.attr('href');
-        
-        // Log tracking added
-        console.log('Adding tracking to PDF link:', href);
-        
+
         // Mark as tracked
         linkElement.addClass('pdf-tracked');
         
@@ -154,8 +144,7 @@
                 return true;
             }
             
-            console.log('Download click tracked for:', href);
-            
+
             // Allow normal link behavior
             return true;
         });
@@ -171,13 +160,11 @@
             return;
         }
         
-        console.log('Sending tracking request - URL:', url, 'Action:', action);
-        
+
         // Make sure we have full URL for tracking
         if (url.startsWith('/')) {
             // This is a relative URL, convert to absolute
             url = window.location.protocol + '//' + window.location.host + url;
-            console.log('Converted to absolute URL:', url);
         }
         
         // Send AJAX request to track action
@@ -191,9 +178,7 @@
             },
             success: function(response) {
                 // Action tracked successfully
-                console.log('PDF ' + action + ' tracked successfully:', url);
-                console.log('Server response:', response);
-                
+
                 // Extra check for potential errors
                 if (response.success === false) {
                     console.error('Server reported error:', response.data ? response.data.message : 'Unknown error');

@@ -10,15 +10,11 @@
         trackedFolders: ['catalogue', 'fichtech'],
         ajaxUrl: pdfStatsTracker.ajax_url,
         nonce: pdfStatsTracker.nonce,
-        debug: true // Set to true to enable detailed console logging
     };
     
     // Initialize tracking on page load
     $(document).ready(function() {
-        if (config.debug) {
-            console.log('PDF Stats Tracker initializing...');
-            console.log('Tracked folders:', config.trackedFolders);
-        }
+        
         
         // Directly target PDF links in our tracked folders
         initPdfTracking();
@@ -39,13 +35,13 @@
             // Check if it's a PDF
             if (isPdfFile(href)) {
                 if (config.debug) {
-                    console.log('Found PDF link:', href);
+                    
                 }
                 
                 // Check if it's in a tracked folder
                 if (isInTrackedFolder(href)) {
                     if (config.debug) {
-                        console.log('Adding tracking to:', href);
+                        
                     }
                     
                     // Only add tracking if not already tracked
@@ -55,10 +51,6 @@
                 }
             }
         });
-        
-        if (config.debug) {
-            console.log('PDF tracking initialization complete');
-        }
     }
     
     /**
@@ -79,7 +71,6 @@
             // Check for folder name in URL path
             if (url.indexOf('/' + folder + '/') !== -1) {
                 if (config.debug) {
-                    console.log('PDF in tracked folder (' + folder + '):', url);
                 }
                 return true;
             }
@@ -89,9 +80,6 @@
         if (pdfStatsTracker.folders) {
             for (var j = 0; j < pdfStatsTracker.folders.length; j++) {
                 if (url.indexOf(pdfStatsTracker.folders[j]) !== -1) {
-                    if (config.debug) {
-                        console.log('PDF in tracked folder URL:', url);
-                    }
                     return true;
                 }
             }
@@ -137,9 +125,7 @@
      * Send tracking event to the server
      */
     function sendTrackingEvent(url, eventType) {
-        if (config.debug) {
-            console.log('Sending ' + eventType + ' event for:', url);
-        }
+        
         
         // Ensure URL is absolute
         if (url.startsWith('/')) {
@@ -155,7 +141,7 @@
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
                     if (config.debug) {
-                        console.log('Tracking successful (' + eventType + '):', url);
+                        
                         try {
                             var response = JSON.parse(xhr.responseText);
                             console.log('Server response:', response);
@@ -184,9 +170,6 @@
         var pdfUrl = window.location.href;
         
         if (isInTrackedFolder(pdfUrl)) {
-            if (config.debug) {
-                console.log('Direct PDF access detected:', pdfUrl);
-            }
             
             // Track both view and download for direct access
             sendTrackingEvent(pdfUrl, 'view');

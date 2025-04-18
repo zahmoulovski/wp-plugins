@@ -3,7 +3,7 @@
  * Plugin Name: PDF Stats Tracker
  * Description: Track PDF views and downloads from specific folders (enhanced version)
  * Version: 2.0
- * Author: Your Name
+ * Author: Med Yassine Zahmoul
  * Text Domain: pdf-stats-tracker
  */
 
@@ -191,7 +191,7 @@ class PDF_Stats_Tracker {
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 if (typeof jQuery !== 'undefined') {
-                    console.log('PDF Stats Tracker: Initializing...');
+                    
                     
                     // Scan page for any PDF links that weren't caught by our scripts
                     var allLinks = document.getElementsByTagName('a');
@@ -200,7 +200,7 @@ class PDF_Stats_Tracker {
                         var href = link.getAttribute('href');
                         
                         if (href && href.toLowerCase().endsWith('.pdf')) {
-                            console.log('Found PDF link via HTML scan:', href);
+                            
                             
                             // Check if in tracked folders
                             if (href.indexOf('/catalogue/') !== -1 || 
@@ -208,7 +208,7 @@ class PDF_Stats_Tracker {
                                 
                                 // Only track if not already tracked
                                 if (!link.classList.contains('pdf-tracked')) {
-                                    console.log('Adding tracking to previously missed link:', href);
+                                    
                                     
                                     // Add tracking manually
                                     link.classList.add('pdf-tracked');
@@ -216,7 +216,7 @@ class PDF_Stats_Tracker {
                                     // Track view on hover
                                     link.addEventListener('mouseenter', function(event) {
                                         var url = this.getAttribute('href');
-                                        console.log('View tracked for direct link:', url);
+                                        
                                         
                                         // Manual AJAX call to track view
                                         var xhr = new XMLHttpRequest();
@@ -228,7 +228,7 @@ class PDF_Stats_Tracker {
                                     // Track download on click
                                     link.addEventListener('click', function(event) {
                                         var url = this.getAttribute('href');
-                                        console.log('Download tracked for direct link:', url);
+                                        
                                         
                                         // Manual AJAX call to track download
                                         var xhr = new XMLHttpRequest();

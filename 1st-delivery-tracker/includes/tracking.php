@@ -20,6 +20,22 @@ function fdt_get_barcode_from_order($order_id) {
     return $barcode;
 }
 
+function fdt_get_order_from_barcode($barcode) {
+    global $wpdb;
+    
+    $query = $wpdb->prepare(
+        "SELECT order_id 
+        FROM {$wpdb->prefix}wc_orders_meta 
+        WHERE meta_value = %s 
+        AND meta_key = '_first_delivery_barcode'",
+        $barcode
+    );
+    
+    return $wpdb->get_var($query);
+}
+
+
+
 // Update the API fetch function with debugging
 function fdt_fetch_order_status($barcode, $token) {
     $url = 'https://www.firstdeliverygroup.com/api/v2/filter';
@@ -72,152 +88,13 @@ add_shortcode('first_delivery_tracker', function() {
     }
     ?>
 
-    <style>
-    .fdt-form-container {
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    .fdt-form-container input[type="text"] {
-        padding: 10px;
-        width: 300px;
-        max-width: 100%;
-        border-radius: 5px;
-        border: 1px solid #ccc;
-        margin-right: 10px;
-    }
-    .fdt-form-container input[type="submit"] {
-        padding: 10px 20px;
-        background-color: #0073aa;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-    .fdt-tracker-bar {
-    display: flex;
-    justify-content: space-between;
-    margin: 30px auto;
-    max-width: 800px;
-    padding: 20px 0;
-    position: relative;
-}
-
-.fdt-step {
-    flex: 1;
-    text-align: center;
-    position: relative;
-    z-index: 2;
-    padding: 40px 30px 20px 30px;
-}
-    /* Progress line */
-.fdt-tracker-bar::before {
-    content: '';
-    position: absolute;
-    top: 25px;
-    left: 50px;
-    right: 50px;
-    height: 4px;
-    background: #ccc;
-    z-index: 1;
-}
-
-/* Progress line fill */
-.fdt-tracker-bar .progress-fill {
-    position: absolute;
-    top: 25px;
-    left: 50px;
-    height: 4px;
-    background: #28a745;
-    z-index: 2;
-    transition: width 0.3s ease;
-}
-
-/* Step circles */
-.fdt-step::before {
-    content: '';
-    position: absolute;
-    top: 15px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #ccc;
-    z-index: 3;
-}
-
-.fdt-step.done::before {
-    background: #28a745;
-}
-
-.fdt-step.current::before {
-    background: #fff;
-    border: 3px solid #28a745;
-    box-sizing: border-box;
-}
-
-/* Mobile Version */
-@media screen and (max-width: 600px) {
-    .fdt-tracker-bar {
-        flex-direction: column;
-        align-items: flex-start;
-        padding: 0 20px;
-    }
-
-    .fdt-tracker-bar::before,
-    .fdt-tracker-bar .progress-fill {
-        display: none;
-    }
-
-    .fdt-step {
-        width: 100%;
-        text-align: left;
-        padding: 0 0 30px 30px;
-        margin-bottom: 15px;
-        border-left: 2px solid #ccc;
-    }
-
-    .fdt-step:last-child {
-        border-left: 0;
-        padding-bottom: 0;
-    }
-
-    .fdt-step::before {
-        left: -11px;
-        top: 0;
-        transform: none;
-    }
-
-    .fdt-step.done {
-        border-left-color: #28a745;
-    }
-
-    .fdt-step.done::before {
-        background: #28a745;
-    }
-
-    .fdt-step.current {
-        border-left-color: #ccc;
-    }
-    /* Add these styles to your existing CSS */
-    .fdt-form-container .search-type {
-        margin-bottom: 15px;
-    }
-    .fdt-form-container .search-type label {
-        margin-right: 15px;
-        cursor: pointer;
-    }
-    .fdt-error {
-        color: red;
-        margin: 10px 0;
-        text-align: center;
-    }
-}
-</style>
+    
 
 <div class="fdt-form-container">
-        <form method="post">
-            <input type="text" name="fdt_barcode" id="fdt_search_input" 
+        <form method="get" action="<?php echo get_permalink(); ?>">
+            <input type="text" name="search" 
+                   id="fdt_search_input" 
+                   value="<?php echo esc_attr($search_term); ?>"
                    placeholder="Entrez votre numéro de commande ou code-barres" required />
             <input type="submit" value="Suivre la commande" />
         </form>
@@ -225,13 +102,20 @@ add_shortcode('first_delivery_tracker', function() {
 
     <script>
     jQuery(document).ready(function($) {
-        $('input[name="search_type"]').on('change', function() {
-            var type = $(this).val();
-            var placeholder = type === 'order' 
-                ? 'Entrez votre numéro de commande' 
-                : 'Entrez votre code-barres';
-            $('#fdt_search_input').attr('placeholder', placeholder);
-            $('#search_type_input').val(type);
+        $('form').on('submit', function(e) {
+            var input = $('#fdt_search_input');
+            var value = input.val().replace(/\D/g, ''); // Remove non-digits
+            var digits = value.length;
+            
+            // Change input name based on number of digits
+            if (digits >= 5 && digits <= 6) {
+                input.attr('name', 'order_id');
+            } else if (digits >= 10) {
+                input.attr('name', 'barcode');
+            } else {
+                e.preventDefault();
+                alert('Veuillez entrer un numéro de commande valide (5-6 chiffres) ou un code-barres (10 chiffres ou plus)');
+            }
         });
     });
     </script>
@@ -239,111 +123,178 @@ add_shortcode('first_delivery_tracker', function() {
 <?php
     if (!empty($search_term)) {
         $barcode = $search_term;
+        $is_order_id = strlen(preg_replace('/\D/', '', $search_term)) >= 5 && strlen(preg_replace('/\D/', '', $search_term)) <= 6;
         
-        // Automatically check if it's an order ID (numeric) and try to get barcode
-        if (is_numeric($search_term)) {
+        // Automatically check if it's an order ID based on length
+        if ($is_order_id) {
             $order_id = absint($search_term);
             $stored_barcode = fdt_get_barcode_from_order($order_id);
             if ($stored_barcode) {
                 $barcode = $stored_barcode;
                 error_log('Found and using stored barcode: ' . $barcode);
+            } else {
+                echo "<p style='text-align:center;color:#dc3545;'>❌ Cette commande n'a pas de code-barres <strong>FIRST DELIVERY</strong> ou a été envoyée avec une autre société de livraison. Veuillez nous contacter via WHATSAPP pour plus d'informations</p>";
+                // Add WhatsApp button
+                $whatsapp_number = get_option(FDT_WHATSAPP_NUMBER, '21698134873');
+                echo '<div style="text-align: center; margin: 15px 0;">
+                    <a href="https://api.whatsapp.com/send?phone=' . esc_attr($whatsapp_number) . '" style="display: inline-block;">
+                        <img src="' . esc_url(FDT_PLUGIN_URL . 'assets/whatsapp-button.png') . '" alt="Contactez-nous sur WhatsApp" style="max-width: 200px; height: auto;">
+                    </a>
+                </div>';
+                return ob_get_clean();
             }
+        }
+
+        // Check if we need to redirect to update URL
+        if (empty($_GET['order_id']) && empty($_GET['barcode'])) {
+            $current_url = add_query_arg(
+                is_numeric($search_term) ? 'order_id' : 'barcode',
+                urlencode($search_term),
+                get_permalink()
+            );
+            wp_redirect($current_url);
+            exit;
         }
     
         $response = fdt_fetch_order_status($barcode, $token);
+        
+        // Debug response
+        error_log('Full API Response: ' . print_r($response, true));
     
-            if ($response && !$response['isError']) {
-                $item = $response['result']['Items'][0];
+        if ($response && isset($response['result']['Items']) && !empty($response['result']['Items'])) {
+            $item = $response['result']['Items'][0];
+            
+            // Debug item data
+            error_log('Item data: ' . print_r($item, true));
+
+            // Get state and determine progress
+            $state = $item['state'];
+            $state_map = [
+                'Préparation de commande' => ['step' => 1, 'color' => '#28a745'],
+                'En attente' => ['step' => 2, 'color' => '#fbbc34'],
+                'A vérifier' => ['step' => 2, 'color' => '#fbbc34'],
+                'Au magasin' => ['step' => 3, 'color' => '#87ceeb'],
+                'En cours' => ['step' => 4, 'color' => '#0073aa'],
+                'Rtn dépôt' => ['step' => 4, 'color' => '#0073aa'],
+                'Livré' => ['step' => 5, 'color' => '#28a745'],
+                // Error states
+                'Retour Expéditeur' => ['step' => 5, 'color' => '#dc3545'],
+                'Rtn client/agence' => ['step' => 5, 'color' => '#dc3545'],
+                'Retour reçu' => ['step' => 5, 'color' => '#dc3545'],
+                'Rtn définitif' => ['step' => 5, 'color' => '#dc3545'],
+                'Echange' => ['step' => 5, 'color' => '#dc3545'],
+                'Supprimé' => ['step' => 5, 'color' => '#dc3545'],
+                'Demande d\'enlèvement' => ['step' => 5, 'color' => '#dc3545'],
+                'Demande d\'enlèvement assignée' => ['step' => 5, 'color' => '#dc3545'],
+                'En cours d\'enlèvement' => ['step' => 5, 'color' => '#dc3545'],
+                'Enlevé' => ['step' => 5, 'color' => '#dc3545'],
+                'Demande d\'enlèvement annulé' => ['step' => 5, 'color' => '#dc3545'],
+                'Retour assigné' => ['step' => 5, 'color' => '#dc3545'],
+                'Retour en cours d\'expédition' => ['step' => 5, 'color' => '#dc3545'],
+                'Retour enlevé' => ['step' => 5, 'color' => '#dc3545'],
+                'Retour Annulé' => ['step' => 5, 'color' => '#dc3545']
+            ];
     
-                // Get state and determine progress
-                $state = $item['state'];
-                $state_map = [
-                    'Préparation de commande' => 1,
-                    'En attente' => 2,
-                    'Au magasin' => 3,
-                    'En cours' => 4,
-                    'Livré' => 5,
-                    'Supprimé' => -1,
-                    'Retour Expéditeur' => -1,
-                    'Rtn définitif' => -1,
-                ];
-
-                $progress = isset($state_map[$state]) ? $state_map[$state] : 0;
-
-                $labels = [
-                    '<a href="https://klarrion.com/mon-compte/ordres/">🛍️ Préparation de commande</a>',
-                    '📦 Expédié à FIRST DELIVERY',
-                    '🏪 Au dépôt / Magasin',
-                    '🚚 En cours de livraison',
-                    '✅ Livrée'
-                ];
+            // Debug the state mapping
+            error_log('State mapping: ' . print_r(isset($state_map[$state]) ? $state_map[$state] : 'State not found', true));
     
-                echo '<div class="fdt-tracker-bar">';
-$current_step = isset($state_map[$state]) ? $state_map[$state] : 0;
-$total_steps = count($labels);
-
-// Calculate progress fill width
-$progress_width = ($current_step / ($total_steps - 1)) * 80;
-echo '<div class="progress-fill" style="width: calc('.$progress_width.'% - 100px)"></div>';
-
-foreach ($labels as $index => $label) {
-    $class = '';
-    if ($current_step == -1) {
-        $class = 'red';
-    } elseif ($index < $current_step) {
-        $class = 'done';
-    } elseif ($index == $current_step) {
-        $class = 'current';
-    }
+            $current_step = isset($state_map[$state]) ? $state_map[$state]['step'] : 1;
+            $current_color = isset($state_map[$state]) ? $state_map[$state]['color'] : '#ccc';
     
-    echo "<div class='fdt-step $class'><small>$label</small></div>";
-}
-echo '</div>';
-
-                // Display additional order info
-                echo '<div style="max-width: 800px; margin: auto; padding: 20px;">';
-                $fields = [
-                    'Client' => [
-                        'Nom' => $item['Client']['name'],
-                        'Adresse' => $item['Client']['address'],
-                        'Ville' => $item['Client']['city'],
-                        'Gouvernorat' => $item['Client']['state'],
-                        'Téléphone' => $item['Client']['telephone'],
-                    ],
-                    'Produit' => [
-                        'Désignation' => $item['Product']['designation'],
-                        'Prix' => $item['Product']['price'] . ' TND',
-                        'Colis' => $item['Product']['itemNumber'],
-                    ],
-                    'Dates' => [
-                        'Créée le' => format_fdt_datetime($item['createdAt']),
-                        'Ramassée le' => format_fdt_datetime($item['pickupAt']),
-                        'Livrée le' => format_fdt_datetime($item['deliveredAt']),
-                    ],
-                    'État actuel' => $item['state'],
-                ];
+            $labels = [
+                '<a href="https://klarrion.com/mon-compte/ordres/">🛍️ Préparation de commande</a>',
+                '📦 Expédié à FIRST DELIVERY',
+                '🏪 Au dèpôt FIRST DELIVERY',
+                '🚚 En cours de livraison',
+                // Dynamic last step based on state
+                (strpos($state, 'Retour') !== false || strpos($state, 'Rtn') !== false || $state === 'Echange' || $state === 'Supprimé' || strpos($state, 'enlèvement') !== false) 
+                    ? '<span style="color: ' . $current_color . ';">❌ ' . $state . '</span>' 
+                    : '✅ Livré'
+            ];
     
-                foreach ($fields as $title => $data) {
-                    if (is_array($data)) {
-                        echo "<h4>$title</h4><div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;'>";
-                        foreach ($data as $key => $val) {
-                            if ($val !== '') {
-                                echo "<div><strong>$key:</strong> $val</div>";
-                            }
+            echo '<div class="fdt-tracker-bar">';
+            
+            // Calculate progress fill width
+            $progress_width = ($current_step / (count($labels) - 1)) * 80;
+            echo '<div class="progress-fill" style="width: calc('.$progress_width.'% - 100px); background-color: '.$current_color.';"></div>';
+    
+            foreach ($labels as $index => $label) {
+                $class = '';
+                $style = '';
+                
+                if ($index < $current_step) {
+                    $class = 'done';
+                    $style = 'color: '.$current_color.';';
+                } elseif ($index == $current_step - 1) { // Adjusted to match current step
+                    $class = 'current';
+                    $style = 'color: '.$current_color.';';
+                }
+                
+                echo "<div class='fdt-step $class' style='$style'><small>$label</small></div>";
+            }
+            echo '</div>';
+    
+            // Display order info only if we have data
+            if (!empty($item['Client']) && !empty($item['Product'])) {
+
+                // Display order info
+            echo '<div style="max-width: 800px; margin: auto; padding: 20px;">';
+
+            $display_order_id = isset($_GET['order_id']) ? $_GET['order_id'] : '';
+            if (empty($display_order_id) && isset($barcode)) {
+                $display_order_id = fdt_get_order_from_barcode($barcode);
+            }
+
+            $fields = [
+                'Commande' => [
+                    'État actuel' => '<span style="color: ' . $current_color . ';">' . $state . '</span>',
+                    'Numero de Commande' => (!empty($display_order_id) ? '<a href="https://klarrion.com/mon-compte/ordres/" style="color: ' . $current_color . ';">#' . $display_order_id . '</a>' : ''),
+                    'Code-barres' => $item['barCode']
+                ],
+                'Client' => [
+                    'Nom' => isset($item['Client']['name']) ? $item['Client']['name'] : '',
+                    'Adresse' => isset($item['Client']['address']) ? $item['Client']['address'] : '',
+                    'Ville' => isset($item['Client']['city']) ? $item['Client']['city'] : '',
+                    'Gouvernorat' => isset($item['Client']['state']) ? $item['Client']['state'] : '',
+                    'Téléphone' => isset($item['Client']['telephone']) ? $item['Client']['telephone'] : '',
+                ],
+                'Produit' => [
+                    'Désignation' => isset($item['Product']['designation']) ? $item['Product']['designation'] : '',
+                    'Prix' => isset($item['Product']['price']) ? $item['Product']['price'] . ' TND' : '',
+                    'Colis' => isset($item['Product']['itemNumber']) ? $item['Product']['itemNumber'] : '',
+                ],
+                'Dates' => [
+                    'Créée le' => format_fdt_datetime($item['createdAt']),
+                    'Ramassée le' => format_fdt_datetime($item['pickupAt']),
+                    'Livrée le' => format_fdt_datetime($item['deliveredAt']),
+                ],
+                
+            ];
+
+            // Display fields
+            foreach ($fields as $title => $data) {
+                if (is_array($data)) {
+                    echo "<h4>$title</h4><div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;'>";
+                    foreach ($data as $key => $val) {
+                        if ($val !== '') {
+                            echo "<div><strong>$key:</strong> $val</div>";
                         }
-                        echo "</div>";
-                    } else {
+                    }
+                    echo "</div>";
+                } else {
+                    if ($data !== '') {
                         echo "<p><strong>$title:</strong> $data</p>";
                     }
                 }
-    
-                echo '</div>';
-            } else {
-                echo "<p style='text-align:center;color:red;'>❌ Aucune commande trouvée pour ce code-barres ou numéro de commande.</p>";
             }
+            echo '</div>';
+        } else {
+            echo "<p style='text-align:center;color:red;'>❌ Aucune commande trouvée pour ce code-barres ou numéro de commande.</p>";
+        }
         }
     
         return ob_get_clean();
+    }
 });
 
 // Date format helper
@@ -353,6 +304,6 @@ function format_fdt_datetime($datetime) {
     return $dt->format('H:i d/m/Y');
 }
 function fdt_enqueue_styles() {
-    wp_enqueue_style('fdt-tracking-styles', plugins_url('includes/fdt-tracking.css', __FILE__));
+    wp_enqueue_style('fdt-tracking-styles', plugins_url('fdt-tracking.css', __FILE__));
 }
 add_action('wp_enqueue_scripts', 'fdt_enqueue_styles');
