@@ -4,7 +4,6 @@ if (!defined('ABSPATH')) exit;
 function fdt_get_barcode_from_order($order_id) {
     global $wpdb;
     
-    // Debug the SQL query
     $query = $wpdb->prepare(
         "SELECT meta_value 
         FROM {$wpdb->prefix}wc_orders_meta 
@@ -12,12 +11,8 @@ function fdt_get_barcode_from_order($order_id) {
         AND meta_key = '_first_delivery_barcode'",
         $order_id
     );
-    error_log('SQL Query: ' . $query);
     
-    $barcode = $wpdb->get_var($query);
-    error_log('Found barcode: ' . ($barcode ? $barcode : 'none'));
-    
-    return $barcode;
+    return $wpdb->get_var($query);
 }
 
 function fdt_get_order_from_barcode($barcode) {

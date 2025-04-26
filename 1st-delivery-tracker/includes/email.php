@@ -2,6 +2,13 @@
 if (!defined('ABSPATH')) exit;
 
 function fdt_send_tracking_email_to_customer($order_id, $barcode) {
+    // Check if email was already sent for this order
+    $email_sent = get_post_meta($order_id, '_fdt_tracking_email_sent', true);
+    if ($email_sent) {
+        error_log("[FDT] Tracking email already sent for order #{$order_id}");
+        return false;
+    }
+
     // Debug log
     error_log("[FDT] Attempting to send tracking email for order #{$order_id} with barcode {$barcode}");
     
@@ -31,7 +38,7 @@ function fdt_send_tracking_email_to_customer($order_id, $barcode) {
 
     // Initialize WooCommerce mailer
     $mailer = WC()->mailer();
-    
+      
     // Get WooCommerce email template path
     $template_path = WC()->template_path();
     
@@ -57,8 +64,7 @@ function fdt_send_tracking_email_to_customer($order_id, $barcode) {
         <li><strong>Numéro de suivi :</strong> <?php echo esc_html($barcode); ?></li>
     </ul>
     <p>👉 Vous pouvez traquer votre commande avec :<br>
-    • Votre numéro de commande : <a href="<?php echo esc_url($order_tracking_url); ?>"><?php echo esc_html($order_tracking_url); ?></a><br>
-    • Votre code-barres : <a href="<?php echo esc_url($tracking_url); ?>"><?php echo esc_html($tracking_url); ?></a></p>
+    • Votre numéro de commande : <a href="<?php echo esc_url($order_tracking_url); ?>"><?php echo esc_html($order_tracking_url); ?></a>
     <div style="text-align: center; margin: 15px 0;">
         <a href="https://api.whatsapp.com/send?phone=<?php echo esc_attr($whatsapp_number); ?>" style="display: inline-block;">
             <img src="<?php echo esc_url(FDT_PLUGIN_URL . 'assets/whatsapp-button.png'); ?>" alt="Contactez-nous sur WhatsApp" style="max-width: 200px; height: auto;">
@@ -96,6 +102,8 @@ function fdt_send_tracking_email_to_customer($order_id, $barcode) {
         $sent = wp_mail($to, $subject, $message, $headers);
         
         if ($sent) {
+            // Mark email as sent
+            update_post_meta($order_id, '_fdt_tracking_email_sent', true);
             error_log("[FDT] Email successfully sent for order #{$order_id}");
             return true;
         } else {
