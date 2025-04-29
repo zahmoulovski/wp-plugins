@@ -257,6 +257,18 @@ add_shortcode('first_delivery_tracker', function() {
                 $display_order_id = fdt_get_order_from_barcode($barcode);
             }
 
+            // Get payment method from order if we have order ID
+            $payment_method = 'Paiement à la livraison';
+            if (!empty($display_order_id)) {
+                $order = wc_get_order($display_order_id);
+                if ($order) {
+                    $payment_method_title = $order->get_payment_method_title();
+                    if (!empty($payment_method_title)) {
+                        $payment_method = $payment_method_title;
+                    }
+                }
+            }
+
             $fields = [
                 'Commande' => [
                     'État actuel' => '<span style="color: ' . $current_color . ';">' . $state . '</span>',
@@ -272,7 +284,8 @@ add_shortcode('first_delivery_tracker', function() {
                 ],
                 'Produit' => [
                     'Désignation' => isset($item['Product']['designation']) ? $item['Product']['designation'] : '',
-                    'Prix' => isset($item['Product']['price']) ? $item['Product']['price'] . ' TND' : '',
+                    'Prix' => isset($item['Product']['price']) ? '<span style="color: #339966; font-size: 22px;"><strong>' . $item['Product']['price'] . ' TND</strong></span>' : '',
+                    'Mode de paiement' => $payment_method,
                     'Colis' => isset($item['Product']['itemNumber']) ? $item['Product']['itemNumber'] : '',
                 ],
                 'Dates' => [
