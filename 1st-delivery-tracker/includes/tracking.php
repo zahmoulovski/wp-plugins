@@ -6,27 +6,44 @@ function fdt_get_barcode_from_order($order_id) {
     
     $query = $wpdb->prepare(
         "SELECT meta_value 
+        FROM {$wpdb->prefix}postmeta 
+        WHERE post_id = %d 
+        AND meta_key = '_first_delivery_barcode'
+        UNION
+        SELECT meta_value 
         FROM {$wpdb->prefix}wc_orders_meta 
         WHERE order_id = %d 
         AND meta_key = '_first_delivery_barcode'",
+        $order_id,
         $order_id
     );
     
-    return $wpdb->get_var($query);
+    $result = $wpdb->get_var($query);
+    error_log("Barcode found for order {$order_id}: " . ($result ? $result : 'none'));
+    return $result;
 }
 
 function fdt_get_order_from_barcode($barcode) {
     global $wpdb;
     
     $query = $wpdb->prepare(
-        "SELECT order_id 
+        "SELECT post_id as order_id 
+        FROM {$wpdb->prefix}postmeta 
+        WHERE LOWER(meta_value) = LOWER(%s)
+        AND meta_key = '_first_delivery_barcode'
+        UNION
+        SELECT order_id 
         FROM {$wpdb->prefix}wc_orders_meta 
-        WHERE meta_value = %s 
-        AND meta_key = '_first_delivery_barcode'",
+        WHERE LOWER(meta_value) = LOWER(%s)
+        AND meta_key = '_first_delivery_barcode'
+        LIMIT 1",
+        $barcode,
         $barcode
     );
     
-    return $wpdb->get_var($query);
+    $result = $wpdb->get_var($query);
+    error_log("Order found for barcode {$barcode}: " . ($result ? $result : 'none'));
+    return $result;
 }
 
 
@@ -240,6 +257,18 @@ add_shortcode('first_delivery_tracker', function() {
                 $display_order_id = fdt_get_order_from_barcode($barcode);
             }
 
+            // Get payment method from order if we have order ID
+            $payment_method = 'Paiement à la livraison';
+            if (!empty($display_order_id)) {
+                $order = wc_get_order($display_order_id);
+                if ($order) {
+                    $payment_method_title = $order->get_payment_method_title();
+                    if (!empty($payment_method_title)) {
+                        $payment_method = $payment_method_title;
+                    }
+                }
+            }
+
             $fields = [
                 'Commande' => [
                     'État actuel' => '<span style="color: ' . $current_color . ';">' . $state . '</span>',
@@ -255,7 +284,8 @@ add_shortcode('first_delivery_tracker', function() {
                 ],
                 'Produit' => [
                     'Désignation' => isset($item['Product']['designation']) ? $item['Product']['designation'] : '',
-                    'Prix' => isset($item['Product']['price']) ? $item['Product']['price'] . ' TND' : '',
+                    'Prix' => isset($item['Product']['price']) ? '<span style="color: #339966; font-size: 22px;"><strong>' . $item['Product']['price'] . ' TND</strong></span>' : '',
+                    'Mode de paiement' => $payment_method,
                     'Colis' => isset($item['Product']['itemNumber']) ? $item['Product']['itemNumber'] : '',
                 ],
                 'Dates' => [
