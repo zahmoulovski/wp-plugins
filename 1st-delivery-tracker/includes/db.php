@@ -42,20 +42,6 @@ add_filter('manage_edit-shop_order_columns', function($columns) {
     return $new_columns;
 }, 20);
 
-// Display barcode in orders list
-add_action('manage_shop_order_posts_custom_column', function($column) {
-    global $post;
-    if ($column === 'fdt_barcode') {
-        $barcode = get_post_meta($post->ID, '_first_delivery_barcode', true);
-        echo $barcode ? esc_html($barcode) : '—';
-    }
-}, 10, 2);
-
-// Make barcode column sortable
-add_filter('manage_edit-shop_order_sortable_columns', function($columns) {
-    $columns['fdt_barcode'] = '_first_delivery_barcode';
-    return $columns;
-});
 
 // Handle barcode deletion
 add_action('wp_ajax_fdt_delete_barcode', function() {

@@ -258,13 +258,15 @@ add_shortcode('first_delivery_tracker', function() {
             }
 
             // Get payment method from order if we have order ID
-            $payment_method = 'Paiement à la livraison';
+            $payment_method = '';
             if (!empty($display_order_id)) {
                 $order = wc_get_order($display_order_id);
                 if ($order) {
                     $payment_method_title = $order->get_payment_method_title();
                     if (!empty($payment_method_title)) {
                         $payment_method = $payment_method_title;
+                    } else {
+                        $payment_method = 'Paiement à la livraison';
                     }
                 }
             }
@@ -282,12 +284,12 @@ add_shortcode('first_delivery_tracker', function() {
                     'Gouvernorat' => isset($item['Client']['state']) ? $item['Client']['state'] : '',
                     'Téléphone' => isset($item['Client']['telephone']) ? $item['Client']['telephone'] : '',
                 ],
-                'Produit' => [
+                'Produit' => array_filter([
                     'Désignation' => isset($item['Product']['designation']) ? $item['Product']['designation'] : '',
                     'Prix' => isset($item['Product']['price']) ? '<span style="color: #339966; font-size: 22px;"><strong>' . $item['Product']['price'] . ' TND</strong></span>' : '',
-                    'Mode de paiement' => $payment_method,
+                    'Mode de paiement' => $payment_method, // Will be filtered out if empty
                     'Colis' => isset($item['Product']['itemNumber']) ? $item['Product']['itemNumber'] : '',
-                ],
+                ]),
                 'Dates' => [
                     'Créée le' => format_fdt_datetime($item['createdAt']),
                     'Ramassée le' => format_fdt_datetime($item['pickupAt']),

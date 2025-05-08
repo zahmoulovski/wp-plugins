@@ -28,7 +28,7 @@ require_once FDT_PLUGIN_DIR . 'includes/db.php';
 require_once FDT_PLUGIN_DIR . 'includes/email.php';
 require_once FDT_PLUGIN_DIR . 'includes/tracking.php';
 require_once FDT_PLUGIN_DIR . 'includes/order-views.php';
-
+require_once FDT_PLUGIN_DIR . 'includes/manage.php';
 
 // Create plugin assets directory and copy WhatsApp image on activation
 register_activation_hook(__FILE__, function() {
@@ -42,55 +42,7 @@ register_activation_hook(__FILE__, function() {
     if (!file_exists($whatsapp_image)) {
         copy('https://klarrion.com/signature/whatsapp-button.png', $whatsapp_image);
     }
-});
-
-// Admin menu
-add_action('admin_menu', function() {
-    add_options_page(
-        'First Delivery Settings',
-        'First Delivery',
-        'manage_options',
-        'first-delivery-settings',
-        'fdt_settings_page'
-    );
-});
-
-// Settings page
-function fdt_settings_page() {
-    ?>
-    <div class="wrap">
-        <h1>First Delivery API Settings</h1>
-        <form method="post" action="options.php">
-            <?php
-                settings_fields('fdt_settings_group');
-                do_settings_sections('first-delivery-settings');
-                submit_button();
-            ?>
-        </form>
-    </div>
-    <?php
-}
-
-// Register settings
-add_action('admin_init', function() {
-    register_setting('fdt_settings_group', FDT_OPTION_NAME);
-    register_setting('fdt_settings_group', FDT_WHATSAPP_NUMBER);
-    register_setting('fdt_settings_group', FDT_EMAIL_FROM);
-
-    add_settings_section('fdt_section_main', 'API Configuration', null, 'first-delivery-settings');
-
-    add_settings_field(FDT_OPTION_NAME, 'API Token', function() {
-        $value = get_option(FDT_OPTION_NAME, '');
-        echo '<input type="text" name="' . FDT_OPTION_NAME . '" value="' . esc_attr($value) . '" class="regular-text" />';
-    }, 'first-delivery-settings', 'fdt_section_main');
-
-    add_settings_field(FDT_WHATSAPP_NUMBER, 'WhatsApp Number', function() {
-        $value = get_option(FDT_WHATSAPP_NUMBER, '');
-        echo '<input type="text" name="' . FDT_WHATSAPP_NUMBER . '" value="' . esc_attr($value) . '" class="regular-text" />';
-    }, 'first-delivery-settings', 'fdt_section_main');
-
-    add_settings_field(FDT_EMAIL_FROM, 'From Email Address', function() {
-        $value = get_option(FDT_EMAIL_FROM, '');
-        echo '<input type="email" name="' . FDT_EMAIL_FROM . '" value="' . esc_attr($value) . '" class="regular-text" />';
-    }, 'first-delivery-settings', 'fdt_section_main');
+    
+    // Create barcodes table
+    fdt_create_barcodes_table();
 });

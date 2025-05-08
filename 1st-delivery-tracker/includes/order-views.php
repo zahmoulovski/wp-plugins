@@ -21,7 +21,7 @@ add_action('woocommerce_order_details_after_order_table', function($order) {
                     <span><?php echo esc_html($barcode); ?></span>
                 </div>
                 <div class="fdt-tracking-row">
-                    <strong>État de la commande</strong>
+                    <strong>État de la Livraison</strong>
                     <span style="color:green; font-weight:bold"><?php echo esc_html($item['state']); ?></span>
                 </div>
             </div>
@@ -153,4 +153,115 @@ add_action('wp_ajax_fdt_save_and_fetch_tracking', function(){
     $html = ob_get_clean();
 
     wp_send_json_success(['html' => $html]);
+});
+
+
+// Add delivery state column to My Account orders table
+add_filter('woocommerce_my_account_my_orders_columns', function($columns) {
+    $new_columns = array();
+    foreach ($columns as $key => $name) {
+        $new_columns[$key] = $name;
+        if ($key === 'order-status') {
+            $new_columns['delivery-status'] = __('État de la Livraison', 'first-delivery-tracker');
+        }
+    }
+    return $new_columns;
+});
+
+// Add delivery state data to the new column
+add_action('woocommerce_my_account_my_orders_column_delivery-status', function($order) {
+    $barcode = get_post_meta($order->get_id(), '_first_delivery_barcode', true);
+    
+    if (!$barcode) {
+        return; // Don't show anything if no barcode
+    }
+    
+    // Create a placeholder with loading state
+    echo '<div class="fdt-delivery-status" data-order-id="' . esc_attr($order->get_id()) . '" data-barcode="' . esc_attr($barcode) . '">
+            <span class="loading">⏳ Chargement...</span>
+          </div>';
+});
+
+// Add AJAX endpoint for fetching delivery status
+add_action('wp_ajax_fdt_get_delivery_status', function() {
+    $barcode = sanitize_text_field($_POST['barcode']);
+    $token = get_option(FDT_OPTION_NAME);
+
+    if (!$barcode || !$token) {
+        wp_send_json_error();
+        return;
+    }
+
+    $response = fdt_fetch_order_status($barcode, $token);
+    if ($response && !$response['isError'] && isset($response['result']['Items'][0])) {
+        $item = $response['result']['Items'][0];
+        wp_send_json_success([
+            'state' => $item['state']
+        ]);
+    } else {
+        wp_send_json_error();
+    }
+});
+
+// Add JavaScript to handle loading states and API calls
+add_action('wp_footer', function() {
+    if (!is_account_page()) return;
+    ?>
+    <script>
+    jQuery(document).ready(function($) {
+        let queue = [];
+        let processing = false;
+        
+        // Collect all delivery status elements
+        $('.fdt-delivery-status').each(function() {
+            queue.push({
+                element: $(this),
+                barcode: $(this).data('barcode')
+            });
+        });
+        
+        function processQueue() {
+            if (processing || queue.length === 0) return;
+            
+            processing = true;
+            const item = queue.shift();
+            
+            $.post(wc_add_to_cart_params.ajax_url, {
+                action: 'fdt_get_delivery_status',
+                barcode: item.barcode
+            }, function(response) {
+                if (response.success) {
+                    item.element.html('<span style="color:green; font-weight:bold">' + 
+                        response.data.state + '</span>');
+                } else {
+                    item.element.html('—');
+                }
+                
+                // Wait 2 seconds before processing next item
+                setTimeout(function() {
+                    processing = false;
+                    processQueue();
+                }, 2000);
+            }).fail(function() {
+                item.element.html('—');
+                setTimeout(function() {
+                    processing = false;
+                    processQueue();
+                }, 2000);
+            });
+        }
+        
+        // Start processing if we have items
+        if (queue.length > 0) {
+            processQueue();
+        }
+    });
+    </script>
+    <style>
+    .fdt-delivery-status .loading {
+        color: #666;
+        font-style: italic;
+    }
+    </style>
+    <?php
 });
