@@ -61,7 +61,7 @@ transition: width 0.3s ease;
 .fdt-step::before {
 content: '';
 position: absolute;
-top: 15px;
+top: -3px;
 left: 50%;
 transform: translateX(-50%);
 width: 20px;
@@ -97,7 +97,7 @@ border: 3px solid currentColor;
   width: 100%;
   text-align: left;
   padding: 0 0 30px 30px;
-  margin-bottom: 15px;
+  margin-bottom: 0px;
   border-left: 2px solid #ccc;
 }
 
@@ -117,7 +117,7 @@ border: 3px solid currentColor;
 }
 
 .fdt-step.done::before {
-  background: #28a745;
+  background: currentColor;
 }
 
 .fdt-step.current {

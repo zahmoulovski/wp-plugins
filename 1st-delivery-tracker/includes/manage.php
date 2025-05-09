@@ -140,6 +140,11 @@ function fdt_barcode_page() {
                 (SELECT meta_value FROM {$wpdb->prefix}postmeta WHERE post_id = pm.post_id AND meta_key = '_billing_email' LIMIT 1),
                 ''
             ) as customer_email,
+            CONCAT(
+                COALESCE((SELECT meta_value FROM {$wpdb->prefix}postmeta WHERE post_id = pm.post_id AND meta_key = '_billing_first_name' LIMIT 1), ''),
+                ' ',
+                COALESCE((SELECT meta_value FROM {$wpdb->prefix}postmeta WHERE post_id = pm.post_id AND meta_key = '_billing_last_name' LIMIT 1), '')
+            ) as customer_name,
             p.post_date as created_at
         FROM {$wpdb->prefix}postmeta pm
         LEFT JOIN {$wpdb->prefix}posts p ON p.ID = pm.post_id
@@ -151,6 +156,7 @@ function fdt_barcode_page() {
             barcode,
             status as post_status,
             customer_email,
+            '' as customer_name,
             created_at
         FROM {$wpdb->prefix}fdt_barcodes
         ORDER BY created_at DESC
@@ -203,6 +209,7 @@ function fdt_barcode_page() {
                             <input type="checkbox" id="cb-select-all-1">
                         </td>
                         <th>Barcode</th>
+                        <th>Order</th>
                         <th>Customer Email</th>
                         <th>Status</th>
                         <th>Created</th>
@@ -220,7 +227,12 @@ function fdt_barcode_page() {
                                 <td>
                                     <?php if ($barcode->post_id): ?>
                                         <a href="<?php echo admin_url('post.php?post=' . $barcode->post_id . '&action=edit'); ?>">
-                                            #<?php echo esc_html($barcode->post_id); ?>
+                                            #<?php echo esc_html($barcode->post_id); ?> 
+                                            <?php 
+                                            if (!empty(trim($barcode->customer_name))) {
+                                                echo esc_html($barcode->customer_name);
+                                            }
+                                            ?>
                                         </a>
                                     <?php else: ?>
                                         —
