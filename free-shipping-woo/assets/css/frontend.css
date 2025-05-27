@@ -1,0 +1,194 @@
+.fspb-progress-container {
+    margin: 15px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.fspb-message {
+    margin-bottom: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #495057;
+    text-align: center;
+}
+
+.fspb-message.qualified {
+    color: #28a745;
+}
+
+.fspb-progress-wrapper {
+    position: relative;
+    background: #e9ecef;
+    height: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.fspb-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #007cba 0%, #0085d1 100%);
+    border-radius: 10px;
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.fspb-progress-bar.qualified {
+    background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+}
+
+.fspb-progress-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: fspb-shimmer 2s infinite;
+}
+
+@keyframes fspb-shimmer {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+.fspb-progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    white-space: nowrap;
+}
+
+.fspb-remaining-amount {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #6c757d;
+    text-align: center;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .fspb-progress-container {
+        margin: 10px 0;
+        padding: 12px;
+    }
+    
+    .fspb-message {
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+    
+    .fspb-progress-wrapper {
+        height: 18px;
+    }
+    
+    .fspb-progress-text {
+        font-size: 11px;
+    }
+    
+    .fspb-remaining-amount {
+        font-size: 11px;
+    }
+}
+
+/* Loading state */
+.fspb-progress-container.loading {
+    opacity: 0.7;
+}
+
+.fspb-progress-container.loading .fspb-progress-bar {
+    animation: fspb-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes fspb-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Integration with WooCommerce themes */
+.woocommerce .fspb-progress-container {
+    border-color: var(--wc-border-color, #e9ecef);
+}
+
+.woocommerce-cart .fspb-progress-container,
+.woocommerce-checkout .fspb-progress-container {
+    margin: 20px 0;
+}
+
+/* Mini cart specific styles */
+.widget_shopping_cart .fspb-progress-container {
+    margin: 10px 0;
+    padding: 10px;
+    font-size: 12px;
+}
+
+.widget_shopping_cart .fspb-message {
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+.widget_shopping_cart .fspb-progress-wrapper {
+    height: 16px;
+}
+
+.widget_shopping_cart .fspb-progress-text {
+    font-size: 10px;
+}
+
+.widget_shopping_cart .fspb-remaining-amount {
+    font-size: 10px;
+    margin-top: 6px;
+}
+
+/* Product page specific styles */
+.single-product .fspb-progress-container {
+    margin: 20px 0;
+    border: 2px solid #e9ecef;
+}
+
+/* Accessibility improvements */
+.fspb-progress-bar[aria-valuenow="100"] {
+    background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fspb-progress-bar,
+    .fspb-progress-bar::before {
+        animation: none;
+        transition: none;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .fspb-progress-container {
+        border-width: 2px;
+        border-color: #000;
+    }
+    
+    .fspb-progress-wrapper {
+        border: 1px solid #000;
+    }
+    
+    .fspb-progress-text {
+        text-shadow: none;
+        font-weight: 700;
+    }
+}

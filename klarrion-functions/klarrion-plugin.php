@@ -37,135 +37,122 @@ function add_ahrefs_analytics_script() {
 }
 add_action('wp_head', 'add_ahrefs_analytics_script');
 
-/*
-// Disable all WooCommerce emails
+// === 1. Toggle WooCommerce Emails ===
+function toggle_woocommerce_emails($enable) {
+    update_option('woo_emails_enabled', $enable);
 
-add_filter('woocommerce_email_enabled_customer_completed_order', '__return_false');
-add_filter('woocommerce_email_enabled_customer_processing_order', '__return_false');
-add_filter('woocommerce_email_enabled_new_order', '__return_false');
-add_filter('woocommerce_email_enabled_cancelled_order', '__return_false');
-add_filter('woocommerce_email_enabled_failed_order', '__return_false');
-add_filter('woocommerce_email_enabled_customer_refunded_order', '__return_false');
-*/
+    $callbacks = [
+        'woocommerce_email_enabled_customer_completed_order',
+        'woocommerce_email_enabled_customer_processing_order',
+        'woocommerce_email_enabled_new_order',
+        'woocommerce_email_enabled_cancelled_order',
+        'woocommerce_email_enabled_failed_order',
+        'woocommerce_email_enabled_customer_refunded_order',
+    ];
 
-/*
+    foreach ($callbacks as $cb) {
+        remove_filter($cb, '__return_false');
+        if (!$enable) {
+            add_filter($cb, '__return_false');
+        }
+    }
+}
+add_action('init', function () {
+    $enabled = get_option('woo_emails_enabled', true);
+    toggle_woocommerce_emails($enabled);
+});
+
+// === 2. Create Users for Orders ===
 function create_users_for_orders_without_accounts() {
-    // Query to get orders without an associated user
-    $args = array(
-        'status' => array_keys(wc_get_order_statuses()), // Include all order statuses
-        'limit' => -1, // Get all orders
-    );
-    // Get all orders
-    $orders = wc_get_orders($args);
+    $orders = wc_get_orders(['status' => array_keys(wc_get_order_statuses()), 'limit' => -1]);
     foreach ($orders as $order) {
-        // Get the email of the customer from the order
-        $order_email = $order->get_billing_email();
-        // Check if a user already exists with this email
-        if (!email_exists($order_email)) {
-            // If user doesn't exist, create one
-            $user_data = array(
-                'user_login' => $order_email, // Use email as login
-                'user_email' => $order_email,
-                'first_name' => $order->get_billing_first_name(), // Use first name from order
-                'last_name' => $order->get_billing_last_name(), // Use last name from order
-                'user_pass' => wp_generate_password(), // Generate a random password
-                'role' => 'customer', // Default to customer role
-            );
-            // Insert the user into WordPress
-            $user_id = wp_insert_user($user_data);
+        $email = $order->get_billing_email();
+        if (!$email || !is_email($email)) continue;
 
-            // Check for errors
+        if (!email_exists($email)) {
+            $user_id = wp_insert_user([
+                'user_login' => $email,
+                'user_email' => $email,
+                'first_name' => $order->get_billing_first_name(),
+                'last_name'  => $order->get_billing_last_name(),
+                'user_pass'  => wp_generate_password(),
+                'role'       => 'customer',
+            ]);
             if (!is_wp_error($user_id)) {
-                // Successfully created user, now associate the order with the user
-                $order->set_customer_id($user_id); // Link the order to the new user
-                $order->save(); // Save the order with the new customer_id
-                error_log('User created for order ID ' . $order->get_id() . ' with email ' . $order_email);
-            } else {
-                error_log('Failed to create user for order ID ' . $order->get_id() . ' - ' . $user_id->get_error_message());
+                $order->set_customer_id($user_id);
+                $order->save();
             }
         } else {
-            // User already exists, link the order to the existing user
-            $existing_user = get_user_by('email', $order_email);
+            $existing_user = get_user_by('email', $email);
             if ($existing_user) {
-                $order->set_customer_id($existing_user->ID); // Link the order to the existing user
-                $order->save(); // Save the order
-                error_log('Order ID ' . $order->get_id() . ' linked to existing user with email ' . $order_email);
+                $order->set_customer_id($existing_user->ID);
+                $order->save();
             }
         }
     }
 }
-// Add a manual trigger for testing
-function trigger_create_users_for_orders_without_accounts() {
-    if (isset($_GET['create_orders_users'])) {
-        create_users_for_orders_without_accounts(); // Call the function directly
-        
-        // Add an admin notice using WordPress standard notice system
-        add_action('admin_notices', function() {
-            echo '<div class="notice notice-success settings-error is-dismissible">
-                <p>Users have been created for orders without accounts.</p>
-            </div>';
-        });
-    }
-}
-add_action('admin_init', 'trigger_create_users_for_orders_without_accounts');
 
-// URL to trigger account creation for users without an account
-// http://klarrion.com/wp-admin/?create_orders_users=1 
-*/
-
-/*
-// Delete all account without an order
+// === 3. Delete Users Without Orders ===
 function delete_users_without_orders() {
-    if (!class_exists('WooCommerce')) {
-        return;
-    }
-    $excluded_roles = array('administrator', 'b2b', 'shop_manager'); // Exclude these roles
-    $args = array(
-        'role__not_in' => $excluded_roles, // Fetch users who are NOT in these roles
-        'number'       => -1, // Get all users
-        'fields'       => 'ID', // Only fetch user IDs
-    );
-    $users = get_users($args);
-    $deleted_count = 0;
+    $excluded_roles = ['administrator', 'b2b', 'shop_manager'];
+    $users = get_users(['role__not_in' => $excluded_roles, 'fields' => 'ID']);
     foreach ($users as $user_id) {
-        $orders = wc_get_orders(array(
-            'customer_id' => $user_id,
-            'limit'       => 1, // Just check if at least one order exists
-        ));
+        $orders = wc_get_orders(['customer_id' => $user_id, 'limit' => 1]);
         if (empty($orders)) {
             wp_delete_user($user_id);
-            $deleted_count++;
         }
     }
-    // If there are still users left without orders, re-run next Sunday at 11:30 PM
-    if ($deleted_count > 0) {
-        $next_sunday = strtotime('next Sunday 23:30');
-        wp_schedule_single_event($next_sunday, 'delete_users_without_orders_event');
-    }
 }
-// Schedule the function to run every Sunday at 11:30 PM
-function schedule_weekly_user_deletion() {
-    $timestamp = strtotime('next Sunday 23:30');
 
-    if (!wp_next_scheduled('delete_users_without_orders_event')) {
-        wp_schedule_event($timestamp, 'weekly', 'delete_users_without_orders_event');
-    }
-}
-add_action('wp', 'schedule_weekly_user_deletion');
-add_action('delete_users_without_orders_event', 'delete_users_without_orders');
-// Manually trigger deletion from admin if needed
-add_action('admin_init', function() {
-    if (isset($_GET['delete_no_order_users']) && current_user_can('manage_options')) {
-        delete_users_without_orders();
+// === 4. Admin Bar Buttons ===
+add_action('admin_bar_menu', function ($wp_admin_bar) {
+    if (!current_user_can('manage_options')) return;
+
+    $emails_enabled = get_option('woo_emails_enabled', true);
+
+    $wp_admin_bar->add_node([
+        'id'    => 'toggle_woo_emails',
+        'title' => $emails_enabled ? '🔕 Disable Woo Emails' : '🔔 Enable Woo Emails',
+        'href'  => wp_nonce_url(admin_url('?toggle_woo_emails=1'), 'toggle_woo_emails')
+    ]);
+
+    $wp_admin_bar->add_node([
+        'id'    => 'create_users_for_orders',
+        'title' => '👤 Create Users for Orders',
+        'href'  => wp_nonce_url(admin_url('?create_users_for_orders=1'), 'create_users_for_orders')
+    ]);
+
+    $wp_admin_bar->add_node([
+        'id'    => 'delete_users_no_orders',
+        'title' => '🧹 Delete Users w/o Orders',
+        'href'  => wp_nonce_url(admin_url('?delete_users_no_orders=1'), 'delete_users_no_orders')
+    ]);
+}, 100);
+
+// === 5. Handle Actions from Button Clicks ===
+add_action('admin_init', function () {
+    if (isset($_GET['toggle_woo_emails']) && check_admin_referer('toggle_woo_emails')) {
+        $current = get_option('woo_emails_enabled', true);
+        update_option('woo_emails_enabled', !$current);
         wp_redirect(admin_url());
         exit;
     }
+
+    if (isset($_GET['create_users_for_orders']) && check_admin_referer('create_users_for_orders')) {
+        create_users_for_orders_without_accounts();
+        add_action('admin_notices', function () {
+            echo '<div class="notice notice-success"><p>✅ Users created for orders without accounts.</p></div>';
+        });
+    }
+
+    if (isset($_GET['delete_users_no_orders']) && check_admin_referer('delete_users_no_orders')) {
+        delete_users_without_orders();
+        add_action('admin_notices', function () {
+            echo '<div class="notice notice-warning"><p>🧹 Users without orders have been deleted.</p></div>';
+        });
+    }
 });
 
-// Trigger delete users accounts without orders
-// https://klarrion.com/wp-admin/?delete_no_order_users
-
-*/
 
 
 // user creation date 
@@ -276,8 +263,8 @@ function zahmoul_variations_per_page() {
 */
 
 
-/*
- * alphabetical order
+
+// alphabetical order
  
 
 // Add custom sorting options: A to Z and Z to A
@@ -311,7 +298,7 @@ function custom_woocommerce_catalog_orderby( $sortby ) {
     return $sortby;
 }
 
-*/
+
 
 // Add WhatsApp Order button and email form after the "Add to Cart" button
 add_action('woocommerce_after_add_to_cart_button', 'add_whatsapp_order_button_with_email');
@@ -1618,4 +1605,260 @@ add_filter('query', 'block_wpforms_license_db_writes');
 
 add_filter('pre_option_wpforms_license', function() {
     return array('key' => 'valid', 'type' => 'pro');
+});
+
+
+// wpforms stop DB payment error 
+add_filter( 'wpforms_payment_load', '__return_false' );
+
+
+
+
+// Start session
+add_action('init', function () {
+    if (is_user_logged_in() && !session_id()) {
+        session_start();
+    }
+});
+
+// Track session entry and current page
+add_action('template_redirect', function () {
+    if (!is_user_logged_in()) return;
+
+    $user_id = get_current_user_id();
+    $current_page = get_the_title();
+
+    if (empty($_SESSION['visit_start_time'])) {
+        $_SESSION['visit_start_time'] = time();
+        $_SESSION['entry_page'] = $current_page ?: 'Unknown Page';
+    }
+
+    // Always update last page (possible exit)
+    $_SESSION['exit_page'] = $current_page ?: 'Unknown Page';
+});
+
+// Save session info on shutdown
+add_action('shutdown', function () {
+    if (!is_user_logged_in() || empty($_SESSION['visit_start_time'])) return;
+
+    $user_id = get_current_user_id();
+    $entry_time = $_SESSION['visit_start_time'];
+    $exit_time = time();
+    $duration = $exit_time - $entry_time;
+
+    $entry_page = $_SESSION['entry_page'] ?? 'Unknown';
+    $exit_page = $_SESSION['exit_page'] ?? 'Unknown';
+
+    $log = [
+        'entry_time' => $entry_time,
+        'duration' => $duration,
+        'entry_page' => $entry_page,
+        'exit_page' => $exit_page,
+    ];
+
+    $history = get_user_meta($user_id, '_visit_history', true);
+    if (!is_array($history)) $history = [];
+    $history[] = $log;
+
+    update_user_meta($user_id, '_visit_history', $history);
+
+    // Clear session
+    unset($_SESSION['visit_start_time'], $_SESSION['entry_page'], $_SESSION['exit_page']);
+});
+
+add_action('show_user_profile', 'show_visit_history_table');
+add_action('edit_user_profile', 'show_visit_history_table');
+
+function show_visit_history_table($user) {
+    $history = get_user_meta($user->ID, '_visit_history', true);
+    if (empty($history)) {
+        echo "<h3>User Visit History</h3><p>No visits logged yet.</p>";
+        return;
+    }
+
+    echo "<h3>User Visit History</h3><table class='widefat'><thead>
+        <tr><th>Date</th><th>Total Duration</th><th>Entry Page</th><th>Exit Page</th></tr></thead><tbody>";
+
+    foreach (array_reverse($history) as $visit) {
+        echo "<tr>
+            <td>" . date('Y-m-d H:i:s', $visit['entry_time']) . "</td>
+            <td>" . gmdate("H:i:s", $visit['duration']) . "</td>
+            <td>" . esc_html($visit['entry_page']) . "</td>
+            <td>" . esc_html($visit['exit_page']) . "</td>
+        </tr>";
+    }
+
+    echo "</tbody></table>";
+}
+
+
+
+
+// Update last active timestamp
+add_action('init', function () {
+    if (is_user_logged_in()) {
+        update_user_meta(get_current_user_id(), '_last_active', time());
+    }
+});
+
+// Add column to admin user list
+add_filter('manage_users_columns', function($columns) {
+    $columns['online_status'] = 'Online';
+    return $columns;
+});
+
+add_filter('manage_users_custom_column', function($value, $column_name, $user_id) {
+    if ($column_name === 'online_status') {
+        $last_active = get_user_meta($user_id, '_last_active', true);
+        if ($last_active && (time() - $last_active) <= 300) {
+            // Green dot
+            return '<span style="color:green;font-size:20px;">●</span>';
+        } else {
+            // Grey dot
+            return '<span style="color:#ccc;font-size:20px;">●</span>';
+        }
+    }
+    return $value;
+}, 10, 3);
+
+
+
+// Add filter dropdown
+add_action('restrict_manage_users', function ($which) {
+    if ($which !== 'top') return;
+
+    $selected = $_GET['online_status'] ?? '';
+    echo '<select name="online_status" style="margin-left:10px;">
+            <option value="">All Users</option>
+            <option value="online"' . selected($selected, 'online', false) . '>Online Users</option>
+          </select>';
+    submit_button(__('Filter'), '', 'filter_online_users', false);
+});
+
+
+add_action('wp_dashboard_setup', function () {
+    wp_add_dashboard_widget(
+        'online_users_widget',
+        'Currently Online Users',
+        'render_online_users_widget'
+    );
+});
+
+function render_online_users_widget() {
+    $users = get_users([
+        'meta_key' => '_last_active',
+        'meta_compare' => 'EXISTS',
+        'fields' => ['ID', 'display_name']
+    ]);
+
+    $online_users = [];
+    $now = time();
+
+    foreach ($users as $user) {
+        $last_active = get_user_meta($user->ID, '_last_active', true);
+        if ($last_active && ($now - $last_active) <= 300) {
+            $online_users[] = $user;
+        }
+    }
+
+    if (empty($online_users)) {
+        echo '<p>No users online.</p>';
+        return;
+    }
+
+    echo '<ul>';
+    foreach ($online_users as $user) {
+        echo '<li>' . esc_html($user->display_name) . ' (ID: ' . $user->ID . ')</li>';
+    }
+    echo '</ul>';
+}
+
+
+
+
+// Filter the users query
+add_filter('pre_get_users', function ($query) {
+    if (!is_admin() || !$query->is_main_query()) return;
+
+    if (isset($_GET['online_status']) && $_GET['online_status'] === 'online') {
+        $online_user_ids = [];
+
+        $users = get_users([
+            'meta_key' => '_last_active',
+            'meta_compare' => 'EXISTS',
+            'fields' => ['ID']
+        ]);
+
+        $current_time = time();
+        foreach ($users as $user) {
+            $last_active = get_user_meta($user->ID, '_last_active', true);
+            if ($last_active && ($current_time - $last_active) <= 300) {
+                $online_user_ids[] = $user->ID;
+            }
+        }
+
+        if (empty($online_user_ids)) {
+            $online_user_ids = [0]; // Prevent showing all users
+        }
+
+        $query->set('include', $online_user_ids);
+    }
+});
+
+
+
+
+
+
+
+
+
+
+// Apply 5% discount on product subtotal if wc_konnect_gateway is selected
+add_action('woocommerce_cart_calculate_fees', function(WC_Cart $cart) {
+    if (is_admin() && !defined('DOING_AJAX')) return;
+
+    $chosen_gateway = WC()->session->get('chosen_payment_method');
+    $discount_label = __('Remise sur le paiement en ligne (5%)', 'your-text-domain');
+
+    // Only apply if konnect is selected
+    if ($chosen_gateway === 'wc_konnect_gateway') {
+        // Prevent duplicate application
+        foreach ($cart->get_fees() as $fee) {
+            if ($fee->name === $discount_label) {
+                return;
+            }
+        }
+
+        // Calculate 5% only on product subtotal (excluding shipping and other fees)
+        $discount = $cart->get_subtotal() * 0.05;
+
+        // Add a non-taxable negative fee (true discount)
+        $cart->add_fee($discount_label, -$discount, false); // 'false' = no tax
+    }
+}, 20);
+
+
+
+// Add promo message next to payment method label (frontend only)
+add_filter('woocommerce_gateway_title', function($title, $gateway_id) {
+    if (!is_admin() && $gateway_id === 'wc_konnect_gateway') {
+        $title .= '<br><span style="color: #ff0000; font-weight: bold;">💸 Réduction instantanée de 5% si vous payez en ligne !</span>';
+    }
+    return $title;
+}, 20, 2);
+
+
+add_action('wp_footer', function() {
+    if (is_checkout()) {
+        ?>
+        <script>
+        jQuery(function($) {
+            $('form.checkout').on('change', 'input[name="payment_method"]', function() {
+                $('body').trigger('update_checkout');
+            });
+        });
+        </script>
+        <?php
+    }
 });

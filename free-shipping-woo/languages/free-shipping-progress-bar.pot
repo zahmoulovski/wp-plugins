@@ -1,0 +1,137 @@
+# Copyright (C) 2024 Free Shipping Progress Bar
+# This file is distributed under the same license as the Free Shipping Progress Bar package.
+msgid ""
+msgstr ""
+"Project-Id-Version: Free Shipping Progress Bar 1.0.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/free-shipping-progress-bar\n"
+"POT-Creation-Date: 2024-01-01 12:00+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"PO-Revision-Date: 2024-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+
+#: free-shipping-progress-bar.php:58
+msgid "Free Shipping Progress Bar requires WooCommerce to be installed and active."
+msgstr ""
+
+#: free-shipping-progress-bar.php:73
+msgid "Add {remaining} more to get free shipping!"
+msgstr ""
+
+#: free-shipping-progress-bar.php:74
+msgid "Congratulations! You qualify for free shipping!"
+msgstr ""
+
+#: includes/class-admin.php:32 includes/class-admin.php:33
+msgid "Free Shipping Progress Bar"
+msgstr ""
+
+#: includes/class-admin.php:34
+msgid "Shipping Progress Bar"
+msgstr ""
+
+#: includes/class-admin.php:44
+msgid "General Settings"
+msgstr ""
+
+#: includes/class-admin.php:51
+msgid "Display Settings"
+msgstr ""
+
+#: includes/class-admin.php:58
+msgid "Product & Category Settings"
+msgstr ""
+
+#: includes/class-admin.php:86
+msgid "Free Shipping Threshold"
+msgstr ""
+
+#: includes/class-admin.php:92
+msgid "The minimum order amount required for free shipping."
+msgstr ""
+
+#: includes/class-admin.php:98
+msgid "Initial Message"
+msgstr ""
+
+#: includes/class-admin.php:110
+msgid "Message shown when free shipping threshold is not met. Use {remaining} for remaining amount."
+msgstr ""
+
+#: includes/class-admin.php:116
+msgid "Success Message"
+msgstr ""
+
+#: includes/class-admin.php:128
+msgid "Message shown when free shipping threshold is achieved."
+msgstr ""
+
+#: includes/class-admin.php:135
+msgid "Display Locations"
+msgstr ""
+
+#: includes/class-admin.php:138
+msgid "Show Progress Bar On"
+msgstr ""
+
+#: includes/class-admin.php:143
+msgid "Product Pages"
+msgstr ""
+
+#: includes/class-admin.php:148
+msgid "Mini Cart"
+msgstr ""
+
+#: includes/class-admin.php:153
+msgid "Cart Page"
+msgstr ""
+
+#: includes/class-admin.php:158
+msgid "Checkout Page"
+msgstr ""
+
+#: includes/class-admin.php:166
+msgid "Product & Category Rules"
+msgstr ""
+
+#: includes/class-admin.php:170
+msgid "Included Products"
+msgstr ""
+
+#: includes/class-admin.php:184
+msgid "Only these products will count towards free shipping. Leave empty to include all products."
+msgstr ""
+
+#: includes/class-admin.php:190
+msgid "Excluded Products"
+msgstr ""
+
+#: includes/class-admin.php:204
+msgid "These products will not count towards free shipping."
+msgstr ""
+
+#: includes/class-admin.php:210
+msgid "Included Categories"
+msgstr ""
+
+#: includes/class-admin.php:224
+msgid "Only products from these categories will count towards free shipping. Leave empty to include all categories."
+msgstr ""
+
+#: includes/class-admin.php:230
+msgid "Excluded Categories"
+msgstr ""
+
+#: includes/class-admin.php:244
+msgid "Products from these categories will not count towards free shipping."
+msgstr ""
+
+#: templates/progress-bar.php:43
+msgid "Free shipping progress"
+msgstr ""
+
+#: templates/progress-bar.php:51
+msgid "Remaining: %s"
+msgstr ""
