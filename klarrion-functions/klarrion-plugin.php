@@ -23,19 +23,46 @@ function klarrion_add_settings_link($links) {
 
 
 
+
+
+
+
+
+
+add_filter('heartbeat_settings', function($settings) {
+    $settings['interval'] = 60; // Default is 15 seconds
+    return $settings;
+});
+
+
+
+
+
+
+
+
 // Increase WooCommerce session timeout to 30 days (default is 48 hours)
 add_filter('wc_session_expiration', 'extend_woocommerce_session_expiration');
 function extend_woocommerce_session_expiration() {
     return 60 * 60 * 24 * 30; // 30 days in seconds
 }
 
-// ahrefs analytics
-function add_ahrefs_analytics_script() {
+
+
+function add_gtag_script() {
     ?>
-    <script src="https://analytics.ahrefs.com/analytics.js" data-key="/KQA5ahIIx3b3Qigy5wU/A" async></script>
+    <!-- Google tag (gtag.js) -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=GT-5TPW4SBC"></script>
+		<script>
+  			window.dataLayer = window.dataLayer || [];
+  			function gtag(){dataLayer.push(arguments);}
+  			gtag('js', new Date());
+
+  			gtag('config', 'GT-5TPW4SBC');
+		</script>
     <?php
 }
-add_action('wp_head', 'add_ahrefs_analytics_script');
+add_action('wp_head', 'add_gtag_script');
 
 // === 1. Toggle WooCommerce Emails ===
 function toggle_woocommerce_emails($enable) {
@@ -1028,6 +1055,48 @@ function replace_shipping_cost_for_instance( $label, $method ) {
     return $label;
 }
 
+
+
+// hide all shipping except local pickup + special delivery
+
+add_filter('woocommerce_package_rates', 'klarrion_restrict_shipping_super_heavy_only', 10, 2);
+
+function klarrion_restrict_shipping_super_heavy_only($rates, $package) {
+    $super_heavy_slug = 'super-heavy';
+    $allowed_instance_ids = array(5, 15); // local pickup (5) + delivery option (15)
+
+    // Check if cart has product with shipping class "super-heavy"
+    $has_super_heavy = false;
+    foreach (WC()->cart->get_cart_contents() as $cart_item) {
+        $shipping_class = $cart_item['data']->get_shipping_class();
+        if ($shipping_class === $super_heavy_slug) {
+            $has_super_heavy = true;
+            break;
+        }
+    }
+
+    // If there is a super-heavy item, filter shipping methods
+    if ($has_super_heavy) {
+        $new_rates = array();
+        foreach ($rates as $rate_key => $rate) {
+            if (in_array($rate->get_instance_id(), $allowed_instance_ids)) {
+                $new_rates[$rate_key] = $rate;
+            }
+        }
+
+        return $new_rates;
+    }
+
+    // Otherwise, return all rates
+    return $rates;
+}
+
+
+
+
+
+
+
 // Adding multiple WooCommerce products to the cart using a URL
 
 add_action('wp', function() {
@@ -1050,29 +1119,7 @@ add_action('wp', function() {
 });
 
 
-/*
-function add_weight_to_cart( $product_name, $cart_item, $cart_item_key ) {
-    // Get the product weight (in kg) and quantity
-    $product_weight = $cart_item['data']->get_weight(); // Get the weight of the product
-    $quantity = $cart_item['quantity']; // Get the quantity of the product
 
-    // Check if the product has a valid weight
-    if ( $product_weight > 0 ) {
-        // Calculate the total weight for this product
-        $total_weight = $product_weight * $quantity;
-
-        // Format the weight calculation: "pH-mètre LUT PH-211<br>(0.6KG * Qté 19 = 11.4KG)"
-        $weight_display = '<br>(' . number_format($product_weight, 1) . 'KG * Qté ' . $quantity . ' = ' . number_format($total_weight, 1) . 'KG)';
-
-        // Add the weight calculation next to the product name with a line break
-        $product_name .= ' <span class="total-weight">' . $weight_display . '</span>';
-    }
-
-    return $product_name;
-}
-add_filter( 'woocommerce_cart_item_name', 'add_weight_to_cart', 10, 3 );
-
-*/
 
 
 
@@ -1248,54 +1295,7 @@ function display_cross_sell_tab_content() {
     }
 }
 
-/*
-// Invoices test code 
 
-add_action('woocommerce_order_details_after_order_table', 'display_invoice_in_order_details');
-add_action('woocommerce_admin_order_data_after_order_details', 'display_invoice_in_admin');
-add_filter('woocommerce_my_account_my_orders_actions', 'add_invoice_button_to_my_orders', 10, 2);
-
-function display_invoice_in_order_details($order) {
-    $order_id = $order->get_id();
-    $invoice_path = '/wp-content/uploads/invoices/' . $order_id . '-facture-2025.pdf';
-    $invoice_url = site_url($invoice_path);
-
-    if (file_exists(ABSPATH . $invoice_path)) {
-        echo '<p><strong>Télécharger la facture:</strong> <a href="' . esc_url($invoice_url) . '" target="_blank">Télécharger</a></p>';
-    } else {
-        echo '<p><strong>Facture:</strong> Pas encore disponible.</p>';
-    }
-}
-
-function display_invoice_in_admin($order) {
-    $order_id = $order->get_id();
-    $invoice_path = '/wp-content/uploads/invoices/' . $order_id . '-facture-2025.pdf';
-    $invoice_url = site_url($invoice_path);
-
-    if (file_exists(ABSPATH . $invoice_path)) {
-        echo '<p><strong>Facture:</strong> <a href="' . esc_url($invoice_url) . '" target="_blank">Télécharger la facture</a></p>';
-    } else {
-        echo '<p><strong>Facture:</strong> Not uploaded yet.</p>';
-    }
-}
-
-function add_invoice_button_to_my_orders($actions, $order) {
-    $order_id = $order->get_id();
-    $invoice_path = '/wp-content/uploads/invoices/' . $order_id . '-facture-2025.pdf';
-    $invoice_url = site_url($invoice_path);
-
-    // Check if the invoice file exists
-    if (file_exists(ABSPATH . $invoice_path)) {
-        $actions['invoice'] = [
-            'url'  => esc_url($invoice_url),
-            'name' => __('Facture', 'woocommerce'),
-        ];
-    }
-
-    return $actions;
-}
-
-*/
 
 
 // trigger for add to cart - qty + redirection to product page via url using SKU
@@ -1614,215 +1614,21 @@ add_filter( 'wpforms_payment_load', '__return_false' );
 
 
 
-// Start session
-add_action('init', function () {
-    if (is_user_logged_in() && !session_id()) {
-        session_start();
-    }
-});
-
-// Track session entry and current page
-add_action('template_redirect', function () {
-    if (!is_user_logged_in()) return;
-
-    $user_id = get_current_user_id();
-    $current_page = get_the_title();
-
-    if (empty($_SESSION['visit_start_time'])) {
-        $_SESSION['visit_start_time'] = time();
-        $_SESSION['entry_page'] = $current_page ?: 'Unknown Page';
-    }
-
-    // Always update last page (possible exit)
-    $_SESSION['exit_page'] = $current_page ?: 'Unknown Page';
-});
-
-// Save session info on shutdown
-add_action('shutdown', function () {
-    if (!is_user_logged_in() || empty($_SESSION['visit_start_time'])) return;
-
-    $user_id = get_current_user_id();
-    $entry_time = $_SESSION['visit_start_time'];
-    $exit_time = time();
-    $duration = $exit_time - $entry_time;
-
-    $entry_page = $_SESSION['entry_page'] ?? 'Unknown';
-    $exit_page = $_SESSION['exit_page'] ?? 'Unknown';
-
-    $log = [
-        'entry_time' => $entry_time,
-        'duration' => $duration,
-        'entry_page' => $entry_page,
-        'exit_page' => $exit_page,
-    ];
-
-    $history = get_user_meta($user_id, '_visit_history', true);
-    if (!is_array($history)) $history = [];
-    $history[] = $log;
-
-    update_user_meta($user_id, '_visit_history', $history);
-
-    // Clear session
-    unset($_SESSION['visit_start_time'], $_SESSION['entry_page'], $_SESSION['exit_page']);
-});
-
-add_action('show_user_profile', 'show_visit_history_table');
-add_action('edit_user_profile', 'show_visit_history_table');
-
-function show_visit_history_table($user) {
-    $history = get_user_meta($user->ID, '_visit_history', true);
-    if (empty($history)) {
-        echo "<h3>User Visit History</h3><p>No visits logged yet.</p>";
-        return;
-    }
-
-    echo "<h3>User Visit History</h3><table class='widefat'><thead>
-        <tr><th>Date</th><th>Total Duration</th><th>Entry Page</th><th>Exit Page</th></tr></thead><tbody>";
-
-    foreach (array_reverse($history) as $visit) {
-        echo "<tr>
-            <td>" . date('Y-m-d H:i:s', $visit['entry_time']) . "</td>
-            <td>" . gmdate("H:i:s", $visit['duration']) . "</td>
-            <td>" . esc_html($visit['entry_page']) . "</td>
-            <td>" . esc_html($visit['exit_page']) . "</td>
-        </tr>";
-    }
-
-    echo "</tbody></table>";
-}
-
-
-
-
-// Update last active timestamp
-add_action('init', function () {
-    if (is_user_logged_in()) {
-        update_user_meta(get_current_user_id(), '_last_active', time());
-    }
-});
-
-// Add column to admin user list
-add_filter('manage_users_columns', function($columns) {
-    $columns['online_status'] = 'Online';
-    return $columns;
-});
-
-add_filter('manage_users_custom_column', function($value, $column_name, $user_id) {
-    if ($column_name === 'online_status') {
-        $last_active = get_user_meta($user_id, '_last_active', true);
-        if ($last_active && (time() - $last_active) <= 300) {
-            // Green dot
-            return '<span style="color:green;font-size:20px;">●</span>';
-        } else {
-            // Grey dot
-            return '<span style="color:#ccc;font-size:20px;">●</span>';
-        }
-    }
-    return $value;
-}, 10, 3);
-
-
-
-// Add filter dropdown
-add_action('restrict_manage_users', function ($which) {
-    if ($which !== 'top') return;
-
-    $selected = $_GET['online_status'] ?? '';
-    echo '<select name="online_status" style="margin-left:10px;">
-            <option value="">All Users</option>
-            <option value="online"' . selected($selected, 'online', false) . '>Online Users</option>
-          </select>';
-    submit_button(__('Filter'), '', 'filter_online_users', false);
-});
-
-
-add_action('wp_dashboard_setup', function () {
-    wp_add_dashboard_widget(
-        'online_users_widget',
-        'Currently Online Users',
-        'render_online_users_widget'
-    );
-});
-
-function render_online_users_widget() {
-    $users = get_users([
-        'meta_key' => '_last_active',
-        'meta_compare' => 'EXISTS',
-        'fields' => ['ID', 'display_name']
-    ]);
-
-    $online_users = [];
-    $now = time();
-
-    foreach ($users as $user) {
-        $last_active = get_user_meta($user->ID, '_last_active', true);
-        if ($last_active && ($now - $last_active) <= 300) {
-            $online_users[] = $user;
-        }
-    }
-
-    if (empty($online_users)) {
-        echo '<p>No users online.</p>';
-        return;
-    }
-
-    echo '<ul>';
-    foreach ($online_users as $user) {
-        echo '<li>' . esc_html($user->display_name) . ' (ID: ' . $user->ID . ')</li>';
-    }
-    echo '</ul>';
-}
-
-
-
-
-// Filter the users query
-add_filter('pre_get_users', function ($query) {
-    if (!is_admin() || !$query->is_main_query()) return;
-
-    if (isset($_GET['online_status']) && $_GET['online_status'] === 'online') {
-        $online_user_ids = [];
-
-        $users = get_users([
-            'meta_key' => '_last_active',
-            'meta_compare' => 'EXISTS',
-            'fields' => ['ID']
-        ]);
-
-        $current_time = time();
-        foreach ($users as $user) {
-            $last_active = get_user_meta($user->ID, '_last_active', true);
-            if ($last_active && ($current_time - $last_active) <= 300) {
-                $online_user_ids[] = $user->ID;
-            }
-        }
-
-        if (empty($online_user_ids)) {
-            $online_user_ids = [0]; // Prevent showing all users
-        }
-
-        $query->set('include', $online_user_ids);
-    }
-});
 
 
 
 
 
 
-
-
-
-
-// Apply 5% discount on product subtotal if wc_konnect_gateway is selected
+// Apply 5% discount on product subtotal if wc_konnect_gateway OR wc_gateway_flouci is selected
 add_action('woocommerce_cart_calculate_fees', function(WC_Cart $cart) {
     if (is_admin() && !defined('DOING_AJAX')) return;
 
     $chosen_gateway = WC()->session->get('chosen_payment_method');
     $discount_label = __('Remise sur le paiement en ligne (5%)', 'your-text-domain');
 
-    // Only apply if konnect is selected
-    if ($chosen_gateway === 'wc_konnect_gateway') {
+    // Only apply if konnect or flouci is selected
+    if ($chosen_gateway === 'wc_konnect_gateway' || $chosen_gateway === 'wc_gateway_flouci') {
         // Prevent duplicate application
         foreach ($cart->get_fees() as $fee) {
             if ($fee->name === $discount_label) {
@@ -1839,16 +1645,18 @@ add_action('woocommerce_cart_calculate_fees', function(WC_Cart $cart) {
 }, 20);
 
 
-
 // Add promo message next to payment method label (frontend only)
 add_filter('woocommerce_gateway_title', function($title, $gateway_id) {
-    if (!is_admin() && $gateway_id === 'wc_konnect_gateway') {
-        $title .= '<br><span style="color: #ff0000; font-weight: bold;">💸 Réduction instantanée de 5% si vous payez en ligne !</span>';
+    if (!is_admin()) {
+        if ($gateway_id === 'wc_konnect_gateway' || $gateway_id === 'wc_gateway_flouci') {
+            $title .= '<br><span style="color: #ff0000; font-weight: bold;">💸 Réduction instantanée de 5% si vous payez en ligne !</span>';
+        }
     }
     return $title;
 }, 20, 2);
 
 
+// Refresh checkout totals when payment method is changed
 add_action('wp_footer', function() {
     if (is_checkout()) {
         ?>
@@ -1862,3 +1670,110 @@ add_action('wp_footer', function() {
         <?php
     }
 });
+
+
+
+
+
+
+
+
+// Add custom WP‑Cron schedule
+add_filter('cron_schedules', function($schedules){
+    $schedules['every_fifteen_minutes'] = [
+        'interval' => 15 * 60,
+        'display'  => __('Every 15 Minutes')
+    ];
+    return $schedules;
+});
+
+// Schedule event on activation
+register_activation_hook(__FILE__, function(){
+    if (!wp_next_scheduled('auto_convert_pending_orders')) {
+        wp_schedule_event(time(), 'every_fifteen_minutes', 'auto_convert_pending_orders');
+    }
+});
+
+// Clear event on deactivation
+register_deactivation_hook(__FILE__, function(){
+    wp_clear_scheduled_hook('auto_convert_pending_orders');
+});
+
+// Convert pending orders older than 2 hours
+add_action('auto_convert_pending_orders', function(){
+    $threshold = (new WC_DateTime())->modify('-2 hours')->format('Y-m-d H:i:s');
+
+    $orders = wc_get_orders([
+        'status'     => 'pending',
+        'limit'      => -1,
+        'return'     => 'objects',
+        'date_query' => [
+            [
+                'column'   => 'post_date',
+                'before'   => $threshold,
+                'inclusive'=> false,
+            ]
+        ],
+    ]);
+
+    foreach ($orders as $order) {
+        try {
+            // Remove 5% discount fee if present
+            foreach ($order->get_fees() as $fee_item) {
+                if (trim($fee_item->get_name()) === 'Remise sur le paiement en ligne (5%)') {
+                    $order->remove_item($fee_item->get_id());
+                }
+            }
+
+            // Switch to cash on delivery
+            $order->set_payment_method('cod');
+            $order->set_payment_method_title('Paiement à la livraison');
+
+            // Recalculate totals and update status
+            $order->calculate_totals();
+            $order->update_status('processing', 'Commande mise à jour automatiquement après 2 heures.');
+            $order->save();
+
+        } catch (Exception $e) {
+            // Optional: log or handle errors silently in production
+        }
+    }
+});
+
+
+
+
+
+
+
+
+
+// Add placeholder logo first, then load animated gif after page load
+function klarrion_animated_logo_script() {
+    ?>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const logo = document.querySelector(".site-logo img");
+
+        if (logo) {
+            // Set placeholder immediately
+            logo.src = "https://klarrion.com/wp-content/uploads/2025/01/placeholder-klarrion.webp";
+            
+            // Fade swap when everything is loaded
+            window.addEventListener("load", function() {
+                setTimeout(() => {
+                    logo.style.transition = "opacity 0.6s ease";
+                    logo.style.opacity = 0;
+
+                    setTimeout(() => {
+                        logo.src = "https://klarrion.com/wp-content/uploads/2025/04/klarrion.com-logo-animation.gif";
+                        logo.style.opacity = 1;
+                    }, 600);
+                }, 200); // small delay for smoothness
+            });
+        }
+    });
+    </script>
+    <?php
+}
+add_action('wp_footer', 'klarrion_animated_logo_script');

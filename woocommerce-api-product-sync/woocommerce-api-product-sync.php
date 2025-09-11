@@ -1,19 +1,17 @@
 <?php
 /*
 Plugin Name: WooCommerce API Product Sync with Multiple Stores
-Description: WooCommerce API Product Sync with Multiple Stores plugin can sync automatically product from one WooCommerce web store (shop) to the other WooCommerce web stores (shops) when product add/update.
-Version: 2.8.0
-Author: Zahmoul Med Yassine
-Author URI: https://klarrion.com/
+Description: This plugin can sync automatically product from one WooCommerce web store (shop) to the other WooCommerce web stores (shops) when product add/update.
+Version: 1.5.0
+Author: Obtain Infotech
+Author URI: https://www.obtaininfotech.com/
 License: GPL2
-Text Domain: wc_api_mps
 */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit( 'restricted access' );
 }
-update_site_option( 'wc_api_mps_purchase_code', '***********' );
-update_site_option( 'wc_api_mps_licence', 1 );
+
 /*
  * This is a constant variable for plugin path.
  */
@@ -39,16 +37,6 @@ if ( ! function_exists( 'wc_api_mps_activation' ) ) {
         $authorization = get_option( 'wc_api_mps_authorization' );
         if ( ! $authorization ) {
             update_option( 'wc_api_mps_authorization', 'query' );
-        }
-        
-        $old_products_sync_by = get_option( 'wc_api_mps_old_products_sync_by' );
-        if ( ! $old_products_sync_by ) {
-            update_option( 'wc_api_mps_old_products_sync_by', 'slug' );
-        }
-        
-        $product_sync_type = get_option( 'wc_api_mps_product_sync_type' );
-        if ( ! $product_sync_type ) {
-            update_option( 'wc_api_mps_product_sync_type', 'full_product' );
         }
         
         $stock_sync = get_option( 'wc_api_mps_stock_sync' );

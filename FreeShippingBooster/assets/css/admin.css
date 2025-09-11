@@ -1,0 +1,187 @@
+.fspb-admin-container {
+    max-width: 800px;
+}
+
+.fspb-admin-container h2 {
+    margin-top: 30px;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.fspb-admin-container .form-table th {
+    width: 200px;
+    padding: 20px 10px 20px 0;
+}
+
+.fspb-admin-container .form-table td {
+    padding: 20px 10px;
+}
+
+.fspb-product-search,
+.fspb-category-search {
+    min-height: 40px;
+}
+
+.fspb-preview-container {
+    margin-top: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.fspb-preview-title {
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.fspb-settings-section {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.fspb-settings-section h3 {
+    margin: 0;
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #ddd;
+    border-radius: 5px 5px 0 0;
+}
+
+.fspb-settings-section .form-table {
+    margin: 0;
+}
+
+.fspb-settings-section .form-table tr:last-child th,
+.fspb-settings-section .form-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Select2 styling for product/category selectors */
+.select2-container {
+    min-width: 400px !important;
+}
+
+.select2-container--default .select2-selection--multiple {
+    min-height: 40px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice {
+    background-color: #0073aa;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 2px 8px;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+    color: #fff;
+    margin-right: 5px;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+    color: #ff6b6b;
+}
+
+/* WordPress editor styling */
+.wp-editor-container {
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .fspb-admin-container .form-table th,
+    .fspb-admin-container .form-table td {
+        display: block;
+        width: 100%;
+        padding: 10px 0;
+    }
+    
+    .fspb-admin-container .form-table th {
+        border-bottom: none;
+        padding-bottom: 5px;
+    }
+    
+    .select2-container {
+        min-width: 100% !important;
+    }
+}
+
+/* Help text styling */
+.fspb-help-text {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 5px;
+    padding: 15px;
+    margin: 20px 0;
+}
+
+.fspb-help-text h4 {
+    margin-top: 0;
+    color: #856404;
+}
+
+.fspb-help-text ul {
+    margin-bottom: 0;
+}
+
+.fspb-help-text li {
+    margin-bottom: 5px;
+}
+
+/* Status indicators */
+.fspb-status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.fspb-status-indicator.active {
+    background-color: #28a745;
+}
+
+.fspb-status-indicator.inactive {
+    background-color: #6c757d;
+}
+
+/* Preview section */
+.fspb-preview {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.fspb-preview h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+/* Error and success messages */
+.fspb-notice {
+    padding: 10px 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+}
+
+.fspb-notice.error {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.fspb-notice.success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}

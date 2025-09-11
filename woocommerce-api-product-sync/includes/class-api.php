@@ -16,64 +16,60 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         
         function __construct( $url, $consumer_key, $consumer_secret ) {
                         
-            $this->url              = rtrim( $url, '/' ).'/wp-json/wc/v3';
+            $this->url              = rtrim( $url, '/' ).'/wp-json/wc/v2';
             $this->site_url         = $url;
             $this->consumer_key     = $consumer_key;
             $this->consumer_secret  = $consumer_secret;
         }
         
         function authentication() {
-
+            
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products?per_page=1&'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products?per_page=1&'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products?per_page=1';
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products?per_page=1' );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $args = array(
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_get( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
                 $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
-                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";
-
-                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
-            }
-
-            $response_code = wp_remote_retrieve_response_code( $wp_remote_response );
-            if ( $response_code == 404 ) {
-                $log = "status: ".$response_code."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
-                $response = array( 'code' => 404 );
-                $response = (object) $response;
+            }
+            
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
             
             return $response;
@@ -83,51 +79,58 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
             
             $old_products_sync_by = get_option( 'wc_api_mps_old_products_sync_by' );
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
                 if ( $old_products_sync_by == 'sku' ) {
-                    $url = $this->url.'/products?sku='.$search.'&'.$query_string;
+                    curl_setopt( $ch, CURLOPT_URL, $this->url.'/products?sku='.$search.'&'.$query_string );
                 } else {
-                    $url = $this->url.'/products?slug='.$search.'&'.$query_string;
+                    curl_setopt( $ch, CURLOPT_URL, $this->url.'/products?slug='.$search.'&'.$query_string );
                 }
-
+                
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
                 if ( $old_products_sync_by == 'sku' ) {
-                    $url = $this->url.'/products?sku='.$search;
+                    curl_setopt( $ch, CURLOPT_URL, $this->url.'/products?sku='.$search );
                 } else {
-                    $url = $this->url.'/products?slug='.$search;
+                    curl_setopt( $ch, CURLOPT_URL, $this->url.'/products?slug='.$search );
                 }
-
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $args = array(
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_get( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
                 $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
+            }
+            
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
@@ -139,90 +142,95 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function getProduct( $product_id ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/'.$product_id.'?'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/'.$product_id.'?'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/'.$product_id;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/'.$product_id );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $args = array(
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_get( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
+            
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
+            }
+            
             return $response;
         }
         
         function addProduct( $data ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $data = json_encode( $data );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products?'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products?'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products';
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products' );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $data = json_encode( $data );
-            $args = array(
-                'method'        => 'POST',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'body'          => $data,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_post( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_POST, true );
+            curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
                 $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
             
-            $response_code = wp_remote_retrieve_response_code( $wp_remote_response );
-            if ( $response_code == 404 ) {
-                $log = "status: ".$response_code."\n";
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
@@ -234,52 +242,51 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function updateProduct( $data, $product_id ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $data = json_encode( $data );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/'.$product_id.'?'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/'.$product_id.'?'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/'.$product_id;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/'.$product_id );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $data = json_encode( $data );
-            $args = array(
-                'method'        => 'POST',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'body'          => $data,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_post( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_POST, true );
+            curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
                 $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
             
-            $response_code = wp_remote_retrieve_response_code( $wp_remote_response );
-            if ( $response_code == 404 ) {
-                $log = "status: ".$response_code."\n";
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
@@ -291,37 +298,52 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function getProductVariations( $product_id ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/'.$product_id.'/variations?per_page=100&'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/'.$product_id.'/variations?'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/'.$product_id.'/variations?per_page=100';
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/'.$product_id.'/variations' );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $args = array(
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_get( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
+                $log .= "message: ".$response->message."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
+            }
+            
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
+            }
             
             return $response;
         }
@@ -329,37 +351,43 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function getProductVariation( $product_id, $variation_product_id ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/'.$product_id.'/variations/'.$variation_product_id.'?'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/'.$product_id.'/variations/'.$variation_product_id.'?'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/'.$product_id.'/variations/'.$variation_product_id;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/'.$product_id.'/variations/'.$variation_product_id );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $args = array(
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_get( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
+            
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
+            }
             
             return $response;
         }
@@ -367,52 +395,51 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function addProductVariation( $data, $product_id ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $data = json_encode( $data );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/'.$product_id.'/variations?'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/'.$product_id.'/variations?'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/'.$product_id.'/variations';
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/'.$product_id.'/variations' );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $data = json_encode( $data );
-            $args = array(
-                'method'        => 'POST',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'body'          => $data,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_post( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_POST, true );
+            curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
                 $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
             
-            $response_code = wp_remote_retrieve_response_code( $wp_remote_response );
-            if ( $response_code == 404 ) {
-                $log = "status: ".$response_code."\n";
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
@@ -424,52 +451,51 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function updateProductVariation( $data, $product_id, $variation_product_id ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $data = json_encode( $data );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/'.$product_id.'/variations/'.$variation_product_id.'?'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/'.$product_id.'/variations/'.$variation_product_id.'?'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/'.$product_id.'/variations/'.$variation_product_id;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/'.$product_id.'/variations/'.$variation_product_id );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $data = json_encode( $data );
-            $args = array(
-                'method'        => 'POST',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'body'          => $data,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_post( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_POST, true );
+            curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
                 $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
             
-            $response_code = wp_remote_retrieve_response_code( $wp_remote_response );
-            if ( $response_code == 404 ) {
-                $log = "status: ".$response_code."\n";
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
@@ -481,128 +507,104 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function getCategories( $slug ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/categories?slug='.$slug.'&'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/categories?slug='.$slug.'&'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/categories?slug='.$slug;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/categories?slug='.$slug );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $args = array(
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_get( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
             
-            return $response;
-        }
-        
-        function getCategory( $category_id ) {
-            
-            $authorization = get_option( 'wc_api_mps_authorization' );
-            if ( $authorization == 'query' ) {
-                $query_string_parameters = array(
-                    'consumer_key'      => $this->consumer_key,
-                    'consumer_secret'   => $this->consumer_secret,
-                );
-                $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/categories/'.$category_id.'?'.$query_string;
-                $header = array(
-                    'Content-Type'  => 'application/json',
-                );
-            } else {
-                $url = $this->url.'/products/categories/'.$category_id;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
-            }
-            
-            $args = array(
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_get( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
-            $response = json_decode( $json_response );
-            
-            return $response;
-        }
-
-        function addCategory( $data ) {
-            
-            $authorization = get_option( 'wc_api_mps_authorization' );
-            if ( $authorization == 'query' ) {
-                $query_string_parameters = array(
-                    'consumer_key'      => $this->consumer_key,
-                    'consumer_secret'   => $this->consumer_secret,
-                );
-                $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/categories?'.$query_string;
-                $header = array(
-                    'Content-Type'  => 'application/json',
-                );
-            } else {
-                $url = $this->url.'/products/categories';
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
-            }
-            
-            $data = json_encode( $data );
-            $args = array(
-                'method'        => 'POST',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'body'          => $data,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_post( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
-            $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
                 $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
             
-            $response_code = wp_remote_retrieve_response_code( $wp_remote_response );
-            if ( $response_code == 404 ) {
-                $log = "status: ".$response_code."\n";
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
+            }
+            
+            return $response;
+        }
+        
+        function addCategory( $data ) {
+            
+            $authorization = get_option( 'wc_api_mps_authorization' );
+            $data = json_encode( $data );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
+            if ( $authorization == 'query' ) {
+                $query_string_parameters = array(
+                    'consumer_key'      => $this->consumer_key,
+                    'consumer_secret'   => $this->consumer_secret,
+                );
+                
+                $query_string = http_build_query( $query_string_parameters );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/categories?'.$query_string );
+                $header = array(
+                    'Content-Type: application/json',
+                );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
+            } else {
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/categories' );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
+            }
+            
+            curl_setopt( $ch, CURLOPT_POST, true );
+            curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
+            $response = json_decode( $json_response );
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
+                $log .= "message: ".$response->message."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
+            }
+            
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
@@ -614,52 +616,51 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function updateCategory( $data, $category_id ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $data = json_encode( $data );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/categories/'.$category_id.'?'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/categories/'.$category_id.'?'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/categories/'.$category_id;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/categories/'.$category_id );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $data = json_encode( $data );
-            $args = array(
-                'method'        => 'POST',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'body'          => $data,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_post( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_POST, true );
+            curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
                 $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
             
-            $response_code = wp_remote_retrieve_response_code( $wp_remote_response );
-            if ( $response_code == 404 ) {
-                $log = "status: ".$response_code."\n";
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
@@ -671,75 +672,52 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function getTags( $slug ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/tags?slug='.$slug.'&'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/tags?slug='.$slug.'&'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/tags?slug='.$slug;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/tags?slug='.$slug );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $args = array(
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_get( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
             
-            return $response;
-        }
-        
-        function getTag( $tag_id ) {
-            
-            $authorization = get_option( 'wc_api_mps_authorization' );
-            if ( $authorization == 'query' ) {
-                $query_string_parameters = array(
-                    'consumer_key'      => $this->consumer_key,
-                    'consumer_secret'   => $this->consumer_secret,
-                );
-                $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/tags/'.$tag_id.'?'.$query_string;
-                $header = array(
-                    'Content-Type'  => 'application/json',
-                );
-            } else {
-                $url = $this->url.'/products/tags/'.$tag_id;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
+                $log .= "message: ".$response->message."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
             
-            $args = array(
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_get( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
-            
-            $response = json_decode( $json_response );
             
             return $response;
         }
@@ -747,52 +725,51 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function addTag( $data ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $data = json_encode( $data );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/tags?'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/tags?'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/tags';
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/tags' );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $data = json_encode( $data );
-            $args = array(
-                'method'        => 'POST',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'body'          => $data,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_post( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_POST, true );
+            curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
                 $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
             
-            $response_code = wp_remote_retrieve_response_code( $wp_remote_response );
-            if ( $response_code == 404 ) {
-                $log = "status: ".$response_code."\n";
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
@@ -804,52 +781,51 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function updateTag( $data, $tag_id ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $data = json_encode( $data );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/tags/'.$tag_id.'?'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/tags/'.$tag_id.'?'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/tags/'.$tag_id;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/tags/'.$tag_id );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $data = json_encode( $data );
-            $args = array(
-                'method'        => 'POST',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'body'          => $data,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_post( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_POST, true );
+            curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
                 $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
             
-            $response_code = wp_remote_retrieve_response_code( $wp_remote_response );
-            if ( $response_code == 404 ) {
-                $log = "status: ".$response_code."\n";
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
@@ -861,37 +837,52 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function getAttributes() {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/attributes?'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/attributes?'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/attributes';
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/attributes' );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $args = array(
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_get( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
+                $log .= "message: ".$response->message."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
+            }
+            
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
+            }
             
             return $response;
         }
@@ -899,52 +890,51 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function addAttribute( $data ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $data = json_encode( $data );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/attributes?'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/attributes?'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/attributes';
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/attributes' );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $data = json_encode( $data );
-            $args = array(
-                'method'        => 'POST',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'body'          => $data,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_post( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_POST, true );
+            curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
                 $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
             
-            $response_code = wp_remote_retrieve_response_code( $wp_remote_response );
-            if ( $response_code == 404 ) {
-                $log = "status: ".$response_code."\n";
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
@@ -956,52 +946,51 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function updateAttribute( $data, $attribute_id ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $data = json_encode( $data );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/attributes/'.$attribute_id.'?'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/attributes/'.$attribute_id.'?'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/attributes/'.$attribute_id;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/attributes/'.$attribute_id );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $data = json_encode( $data );
-            $args = array(
-                'method'        => 'POST',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'body'          => $data,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_post( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_POST, true );
+            curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
                 $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
             
-            $response_code = wp_remote_retrieve_response_code( $wp_remote_response );
-            if ( $response_code == 404 ) {
-                $log = "status: ".$response_code."\n";
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
@@ -1013,128 +1002,104 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function getAttributeTerms( $slug, $attribute_id ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
+                
                 $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/attributes/'.$attribute_id.'/terms?slug='.$slug.'&'.$query_string;
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/attributes/'.$attribute_id.'/terms?slug='.$slug.'&'.$query_string );
                 $header = array(
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             } else {
-                $url = $this->url.'/products/attributes/'.$attribute_id.'/terms?slug='.$slug;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/attributes/'.$attribute_id.'/terms?slug='.$slug );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $args = array(
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_get( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
             
-            return $response;
-        }
-        
-        function getAttributeTerm( $attribute_term_id, $attribute_id ) {
-            
-            $authorization = get_option( 'wc_api_mps_authorization' );
-            if ( $authorization == 'query' ) {
-                $query_string_parameters = array(
-                    'consumer_key'      => $this->consumer_key,
-                    'consumer_secret'   => $this->consumer_secret,
-                );
-                $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/attributes/'.$attribute_id.'/terms/'.$attribute_term_id.'?'.$query_string;
-                $header = array(
-                    'Content-Type'  => 'application/json',
-                );
-            } else {
-                $url = $this->url.'/products/attributes/'.$attribute_id.'/terms/'.$attribute_term_id;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
-            }
-            
-            $args = array(
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_get( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
-            $response = json_decode( $json_response );
-            
-            return $response;
-        }
-
-        function addAttributeTerm( $data, $attribute_id ) {
-            
-            $authorization = get_option( 'wc_api_mps_authorization' );
-            if ( $authorization == 'query' ) {
-                $query_string_parameters = array(
-                    'consumer_key'      => $this->consumer_key,
-                    'consumer_secret'   => $this->consumer_secret,
-                );
-                $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/attributes/'.$attribute_id.'/terms?'.$query_string;
-                $header = array(
-                    'Content-Type'  => 'application/json',
-                );
-            } else {
-                $url = $this->url.'/products/attributes/'.$attribute_id.'/terms';
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
-            }
-            
-            $data = json_encode( $data );
-            $args = array(
-                'method'        => 'POST',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'body'          => $data,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_post( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
-            $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
                 $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
             }
             
-            $response_code = wp_remote_retrieve_response_code( $wp_remote_response );
-            if ( $response_code == 404 ) {
-                $log = "status: ".$response_code."\n";
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
+            }
+            
+            return $response;
+        }
+        
+        function addAttributeTerm( $data, $attribute_id ) {
+            
+            $authorization = get_option( 'wc_api_mps_authorization' );
+            $data = json_encode( $data );
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
+            );
+            
+            $ch = curl_init();
+            if ( $authorization == 'query' ) {
+                $query_string_parameters = array(
+                    'consumer_key'      => $this->consumer_key,
+                    'consumer_secret'   => $this->consumer_secret,
+                );
+                
+                $query_string = http_build_query( $query_string_parameters );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/attributes/'.$attribute_id.'/terms?'.$query_string );
+                $header = array(
+                    'Content-Type: application/json',
+                );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
+            } else {
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/attributes/'.$attribute_id.'/terms' );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
+            }
+            
+            curl_setopt( $ch, CURLOPT_POST, true );
+            curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
+            $response = json_decode( $json_response );
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
+                $log .= "message: ".$response->message."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
+            }
+            
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
                 $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
 
                 file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
@@ -1146,154 +1111,55 @@ if ( ! class_exists( 'WC_API_MPS' ) ) {
         function updateAttributeTerm( $data, $attribute_term_id, $attribute_id ) {
             
             $authorization = get_option( 'wc_api_mps_authorization' );
-            if ( $authorization == 'query' ) {
-                $query_string_parameters = array(
-                    'consumer_key'      => $this->consumer_key,
-                    'consumer_secret'   => $this->consumer_secret,
-                );
-                $query_string = http_build_query( $query_string_parameters );
-                $url = $this->url.'/products/attributes/'.$attribute_id.'/terms/'.$attribute_term_id.'?'.$query_string;
-                $header = array(
-                    'Content-Type'  => 'application/json',
-                );
-            } else {
-                $url = $this->url.'/products/attributes/'.$attribute_id.'/terms/'.$attribute_term_id;
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
-            }
-            
             $data = json_encode( $data );
-            $args = array(
-                'method'        => 'POST',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'body'          => $data,
-                'sslverify'     => false,
+            $header = array(
+                'Authorization: Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
+                'Content-Type: application/json',
             );
-            $wp_remote_response = wp_remote_post( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
             
-            $response = json_decode( $json_response );
-            if ( isset( $response->code ) ) {
-                $log = "errorCode: ".$response->code."\n";
-                $log .= "message: ".$response->message."\n";
-                $log .= "API Call: ".__FUNCTION__."\n";
-                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
-
-                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
-            }
-            
-            $response_code = wp_remote_retrieve_response_code( $wp_remote_response );
-            if ( $response_code == 404 ) {
-                $log = "status: ".$response_code."\n";
-                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
-
-                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
-            }
-            
-            return $response;
-        }
-        
-        function deleteProduct( $product_id, $force = 0 ) {
-            
-            $authorization = get_option( 'wc_api_mps_authorization' );
+            $ch = curl_init();
             if ( $authorization == 'query' ) {
                 $query_string_parameters = array(
                     'consumer_key'      => $this->consumer_key,
                     'consumer_secret'   => $this->consumer_secret,
                 );
-                $query_string = http_build_query( $query_string_parameters );
-                if ( $force ) {
-                    $url = $this->url.'/products/'.$product_id.'?'.$query_string.'&force=true';
-                } else {
-                    $url = $this->url.'/products/'.$product_id.'?'.$query_string;
-                }
-
-                $header = array(
-                    'Content-Type'  => 'application/json',
-                );
-            } else {
-                if ( $force ) {
-                    $url = $this->url.'/products/'.$product_id.'?force=true';
-                } else {
-                    $url = $this->url.'/products/'.$product_id;
-                }
-
-                $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
-                );
-            }
-            
-            $args = array(
-                'method'        => 'DELETE',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_request( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
-            $response = json_decode( $json_response );
-            
-            return $response;
-        }
-
-        function deleteProductVariation( $product_id, $variation_product_id, $force = 0 ) {
-            
-            $authorization = get_option( 'wc_api_mps_authorization' );
-            if ( $authorization == 'query' ) {
-                $query_string_parameters = array(
-                    'consumer_key'      => $this->consumer_key,
-                    'consumer_secret'   => $this->consumer_secret,
-                );
-                $query_string = http_build_query( $query_string_parameters );
-                if ( $force ) {
-                    $url = $this->url.'/products/'.$product_id.'/variations/'.$variation_product_id.'?'.$query_string.'&force=true';
-                } else {
-                    $url = $this->url.'/products/'.$product_id.'/variations/'.$variation_product_id.'?'.$query_string;
-                }
-
-                $header = array(
-                    'Content-Type'  => 'application/json',
-                );
-            } else {
-                if ( $force ) {
-                    $url = $this->url.'/products/'.$product_id.'/variations/'.$variation_product_id.'?force=true';
-                } else {
-                    $url = $this->url.'/products/'.$product_id.'/variations/'.$variation_product_id;
-                }
                 
+                $query_string = http_build_query( $query_string_parameters );
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/attributes/'.$attribute_id.'/terms/'.$attribute_term_id.'?'.$query_string );
                 $header = array(
-                    'Authorization' => 'Basic '.base64_encode( $this->consumer_key.':'.$this->consumer_secret ),
-                    'Content-Type'  => 'application/json',
+                    'Content-Type: application/json',
                 );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
+            } else {
+                curl_setopt( $ch, CURLOPT_URL, $this->url.'/products/attributes/'.$attribute_id.'/terms/'.$attribute_term_id );
+                curl_setopt( $ch, CURLOPT_HTTPHEADER, $header );
             }
             
-            $args = array(
-                'method'        => 'DELETE',
-                'timeout'       => 0,
-                'httpversion'   => '1.0',
-                'headers'       => $header,
-                'sslverify'     => false,
-            );
-            $wp_remote_response = wp_remote_request( $url, $args );
-            $json_response = '';
-            if ( ! is_wp_error( $wp_remote_response ) ) {
-                $json_response = $wp_remote_response['body'];
-            }
-            
+            curl_setopt( $ch, CURLOPT_POST, true );
+            curl_setopt( $ch, CURLOPT_POSTFIELDS, $data );
+            curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYPEER, false );
+            curl_setopt( $ch, CURLOPT_SSL_VERIFYHOST, false );
+            $json_response = curl_exec( $ch );
+            $status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+            curl_close( $ch );
             $response = json_decode( $json_response );
+            
+            if ( isset( $response->code ) ) {                
+                $log = "Store URL: ".$this->site_url."\n";
+                $log .= "errorCode: ".$response->code."\n";
+                $log .= "message: ".$response->message."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
+            }
+            
+            if ( $status == 0 ) {
+                $log = "status: ".$status."\n";
+                $log .= "Date: ".date( 'Y-m-d H:i:s' )."\n\n";                               
+
+                file_put_contents( WC_API_MPS_PLUGIN_PATH.'debug.log', $log, FILE_APPEND );
+            }
             
             return $response;
         }
