@@ -128,13 +128,13 @@ export const api = {
       acceptedPaymentMethods: ['wallet', 'bank_card', 'e-DINAR'],
       lifespan: 30,
       checkoutForm: true,
-      addPaymentFeesToAmount: true,
+      addPaymentFeesToAmount: false,
       firstName: customer.firstName,
       lastName: customer.lastName,
       phoneNumber: customer.phone,
       email: customer.email,
       orderId: String(orderId),
-      webhook: 'https://YOUR_DOMAIN/api/konnect-webhook',
+      webhook: 'http://localhost:5173/api/notification_payment',
       theme: 'light',
     };
 

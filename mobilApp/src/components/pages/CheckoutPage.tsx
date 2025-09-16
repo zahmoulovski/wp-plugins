@@ -70,12 +70,11 @@ export function CheckoutPage({ onBack }: CheckoutPageProps) {
     setLoading(true);
 
     try {
-      // --- Create WooCommerce order first ---
+      // ---- Create WooCommerce order ----
       const orderData = {
         payment_method: formData.paymentMethod,
         payment_method_title:
           formData.paymentMethod === 'konnect' ? 'Konnect' : formData.paymentMethod,
-        set_paid: false,
         billing: {
           first_name: formData.firstName,
           last_name: formData.lastName,
@@ -105,9 +104,11 @@ export function CheckoutPage({ onBack }: CheckoutPageProps) {
 
       const order = await api.createOrder(orderData);
 
-      // --- If Konnect chosen: launch online payment ---
+      // ---- KONNECT online payment branch ----
       if (formData.paymentMethod === 'konnect') {
         const totalTnd = parseFloat(calculateTotal());
+
+        // Call Konnect init-payment endpoint
         const { payUrl } = await api.initKonnectPayment(order.id, totalTnd, {
           firstName: formData.firstName,
           lastName: formData.lastName,
@@ -115,12 +116,12 @@ export function CheckoutPage({ onBack }: CheckoutPageProps) {
           phone: formData.phone,
         });
 
-        const popup = window.open(payUrl, '_blank', 'width=650,height=800');
-        if (!popup) alert('Please allow pop-ups to continue to payment.');
-        return; // wait for Konnect webhook to confirm payment
+        // Direct redirect so browser can't block it
+        window.location.href = payUrl;
+        return; // stop further processing; webhook will mark the order paid
       }
 
-      // --- Offline methods flow (cash on delivery, etc.) ---
+      // ---- Offline methods (cash, bank transfer, etc.) ----
       dispatch({ type: 'CLEAR_CART' });
       alert(`Order #${order.id} placed successfully!`);
       onBack();
@@ -141,12 +142,139 @@ export function CheckoutPage({ onBack }: CheckoutPageProps) {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Commande</h1>
       </div>
 
-      
-        <form onSubmit={handleSubmit} className="space-y-6"> {/* Shipping Information */} <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700"> <div className="flex items-center mb-4"> <Truck className="h-5 w-5 text-primary-600 dark:text-primary-400 mr-2" /> <h2 className="text-lg font-semibold text-gray-900 dark:text-white"> Informations de Livraison </h2> </div> <div className="grid grid-cols-2 gap-4"> <input type="text" name="firstName" placeholder="Prénom" value={formData.firstName} onChange={handleInputChange} required className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" /> <input type="text" name="lastName" placeholder="Nom" value={formData.lastName} onChange={handleInputChange} required className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" /> </div> <div className="grid grid-cols-2 gap-4 mt-4"> <input type="email" name="email" placeholder="E-mail" value={formData.email} onChange={handleInputChange} required className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" /> <input type="tel" name="phone" placeholder="Téléphone" value={formData.phone} onChange={handleInputChange} required className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" /> </div> <input type="text" name="address" placeholder="Adresse" value={formData.address} onChange={handleInputChange} required className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white mt-4" /> <div className="grid grid-cols-3 gap-4 mt-4"> <input type="text" name="city" placeholder="Ville" value={formData.city} onChange={handleInputChange} required className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" /> <input type="text" name="state" placeholder="Gouvernorat" value={formData.state} onChange={handleInputChange} required className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" /> <input type="text" name="zipCode" placeholder="Code Postal" value={formData.zipCode} onChange={handleInputChange} required className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" /> </div> </div> {/* Shipping Methods */} {shippingMethods.length > 0 && ( <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700"> <div className="flex items-center mb-4"> <Truck className="h-5 w-5 text-primary-600 dark:text-primary-400 mr-2" /> <h2 className="text-lg font-semibold text-gray-900 dark:text-white"> Méthode de Livraison </h2> </div> <div className="space-y-3"> {shippingMethods.map((method) => ( <label key={method.id} className="flex items-center justify-between"> <div className="flex items-center"> <input type="radio" name="shippingMethod" value={method.id} checked={selectedShipping === method.id} onChange={(e) => setSelectedShipping(e.target.value)} className="mr-3" /> <span className="text-gray-900 dark:text-white">{method.title}</span> </div> {method.cost && ( <span className="text-primary-600 dark:text-primary-400 font-semibold"> {parseFloat(method.cost).toFixed(2)} TND </span> )} </label> ))} </div> </div> )} {/* Payment Method */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Shipping Information */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center mb-4">
+            <Truck className="h-5 w-5 text-primary-600 dark:text-primary-400 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Informations de Livraison
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <input
+              type="text"
+              name="firstName"
+              placeholder="Prénom"
+              value={formData.firstName}
+              onChange={handleInputChange}
+              required
+              className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            <input
+              type="text"
+              name="lastName"
+              placeholder="Nom"
+              value={formData.lastName}
+              onChange={handleInputChange}
+              required
+              className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <input
+              type="email"
+              name="email"
+              placeholder="E-mail"
+              value={formData.email}
+              onChange={handleInputChange}
+              required
+              className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            <input
+              type="tel"
+              name="phone"
+              placeholder="Téléphone"
+              value={formData.phone}
+              onChange={handleInputChange}
+              required
+              className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <input
+            type="text"
+            name="address"
+            placeholder="Adresse"
+            value={formData.address}
+            onChange={handleInputChange}
+            required
+            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white mt-4"
+          />
+
+          <div className="grid grid-cols-3 gap-4 mt-4">
+            <input
+              type="text"
+              name="city"
+              placeholder="Ville"
+              value={formData.city}
+              onChange={handleInputChange}
+              required
+              className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            <input
+              type="text"
+              name="state"
+              placeholder="Gouvernorat"
+              value={formData.state}
+              onChange={handleInputChange}
+              required
+              className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            <input
+              type="text"
+              name="zipCode"
+              placeholder="Code Postal"
+              value={formData.zipCode}
+              onChange={handleInputChange}
+              required
+              className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+        </div>
+        {/* Shipping Methods */}
+        {shippingMethods.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center mb-4">
+              <Truck className="h-5 w-5 text-primary-600 dark:text-primary-400 mr-2" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Méthode de Livraison
+              </h2>
+            </div>
+            <div className="space-y-3">
+              {shippingMethods.map(method => (
+                <label key={method.id} className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      name="shippingMethod"
+                      value={method.id}
+                      checked={selectedShipping === method.id}
+                      onChange={(e) => setSelectedShipping(e.target.value)}
+                      className="mr-3"
+                    />
+                    <span className="text-gray-900 dark:text-white">{method.title}</span>
+                  </div>
+                  {method.cost && (
+                    <span className="text-primary-600 dark:text-primary-400 font-semibold">
+                      {parseFloat(method.cost).toFixed(2)} TND
+                    </span>
+                  )}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Payment Method */}
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center mb-4">
             <CreditCard className="h-5 w-5 text-primary-600 dark:text-primary-400 mr-2" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Méthode de Paiement</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Méthode de Paiement
+            </h2>
           </div>
           <div className="space-y-3">
             {paymentMethods.map(method => (
@@ -170,9 +298,8 @@ export function CheckoutPage({ onBack }: CheckoutPageProps) {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Résumé de la Commande
           </h2>
-
           <div className="space-y-3">
-            {state.cart.map((item) => (
+            {state.cart.map(item => (
               <div key={item.id} className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">
                   {item.product.name} × {item.quantity}
@@ -183,7 +310,6 @@ export function CheckoutPage({ onBack }: CheckoutPageProps) {
               </div>
             ))}
           </div>
-
           <div className="border-t border-gray-200 dark:border-gray-600 mt-4 pt-4 space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Sous-total</span>
