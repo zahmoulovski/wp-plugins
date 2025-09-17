@@ -75,11 +75,31 @@ export const api = {
       return cachedCategories;
     }
 
-    const categories = await apiRequest('/products/categories?per_page=100');
+    // Increase per_page to get more categories and handle pagination
+    let allCategories: Category[] = [];
+    let page = 1;
+    const perPage = 100;
+    
+    while (true) {
+      const categories = await apiRequest(`/products/categories?per_page=${perPage}&page=${page}`);
+      allCategories = allCategories.concat(categories);
+      
+      // If we got fewer than perPage items, we've reached the end
+      if (categories.length < perPage) {
+        break;
+      }
+      
+      page++;
+      
+      // Safety check to prevent infinite loops
+      if (page > 10) {
+        break;
+      }
+    }
     
     // Cache the results
-    cacheService.setCategories(categories);
-    return categories;
+    cacheService.setCategories(allCategories);
+    return allCategories;
   },
 
   async getCategory(id: number): Promise<Category> {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { X, ChevronDown, ChevronRight, Home, Grid3X3, Search, ShoppingCart, User, Package, Heart, MessageCircle, Settings } from 'lucide-react';
+import { X, ChevronDown, ChevronRight, Home, Grid3X3, Search, ShoppingCart, User, Package, Heart, MessageCircle, Settings, ArrowUpRight } from 'lucide-react';
 import { Category } from '../../types';
 import { api } from '../../services/api';
 import { cacheService } from '../../services/cache';
@@ -11,28 +11,20 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-interface CategoryItemProps {
-  category: Category;
-  allCategories: Category[];
-  level: number;
-  expandedCategories: Set<number>;
-  onToggleCategory: (categoryId: number) => void;
-  onClose: () => void;
-}
-
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { state } = useApp();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
+  const [subcategories, setSubcategories] = useState<{ [key: number]: Category[] }>({});
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  // Load all categories
+  // Load main categories
   useEffect(() => {
     const loadCategories = async () => {
       try {
         const data = await api.getCategories();
-        setAllCategories(data);
+        setAllCategories(data); // Store all categories
         const mainCategories = data.filter(cat => cat && cat.id && cat.name && cat.parent === 0);
         setCategories(mainCategories);
       } catch (error) {
@@ -41,6 +33,30 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     };
     loadCategories();
   }, []);
+
+  // Pre-load all subcategories when sidebar opens for better UX
+  useEffect(() => {
+    if (isOpen && categories.length > 0) {
+      const preloadSubcategories = async () => {
+        try {
+          const allCategories = await api.getCategories();
+          const newSubcategories: { [key: number]: Category[] } = {};
+          
+          categories.forEach(category => {
+            const subs = allCategories.filter(cat => cat.parent === category.id);
+            newSubcategories[category.id] = subs;
+          });
+          
+          setSubcategories(newSubcategories);
+        } catch (error) {
+          console.error('Error preloading subcategories:', error);
+        }
+      };
+      
+      // Use a timeout to avoid blocking the UI
+      setTimeout(preloadSubcategories, 100);
+    }
+  }, [isOpen, categories.length]);
 
   // Click outside to close
   useEffect(() => {
@@ -61,86 +77,108 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     };
   }, [isOpen, onClose]);
 
-  const toggleCategory = (categoryId: number) => {
+  const toggleCategory = async (categoryId: number) => {
+    // Toggle only the clicked category, don't close others
     const newExpanded = new Set(expandedCategories);
     
     if (expandedCategories.has(categoryId)) {
       newExpanded.delete(categoryId);
     } else {
       newExpanded.add(categoryId);
+      // Load subcategories if not already loaded
+      if (!subcategories[categoryId]) {
+        try {
+          // Check cache first
+          const cachedSubs = cacheService.getSubcategories(categoryId);
+          if (cachedSubs) {
+            setSubcategories(prev => ({ ...prev, [categoryId]: cachedSubs }));
+          } else {
+            const allCategories = await api.getCategories();
+            // Remove the count > 0 filter to show ALL subcategories
+            const subs = allCategories.filter(cat => cat.parent === categoryId);
+            // Cache the subcategories
+            cacheService.setSubcategories(categoryId, subs);
+            setSubcategories(prev => ({ ...prev, [categoryId]: subs }));
+          }
+        } catch (error) {
+          console.error('Error loading subcategories:', error);
+        }
+      }
     }
     
     setExpandedCategories(newExpanded);
   };
 
-  const cartItemsCount = state.cart.reduce((total, item) => total + item.quantity, 0);
+  // Check if a category has subcategories by checking all available categories
+  const hasSubcategories = (categoryId: number): boolean => {
+    // Check if there are any categories that have this categoryId as parent
+    return allCategories.length > 0 && allCategories.some(cat => cat.parent === categoryId);
+  };
 
-  // Recursive Category Item Component
-  function CategoryItem({ category, allCategories, level, expandedCategories, onToggleCategory, onClose }: CategoryItemProps) {
-    const [childCategories, setChildCategories] = useState<Category[]>([]);
-    const hasChildren = childCategories.length > 0;
-
-    useEffect(() => {
-      // Find direct children of this category
-      const children = allCategories.filter(cat => cat.parent === category.id && cat.count > 0);
-      setChildCategories(children);
-    }, [category.id, allCategories]);
-
-    const isExpanded = expandedCategories.has(category.id);
-
+  // Recursive component to render all levels of categories
+  const renderCategoryTree = (parentId: number = 0, level: number = 0) => {
+    const catsToRender = parentId === 0 ? categories : subcategories[parentId] || [];
+    
+    if (parentId !== 0 && !subcategories[parentId]) {
+      return null;
+    }
+    
     return (
-      <div>
-        <div className="flex items-center group" style={{ marginLeft: `${level * 16}px` }}>
-          <Link
-            to={`/categories/${category.slug}`}
-            onClick={onClose}
-            className="flex-1 flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            {category.image && (
-              <img
-                src={category.image.src}
-                alt={category.name}
-                className="w-5 h-5 rounded object-cover"
-              />
-            )}
-            <span className="text-gray-900 dark:text-white font-medium group-hover:text-primary-600 dark:group-hover:text-primary-400">
-              {category.name}
-            </span>
-          </Link>
-          {hasChildren && (
-            <button
-              onClick={() => onToggleCategory(category.id)}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              aria-label={isExpanded ? "Masquer les sous-catégories" : "Afficher les sous-catégories"}
-            >
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4 text-gray-400 transition-transform duration-200" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-gray-400 transition-transform duration-200" />
-              )}
-            </button>
-          )}
-        </div>
+      <div className={`space-y-1 ${level > 0 ? 'ml-4 mt-1' : ''}`}>
+        {catsToRender.map((category) => (
+          <div key={category.id}>
+            <div className="flex items-center group">
+              <div className="flex-1 flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                {category.image && (
+                  <img
+                    src={category.image.src}
+                    alt={category.name}
+                    className="w-6 h-6 rounded object-cover"
+                  />
+                )}
+                <Link
+                  to={`/categories/${category.slug}`}
+                  onClick={onClose}
+                  className="flex-1 text-gray-900 dark:text-white font-medium group-hover:text-primary-600 dark:group-hover:text-primary-400"
+                >
+                  {category.name}
+                </Link>
+                {hasSubcategories(category.id) && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleCategory(category.id);
+                    }}
+                    className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    aria-label={expandedCategories.has(category.id) ? "Masquer les sous-catégories" : "Afficher les sous-catégories"}
+                  >
+                    {expandedCategories.has(category.id) ? (
+                      <ChevronDown className="h-4 w-4 text-gray-400 transition-transform duration-200" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-gray-400 transition-transform duration-200" />
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
 
-        {/* Child Categories */}
-        {isExpanded && hasChildren && (
-          <div className="mt-1 space-y-1">
-            {childCategories.map((childCategory) => (
-              <CategoryItem
-                key={childCategory.id}
-                category={childCategory}
-                allCategories={allCategories}
-                level={level + 1}
-                expandedCategories={expandedCategories}
-                onToggleCategory={onToggleCategory}
-                onClose={onClose}
-              />
-            ))}
+            {/* Recursive subcategories */}
+            {expandedCategories.has(category.id) && hasSubcategories(category.id) && (
+              <div className="ml-4 mt-1">
+                {!subcategories[category.id] ? (
+                  <div className="p-2 text-gray-500 dark:text-gray-400 text-sm">Chargement...</div>
+                ) : (
+                  renderCategoryTree(category.id, level + 1)
+                )}
+              </div>
+            )}
           </div>
-        )}
+        ))}
       </div>
     );
-  }
+  };
+
+  const cartItemsCount = state.cart.reduce((total, item) => total + item.quantity, 0);
 
   const mainMenuItems = [
     { path: '/', icon: Home, label: 'Accueil' },
@@ -211,19 +249,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           {/* Categories Accordion */}
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Catégories</h3>
-            <div className="space-y-1">
-              {categories.map((category) => (
-                <CategoryItem
-                  key={category.id}
-                  category={category}
-                  allCategories={allCategories}
-                  level={0}
-                  expandedCategories={expandedCategories}
-                  onToggleCategory={toggleCategory}
-                  onClose={onClose}
-                />
-              ))}
-            </div>
+            {renderCategoryTree()}
           </div>
 
           {/* Secondary Menu */}

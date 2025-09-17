@@ -75,7 +75,7 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
       
       const [products, subcats] = await Promise.all([
         api.getProductsByCategory(categoryId, { page, per_page: 10 }),
-        page === 1 ? api.getCategories().then(cats => cats.filter(cat => cat.parent === categoryId && cat.count > 0)) : Promise.resolve([])
+        page === 1 ? api.getCategories().then(cats => cats.filter(cat => cat.parent === categoryId)) : Promise.resolve([])
       ]);
       
       if (page === 1) {
@@ -193,7 +193,7 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
                 to="/categories"
                 className="text-primary-600 dark:text-primary-400 mr-4"
               >
-                ← Back
+                ← Retour
               </Link>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {selectedCategory.name}
