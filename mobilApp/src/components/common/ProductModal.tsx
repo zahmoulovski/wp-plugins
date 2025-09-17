@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, ShoppingCart, Heart, Plus, Minus, MessageCircleCode } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Product } from '../../types';
 import { useApp } from '../../contexts/AppContext';
 
@@ -8,10 +9,9 @@ interface ProductModalProps {
   product: Product;
   isOpen: boolean;
   onClose: () => void;
-  onCategoryClick?: (categoryId: number) => void;
 }
 
-export function ProductModal({ product, isOpen, onClose, onCategoryClick }: ProductModalProps) {
+export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const { dispatch } = useApp();
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -20,10 +20,12 @@ export function ProductModal({ product, isOpen, onClose, onCategoryClick }: Prod
 
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
+    
     const handleResize = () => {
       const container = containerRef.current;
       const text = textRef.current;
@@ -31,9 +33,29 @@ export function ProductModal({ product, isOpen, onClose, onCategoryClick }: Prod
         setIsOverflowing(text.scrollWidth > container.clientWidth);
       }
     };
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [isOpen]);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscapeKey);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [isOpen, onClose]);
   
 
   if (!isOpen) return null;
@@ -90,7 +112,7 @@ export function ProductModal({ product, isOpen, onClose, onCategoryClick }: Prod
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div ref={modalRef} className="bg-white dark:bg-gray-900 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
 
         {/* Modal Header */}
         <div className="sticky top-0 bg-white dark:bg-gray-900 p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -188,19 +210,14 @@ export function ProductModal({ product, isOpen, onClose, onCategoryClick }: Prod
             <div className="mb-4">
               <div className="flex flex-wrap gap-2">
                 {product.categories.map((category) => (
-                  <span
+                  <Link
                     key={category.id}
-                    onClick={() => {
-                      console.log('ProductModal category clicked:', category.id);
-                      if (onCategoryClick) {
-                        onCategoryClick(category.id);
-                        onClose();
-                      }
-                    }}
-                    className="px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-sm cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    to={`/categories/${category.id}`}
+                    onClick={onClose}
+                    className="px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors inline-block"
                   >
                     {category.name}
-                  </span>
+                  </Link>
                 ))}
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { Product, Category, Customer, Order } from '../types';
+import { cacheService } from './cache';
 
 const BASE_URL = 'https://klarrion.com/wp-json/wc/v3';
 const CONSUMER_KEY = 'ck_dfe0100c9d01f160659ad10ce926673b08030068';
@@ -31,12 +32,32 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
 export const api = {
   // ---------- WooCommerce ----------
   async getProducts(params: Record<string, string | number> = {}): Promise<Product[]> {
+    // Check cache first
+    const cachedProducts = cacheService.getProducts(params);
+    if (cachedProducts) {
+      return cachedProducts;
+    }
+
     const queryParams = new URLSearchParams(params as Record<string, string>).toString();
-    return apiRequest(`/products?${queryParams}`);
+    const products = await apiRequest(`/products?${queryParams}`);
+    
+    // Cache the results
+    cacheService.setProducts(products, params);
+    return products;
   },
 
   async getProduct(id: number): Promise<Product> {
-    return apiRequest(`/products/${id}`);
+    // Check cache first
+    const cachedProduct = cacheService.getProduct(id);
+    if (cachedProduct) {
+      return cachedProduct;
+    }
+
+    const product = await apiRequest(`/products/${id}`);
+    
+    // Cache the result
+    cacheService.setProduct(product);
+    return product;
   },
 
   async searchProducts(query: string): Promise<Product[]> {
@@ -48,7 +69,17 @@ export const api = {
   },
 
   async getCategories(): Promise<Category[]> {
-    return apiRequest('/products/categories?per_page=100');
+    // Check cache first
+    const cachedCategories = cacheService.getCategories();
+    if (cachedCategories) {
+      return cachedCategories;
+    }
+
+    const categories = await apiRequest('/products/categories?per_page=100');
+    
+    // Cache the results
+    cacheService.setCategories(categories);
+    return categories;
   },
 
   async getCategory(id: number): Promise<Category> {

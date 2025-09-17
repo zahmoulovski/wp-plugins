@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Sun, Moon } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 
 interface HeaderProps {
   currentPage: string;
   onPageChange: (page: string) => void;
+  onMenuClick: () => void;
+  isMenuOpen?: boolean;
 }
 
-export function Header({ currentPage, onPageChange }: HeaderProps) {
+export function Header({ currentPage, onPageChange, onMenuClick, isMenuOpen = false }: HeaderProps) {
   const { state, dispatch } = useApp();
 
   const toggleDarkMode = () => {
@@ -23,19 +26,42 @@ export function Header({ currentPage, onPageChange }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-800">
       <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center">
-           
+        <div className="flex items-center space-x-3">
           <button
-            onClick={() => onPageChange('home')}
-            aria-label="Aller à l’accueil"
-            className={`focus:outline-none ${currentPage === 'home' ? 'opacity-100' : 'opacity-90 hover:opacity-100'}`}
+            onClick={onMenuClick}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative w-9 h-9"
+            aria-label="Ouvrir le menu"
+          >
+            {/* Animated Hamburger Icon */}
+            <div className="w-5 h-4 relative">
+              <span 
+                className={`absolute block h-0.5 w-full bg-current text-gray-600 dark:text-gray-400 transition-all duration-300 ${
+                  isMenuOpen ? 'rotate-45 top-2' : 'top-0'
+                }`}
+              />
+              <span 
+                className={`absolute block h-0.5 w-full bg-current text-gray-600 dark:text-gray-400 transition-all duration-300 top-2 ${
+                  isMenuOpen ? 'opacity-0' : 'opacity-100'
+                }`}
+              />
+              <span 
+                className={`absolute block h-0.5 w-full bg-current text-gray-600 dark:text-gray-400 transition-all duration-300 ${
+                  isMenuOpen ? '-rotate-45 top-2' : 'top-4'
+                }`}
+              />
+            </div>
+          </button>
+          <Link
+            to="/"
+            aria-label="Aller à l'accueil"
+            className="focus:outline-none hover:opacity-100 transition-opacity"
           >
             <img
               src={logoSrc}
               alt="KLARRION"
               className="h-8 w-auto"
             />
-          </button>
+          </Link>
         </div>
 
         <button

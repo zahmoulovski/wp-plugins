@@ -1,22 +1,19 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Home, Grid3X3, Search, ShoppingCart, User } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 
-interface BottomNavProps {
-  currentPage: string;
-  onPageChange: (page: string) => void;
-}
-
-export function BottomNav({ currentPage, onPageChange }: BottomNavProps) {
+export function BottomNav() {
   const { state } = useApp();
+  const location = useLocation();
   const cartItemsCount = state.cart.reduce((total, item) => total + item.quantity, 0);
 
   const navItems = [
-    { id: 'home', icon: Home, label: 'Accueil' },
-    { id: 'categories', icon: Grid3X3, label: 'Catégories' },
-    { id: 'search', icon: Search, label: 'Recherche' },
-    { id: 'cart', icon: ShoppingCart, label: 'Panier', badge: cartItemsCount },
-    { id: 'profile', icon: User, label: 'Profil' },
+    { path: '/', icon: Home, label: 'Accueil' },
+    { path: '/categories', icon: Grid3X3, label: 'Catégories' },
+    { path: '/search', icon: Search, label: 'Recherche' },
+    { path: '/cart', icon: ShoppingCart, label: 'Panier', badge: cartItemsCount },
+    { path: '/profile', icon: User, label: 'Profil' },
   ];
 
   return (
@@ -24,12 +21,12 @@ export function BottomNav({ currentPage, onPageChange }: BottomNavProps) {
       <div className="flex justify-around items-center px-2 py-2">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = currentPage === item.id;
+          const isActive = location.pathname === item.path;
           
           return (
-            <button
-              key={item.id}
-              onClick={() => onPageChange(item.id)}
+            <Link
+              key={item.path}
+              to={item.path}
               className={`relative flex flex-col items-center justify-center p-2 min-w-[60px] rounded-lg transition-all duration-200 ${
                 isActive 
                   ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30' 
@@ -44,7 +41,7 @@ export function BottomNav({ currentPage, onPageChange }: BottomNavProps) {
                   {item.badge > 99 ? '99+' : item.badge}
                 </div>
               )}
-            </button>
+            </Link>
           );
         })}
       </div>

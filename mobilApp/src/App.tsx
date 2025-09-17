@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { AppProvider } from './contexts/AppContext';
 import { Header } from './components/Layout/Header';
+import { Sidebar } from './components/Layout/Sidebar';
 import { BottomNav } from './components/Layout/BottomNav';
 import { HomePage } from './components/pages/HomePage';
 import { CategoriesPage } from './components/pages/CategoriesPage';
@@ -13,110 +15,87 @@ import { ProductModal } from './components/common/ProductModal';
 import { Product } from './types';
 
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState('home');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
-  const [navigationHistory, setNavigationHistory] = useState<string[]>(['home']);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const handlePageChange = (page: string) => {
-    setCurrentPage(page);
-    // Update navigation history
-    setNavigationHistory(prev => [...prev, page]);
-    // Clear selected category when navigating away from categories immediately
-    // This prevents timing issues with category loading
-    if (page !== 'categories') {
-      setSelectedCategoryId(null);
-    }
-  };
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
   };
 
-  const handleCategoryClick = (categoryId: number) => {
-    console.log('handleCategoryClick called with categoryId:', categoryId);
-    setSelectedCategoryId(categoryId);
-    setCurrentPage('categories');
-    setNavigationHistory(prev => [...prev, 'categories']);
-  };
-
   const handleCheckout = () => {
-    setCurrentPage('checkout');
+    navigate('/checkout');
   };
 
   const handleBackToCart = () => {
-    setCurrentPage('cart');
+    navigate('/cart');
   };
 
   const handleOrderSuccess = (order: any, subtotal: string) => {
     console.log('Order success triggered:', { order, subtotal });
-    setCurrentPage('thank-you');
     // Store order details for thank you page
     (window as any).orderDetails = { order, subtotal };
+    navigate('/thank-you');
   };
 
-  const handleBackNavigation = () => {
-    console.log('handleBackNavigation called, current history:', navigationHistory);
-    
-    // Always navigate back to home and reset category selection
-    setCurrentPage('home');
-    setSelectedCategoryId(null);
-    setNavigationHistory(['home']);
+  const handleBackToHome = () => {
+    navigate('/');
   };
 
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'home':
-        return <HomePage onProductClick={handleProductClick} />;
-      case 'categories':
-        return (
-          <CategoriesPage 
-            onProductClick={handleProductClick} 
-            selectedCategoryId={selectedCategoryId}
-            onBack={handleBackNavigation}
-          />
-        );
-      case 'search':
-        return <SearchPage onProductClick={handleProductClick} />;
-      case 'cart':
-        return <CartPage onCheckout={handleCheckout} />;
-      case 'checkout':
-        return <CheckoutPage onBack={handleBackToCart} onOrderSuccess={handleOrderSuccess} />;
-      case 'thank-you':
-        return <ThankYouPage orderDetails={(window as any).orderDetails} onBackToHome={() => setCurrentPage('home')} onContinueShopping={() => setCurrentPage('categories')} />;
-      case 'profile':
-        return <ProfilePage />;
-      default:
-        return <HomePage onProductClick={handleProductClick} />;
-    }
+  const handleContinueShopping = () => {
+    navigate('/categories');
+  };
+
+  const isCheckoutPage = location.pathname === '/checkout';
+
+  const handleMenuClick = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const handleSidebarClose = () => {
+    setIsSidebarOpen(false);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <Header />
+      <Header onMenuClick={handleMenuClick} isMenuOpen={isSidebarOpen} />
+      <Sidebar isOpen={isSidebarOpen} onClose={handleSidebarClose} />
       <main>
-        {renderPage()}
+        <Routes>
+          <Route path="/" element={<HomePage onProductClick={handleProductClick} />} />
+          <Route path="/categories" element={<CategoriesPage onProductClick={handleProductClick} />} />
+          <Route path="/categories/:categorySlug" element={<CategoriesPage onProductClick={handleProductClick} />} />
+          <Route path="/search" element={<SearchPage onProductClick={handleProductClick} />} />
+          <Route path="/cart" element={<CartPage onCheckout={handleCheckout} />} />
+          <Route path="/checkout" element={<CheckoutPage onBack={handleBackToCart} onOrderSuccess={handleOrderSuccess} />} />
+          <Route 
+            path="/thank-you" 
+            element={
+              <ThankYouPage 
+                orderDetails={(window as any).orderDetails} 
+                onBackToHome={handleBackToHome} 
+                onContinueShopping={handleContinueShopping} 
+              />
+            } 
+          />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
-      {currentPage !== 'checkout' && (
-        <BottomNav currentPage={currentPage} onPageChange={handlePageChange} />
-      )}
+      {!isCheckoutPage && <BottomNav />}
       
       <ProductModal
         product={selectedProduct}
         isOpen={!!selectedProduct}
         onClose={() => setSelectedProduct(null)}
-        onCategoryClick={handleCategoryClick}
       />
     </div>
   );
 }
 
 function App() {
-  useEffect(() => {
-    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
-    document.documentElement.classList.toggle('dark', savedDarkMode);
-  }, []);
-
   return (
     <AppProvider>
       <AppContent />

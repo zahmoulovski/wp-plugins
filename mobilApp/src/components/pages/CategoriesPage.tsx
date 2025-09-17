@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Category, Product } from '../../types';
 import { api } from '../../services/api';
 import { LoadingSpinner } from '../common/LoadingSpinner';
@@ -8,11 +9,11 @@ import { PullToRefresh } from '../common/PullToRefresh';
 
 interface CategoriesPageProps {
   onProductClick: (product: Product) => void;
-  selectedCategoryId?: number;
-  onBack?: () => void;
 }
 
-export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: CategoriesPageProps) {
+export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
+  const { categorySlug } = useParams<{ categorySlug: string }>();
+  const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [categoryProducts, setCategoryProducts] = useState<Product[]>([]);
@@ -22,36 +23,27 @@ export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: C
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasAutoSelected, setHasAutoSelected] = useState(false);
-  const [isAutoSelecting, setIsAutoSelecting] = useState(false);
 
-  // Debug component lifecycle
-  useEffect(() => {
-    console.log('CategoriesPage mounted/updated', { selectedCategoryId, selectedCategory });
-    return () => {
-      console.log('CategoriesPage unmounting');
-    };
-  }, [selectedCategoryId, selectedCategory]);
+  // Helper function to find category by slug or ID
+  const findCategory = (categories: Category[], identifier: string): Category | undefined => {
+    // Try to find by slug first
+    const bySlug = categories.find(cat => cat.slug === identifier);
+    if (bySlug) return bySlug;
+    
+    // Fallback to ID if slug not found
+    const id = parseInt(identifier);
+    if (!isNaN(id)) {
+      return categories.find(cat => cat.id === id);
+    }
+    
+    return undefined;
+  };
 
   const loadCategories = async () => {
     try {
       setLoading(true);
       const data = await api.getCategories();
-      console.log('Loaded categories from API:', data.length, 'total categories');
-      
-      // Filter categories but be more permissive - include categories with 0 count for navigation
-      // and include both parent and child categories
-      const filteredCategories = data.filter(cat => {
-        // Include all categories except those that are clearly invalid
-        return cat && cat.id && cat.name; // Basic validation
-      });
-      
-      console.log('Filtered categories:', filteredCategories.length, 'categories');
-      
-      // For main view, show only parent categories (parent === 0) but include those with 0 count
-      // This ensures all main categories are visible even if they have no products directly
-      const mainCategories = filteredCategories.filter(cat => cat.parent === 0);
-      
+      const mainCategories = data.filter(cat => cat && cat.id && cat.name && cat.parent === 0);
       setCategories(mainCategories);
     } catch (error) {
       console.error('Error loading categories:', error);
@@ -60,49 +52,21 @@ export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: C
     }
   };
 
-  const loadCategoryById = async (categoryId: number) => {
+  const loadCategoryById = async (categoryIdentifier: string) => {
     try {
-      console.log('Attempting to load category by ID:', categoryId);
-      
-      // Try multiple approaches to find the category
-      let category = categories.find(cat => cat.id === categoryId);
-      
-      if (!category) {
-        // Try to get the category directly from the API
-        const allCategories = await api.getCategories();
-        category = allCategories.find(cat => cat.id === categoryId);
-        console.log('Found category in full API response:', category);
-      }
-      
+      const allCategories = await api.getCategories();
+      const category = findCategory(allCategories, categoryIdentifier);
       if (category) {
-        console.log('Found category via API:', category);
-        // Set the selected category and load its products
         setSelectedCategory(category);
-        setCurrentPage(1);
         await loadCategoryProducts(category.id, 1);
-        setHasAutoSelected(true);
-        setIsAutoSelecting(false);
-        
-        // Add this category to the main categories list if it's not already there
-        if (!categories.find(cat => cat.id === categoryId)) {
-          setCategories(prev => [...prev, category]);
-        }
-      } else {
-        console.log('Category not found via API with ID:', categoryId);
-        setIsAutoSelecting(false);
-        // Silently handle - category might not exist or API might be unavailable
       }
     } catch (error) {
       console.error('Error loading category by ID:', error);
-      setIsAutoSelecting(false);
-      // Silently handle API errors - don't show alerts to users
     }
   };
 
   const loadCategoryProducts = async (categoryId: number, page: number = 1, append: boolean = false) => {
     try {
-      console.log('Loading category products for category:', categoryId, 'page:', page);
-      
       if (page === 1) {
         setProductsLoading(true);
       } else {
@@ -114,8 +78,6 @@ export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: C
         page === 1 ? api.getCategories().then(cats => cats.filter(cat => cat.parent === categoryId && cat.count > 0)) : Promise.resolve([])
       ]);
       
-      console.log('Loaded products:', products.length, 'subcategories:', subcats.length);
-      
       if (page === 1) {
         setCategoryProducts(products);
         setSubcategories(subcats);
@@ -126,7 +88,6 @@ export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: C
       setHasMoreProducts(products.length === 10);
     } catch (error) {
       console.error('Error loading category products:', error);
-      // Reset products on error
       if (page === 1) {
         setCategoryProducts([]);
         setSubcategories([]);
@@ -144,58 +105,15 @@ export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: C
     loadCategories();
   }, []);
 
-  // Auto-select category when selectedCategoryId is provided
   useEffect(() => {
-    console.log('Auto-select effect triggered:', { selectedCategoryId, hasAutoSelected, categoriesLength: categories.length, loading, selectedCategory });
-    
-    // Reset auto-selection when selectedCategoryId changes to null (back navigation)
-    if (!selectedCategoryId) {
-      console.log('selectedCategoryId is null, resetting auto-selection');
-      setHasAutoSelected(false);
+    if (categorySlug) {
+      loadCategoryById(categorySlug);
+    } else {
       setSelectedCategory(null);
       setCategoryProducts([]);
       setSubcategories([]);
-      setIsAutoSelecting(false);
-      return;
     }
-    
-    // Only attempt auto-selection if we have a category ID, categories are loaded, and we haven't auto-selected yet
-    if (selectedCategoryId && !hasAutoSelected && categories.length > 0 && !loading) {
-      // Show loading state during auto-selection
-      setIsAutoSelecting(true);
-      
-      // Add timeout to prevent infinite loading if API fails
-      const timeout = setTimeout(() => {
-        setIsAutoSelecting(false);
-      }, 3000); // 3 second timeout
-      
-      const category = categories.find(cat => cat.id === selectedCategoryId);
-      console.log('Found category for auto-selection:', category);
-      
-      if (category) {
-        // Set the selected category and load its products
-        setSelectedCategory(category);
-        setCurrentPage(1);
-        loadCategoryProducts(category.id, 1);
-        setHasAutoSelected(true);
-        setIsAutoSelecting(false);
-        clearTimeout(timeout);
-      } else {
-        console.log('Category not found with ID:', selectedCategoryId);
-        // Try to load the category directly since it might be a subcategory or not in the main list
-        loadCategoryById(selectedCategoryId).then(() => {
-          clearTimeout(timeout);
-        });
-      }
-    }
-  }, [selectedCategoryId, hasAutoSelected, categories, loading]);
-
-  // Reset auto-selection flag when selectedCategoryId changes
-  useEffect(() => {
-    if (selectedCategoryId) {
-      setHasAutoSelected(false);
-    }
-  }, [selectedCategoryId]);
+  }, [categorySlug]);
 
   const handleRefresh = async () => {
     if (selectedCategory) {
@@ -207,27 +125,12 @@ export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: C
   };
 
   const handleCategoryClick = (category: Category) => {
-    setSelectedCategory(category);
-    setCurrentPage(1);
-    loadCategoryProducts(category.id, 1);
+    navigate(`/categories/${category.slug}`);
   };
 
   const handleBackToCategories = () => {
-    console.log('handleBackToCategories called', { selectedCategory, onBack });
-    
-    // If we have a selected category, clear it first
     if (selectedCategory) {
-      console.log('Clearing selected category');
-      setSelectedCategory(null);
-      setCategoryProducts([]);
-      setSubcategories([]);
-      setCurrentPage(1);
-      setHasMoreProducts(true);
-      setHasAutoSelected(false);
-    } else if (onBack) {
-      // Only call onBack if we're already at the top level of categories
-      console.log('Calling onBack() from top level');
-      onBack();
+      navigate('/categories');
     }
   };
 
@@ -239,7 +142,7 @@ export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: C
     }
   };
 
-  if (loading || isAutoSelecting) {
+  if (loading) {
     return <LoadingSpinner />;
   }
 
@@ -254,10 +157,10 @@ export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: C
             
             <div className="space-y-3">
               {categories.map((category) => (
-                <div
+                <Link
                   key={category.id}
-                  onClick={() => handleCategoryClick(category)}
-                  className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 cursor-pointer hover:shadow-md transition-all duration-200"
+                  to={`/categories/${category.slug}`}
+                  className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 cursor-pointer hover:shadow-md transition-all duration-200 block"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
@@ -279,19 +182,19 @@ export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: C
                     </div>
                     <ChevronRight className="h-5 w-5 text-gray-400" />
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </>
         ) : (
           <>
             <div className="flex items-center mb-6">
-              <button
-                onClick={handleBackToCategories}
+              <Link
+                to="/categories"
                 className="text-primary-600 dark:text-primary-400 mr-4"
               >
                 ← Back
-              </button>
+              </Link>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {selectedCategory.name}
               </h1>
@@ -309,10 +212,10 @@ export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: C
                     </h2>
                     <div className="space-y-3">
                       {subcategories.map((subcategory) => (
-                        <div
+                        <Link
                           key={subcategory.id}
-                          onClick={() => handleCategoryClick(subcategory)}
-                          className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 cursor-pointer hover:shadow-md transition-all duration-200"
+                          to={`/categories/${subcategory.id}`}
+                          className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 cursor-pointer hover:shadow-md transition-all duration-200 block"
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-4">
@@ -334,7 +237,7 @@ export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: C
                             </div>
                             <ChevronRight className="h-5 w-5 text-gray-400" />
                           </div>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   </div>
@@ -379,7 +282,7 @@ export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: C
                 {categoryProducts.length === 0 && subcategories.length === 0 && (
                   <div className="text-center py-12">
                     <p className="text-gray-500 dark:text-gray-400">
-                      Aucun produit ou sous-catégorie trouvé
+                      Aucun produit trouvé dans cette catégorie.
                     </p>
                   </div>
                 )}

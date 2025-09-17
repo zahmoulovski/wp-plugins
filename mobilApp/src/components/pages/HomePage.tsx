@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Product } from '../../types';
 import { api } from '../../services/api';
+import { cacheService } from '../../services/cache';
 import { ProductCard } from '../common/ProductCard';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { PullToRefresh } from '../common/PullToRefresh';
@@ -39,8 +40,20 @@ export function HomePage({ onProductClick }: HomePageProps) {
       setLoading(true);
       setError(null);
 
-      const nonFeatured = await api.getProducts({ per_page: 20, featured: false });
-      const featured = await api.getProducts({ per_page: 20, featured: true });
+      // Check cache first
+      const cachedFeatured = cacheService.getProducts({ per_page: 20, featured: true });
+      const cachedNonFeatured = cacheService.getProducts({ per_page: 20, featured: false });
+
+      let featured = cachedFeatured;
+      let nonFeatured = cachedNonFeatured;
+
+      // If not in cache, fetch from API
+      if (!featured || !nonFeatured) {
+        [nonFeatured, featured] = await Promise.all([
+          api.getProducts({ per_page: 20, featured: false }),
+          api.getProducts({ per_page: 20, featured: true })
+        ]);
+      }
 
       // 🔀 Shuffle before setting state
       setProducts({
@@ -62,9 +75,17 @@ export function HomePage({ onProductClick }: HomePageProps) {
 
       const results: Record<string, Product[]> = {};
       for (const cat of CATEGORIES) {
-        const products = await api.getProducts({ per_page: 20, category: cat.id });
+        // Check cache first for each category
+        const cacheKey = `category_${cat.id}_products`;
+        let cachedProducts = cacheService.get(cacheKey);
+        
+        if (!cachedProducts) {
+          cachedProducts = await api.getProducts({ per_page: 20, category: cat.id });
+          cacheService.set(cacheKey, cachedProducts, 10 * 60 * 1000); // Cache for 10 minutes
+        }
+        
         // 🔀 Shuffle each category list
-        results[cat.title] = shuffleArray(products);
+        results[cat.title] = shuffleArray(cachedProducts);
       }
       setCategoryProducts(results);
     } catch (err) {
