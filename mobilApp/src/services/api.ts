@@ -6,10 +6,11 @@ const CONSUMER_SECRET = 'cs_39958925e281230d5078b21e722451225056d4ea';
 
 const auth = btoa(`${CONSUMER_KEY}:${CONSUMER_SECRET}`);
 
-// ---- Konnect configuration ----
-// ⚠️  For production move these to server-side env vars!
-export const KONNECT_API_KEY   = '67330b734846127416a9420d:k4pEgWFVWjP39GHw4dXBaO';
-export const KONNECT_WALLET_ID = '67330b734846127416a94223';
+// ---- Flouci configuration ----
+// ⚠️ For production move these to server-side env vars!
+export const FLOUCI_PUBLIC_KEY = '40f9dd4f-d834-4742-800d-4db524a24836'; // Replace with your actual key
+export const FLOUCI_PRIVATE_KEY = 'b9390a7a-fc0c-4004-a4fe-7e6be0044a83'; // Replace with your actual key
+const FLOUCI_BASE_URL = 'https://developers.flouci.com/api/v2';
 
 async function apiRequest(endpoint: string, options: RequestInit = {}) {
   const response = await fetch(`${BASE_URL}${endpoint}`, {
@@ -96,60 +97,179 @@ export const api = {
   },
 
   async getOrder(id: number): Promise<Order> {
-    return apiRequest(`/orders/${id}`);
+    return apiRequest(`/orders/${id}?_embed`);
   },
 
   async getPaymentMethods(): Promise<any[]> {
     return apiRequest('/payment_gateways');
   },
 
-  async getShippingMethods(): Promise<any[]> {
-    return apiRequest('/shipping_methods');
+  async getShippingZones(): Promise<any[]> {
+    return apiRequest('/shipping/zones');
   },
 
-  // ---------- Konnect ----------
-  /**
-   * Create a Konnect payment session and return { payUrl, paymentRef }.
-   * amountTnd = total amount in TND (not millimes).
-   */
-  async initKonnectPayment(
-    orderId: number,
-    amountTnd: number,
-    customer: { firstName: string; lastName: string; email: string; phone: string }
-  ): Promise<{ payUrl: string; paymentRef: string }> {
-    const amountMilli = Math.round(amountTnd * 1000); // Konnect uses millimes
+  async getShippingZoneMethods(zoneId: number): Promise<any[]> {
+    return apiRequest(`/shipping/zones/${zoneId}/methods`);
+  },
 
+  async getAllShippingMethods(): Promise<any[]> {
+    try {
+      // Get all shipping zones
+      const zones = await this.getShippingZones();
+      const allMethods: any[] = [];
+      
+      // Get methods for each zone
+      for (const zone of zones) {
+        try {
+          const methods = await this.getShippingZoneMethods(zone.id);
+          const enabledMethods = methods.filter(method => method.enabled);
+          
+          // Format methods for frontend use
+          enabledMethods.forEach(method => {
+            let cost = '0.00';
+            if (method.settings && method.settings.cost) {
+              cost = method.settings.cost.value || '0.00';
+            } else if (method.settings && method.settings.min_amount) {
+              cost = '0.00'; // Free shipping
+            }
+            
+            allMethods.push({
+              id: `${method.method_id}:${method.instance_id}`,
+              title: method.title,
+              cost: cost,
+              method_id: method.method_id,
+              zone_id: zone.id,
+              zone_name: zone.name
+            });
+          });
+        } catch (error) {
+          console.error(`Error fetching methods for zone ${zone.id}:`, error);
+        }
+      }
+      
+      // Also get global methods (zone 0)
+      try {
+        const globalMethods = await this.getShippingZoneMethods(0);
+        const enabledGlobalMethods = globalMethods.filter(method => method.enabled);
+        
+        enabledGlobalMethods.forEach(method => {
+          let cost = '0.00';
+          if (method.settings && method.settings.cost) {
+            cost = method.settings.cost.value || '0.00';
+          } else if (method.settings && method.settings.min_amount) {
+            cost = '0.00'; // Free shipping
+          }
+          
+          allMethods.push({
+            id: `${method.method_id}:${method.instance_id}`,
+            title: method.title,
+            cost: cost,
+            method_id: method.method_id,
+            zone_id: 0,
+            zone_name: 'Global'
+          });
+        });
+      } catch (error) {
+        console.error('Error fetching global shipping methods:', error);
+      }
+      
+      return allMethods;
+    } catch (error) {
+      console.error('Error fetching all shipping methods:', error);
+      throw error;
+    }
+  },
+
+  async calculateShipping(cartItems: any[], shippingAddress: any): Promise<any> {
     const body = {
-      receiverWalletId: KONNECT_WALLET_ID,
-      token: 'TND',
-      amount: amountMilli,
-      type: 'immediate',
-      description: `Order #${orderId}`,
-      acceptedPaymentMethods: ['wallet', 'bank_card', 'e-DINAR'],
-      lifespan: 30,
-      checkoutForm: true,
-      addPaymentFeesToAmount: false,
-      firstName: customer.firstName,
-      lastName: customer.lastName,
-      phoneNumber: customer.phone,
-      email: customer.email,
-      orderId: String(orderId),
-      webhook: 'http://localhost:5173/api/notification_payment',
-      theme: 'light',
+      line_items: cartItems.map(item => ({
+        product_id: item.product.id,
+        quantity: item.quantity,
+      })),
+      shipping: shippingAddress,
+    };
+    
+    return apiRequest('/shipping/calculate', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  // Update order meta data (for storing payment information)
+  async updateOrderMeta(orderId: number, metaData: Record<string, any>): Promise<Order> {
+    const metaArray = Object.entries(metaData).map(([key, value]) => ({
+      key,
+      value: String(value)
+    }));
+
+    return apiRequest(`/orders/${orderId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        meta_data: metaArray
+      }),
+    });
+  },
+
+  // ---------- Flouci ----------
+  /**
+   * Create a Flouci payment session and return { payUrl, payment_id }.
+   * amountTnd = total amount in TND, will be converted to millimes internally.
+   */
+  async initFlouciPayment(
+    orderId: number,
+    amountInMillimes: number, // Already converted to millimes in CheckoutPage
+    customer: { firstName: string; lastName: string; email: string; phone: string }
+  ): Promise<{ payUrl: string; payment_id: string }> {
+    
+    const currentDomain = window.location.origin;
+    
+    const body = {
+      amount: amountInMillimes, // Amount in millimes (already converted)
+      success_link: `${currentDomain}/payment-success?order_id=${orderId}`,
+      fail_link: `${currentDomain}/payment-failed?order_id=${orderId}`,
+      webhook: `https://klarrion.com/wp-json/flouci/v1/webhook`, // Your WordPress webhook endpoint
+      developer_tracking_id: `order_${orderId}`
     };
 
-    const res = await fetch('https://api.konnect.network/payments/init-payment', {
+    const response = await fetch(`${FLOUCI_BASE_URL}/generate_payment`, {
       method: 'POST',
       headers: {
-        'x-api-key': KONNECT_API_KEY,
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${FLOUCI_PUBLIC_KEY}:${FLOUCI_PRIVATE_KEY}`
       },
       body: JSON.stringify(body),
     });
 
-    if (!res.ok) {
-      throw new Error(`Konnect init-payment failed: ${res.status}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(`Flouci payment initialization failed: ${response.status} ${errorData?.result?.message || response.statusText}`);
     }
-    return res.json();
+
+    const data = await response.json();
+    
+    return {
+      payUrl: data.result.link,
+      payment_id: data.result.payment_id
+    };
+  },
+
+  /**
+   * Verify Flouci payment status (optional - for manual verification)
+   */
+  async verifyFlouciPayment(paymentId: string): Promise<any> {
+    const response = await fetch(`${FLOUCI_BASE_URL}/verify/${paymentId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${FLOUCI_PUBLIC_KEY}:${FLOUCI_PRIVATE_KEY}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(`Flouci payment verification failed: ${response.status} ${errorData?.result?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.result;
   },
 };

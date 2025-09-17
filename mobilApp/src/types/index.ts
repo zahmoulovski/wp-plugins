@@ -18,6 +18,8 @@ export interface Product {
     name: string;
     slug: string;
   }>;
+  shipping_class: string;
+  shipping_class_id: number;
   stock_status: string;
   stock_quantity: number;
   on_sale: boolean;

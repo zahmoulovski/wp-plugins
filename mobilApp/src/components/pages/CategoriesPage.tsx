@@ -8,9 +8,10 @@ import { PullToRefresh } from '../common/PullToRefresh';
 
 interface CategoriesPageProps {
   onProductClick: (product: Product) => void;
+  selectedCategoryId?: number;
 }
 
-export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
+export function CategoriesPage({ onProductClick, selectedCategoryId }: CategoriesPageProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [categoryProducts, setCategoryProducts] = useState<Product[]>([]);
@@ -20,6 +21,8 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [hasAutoSelected, setHasAutoSelected] = useState(false);
+  const [isAutoSelecting, setIsAutoSelecting] = useState(false);
 
   const loadCategories = async () => {
     try {
@@ -31,6 +34,37 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
       console.error('Error loading categories:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCategoryById = async (categoryId: number) => {
+    try {
+      // Try to get the category directly from the API
+      const allCategories = await api.getCategories();
+      const category = allCategories.find(cat => cat.id === categoryId);
+      
+      if (category) {
+        console.log('Found category via API:', category);
+        // Set the selected category and load its products
+        setSelectedCategory(category);
+        setCurrentPage(1);
+        await loadCategoryProducts(category.id, 1);
+        setHasAutoSelected(true);
+        setIsAutoSelecting(false);
+        
+        // Add this category to the main categories list if it's not already there
+        if (!categories.find(cat => cat.id === categoryId)) {
+          setCategories(prev => [...prev, category]);
+        }
+      } else {
+        console.log('Category not found via API with ID:', categoryId);
+        setIsAutoSelecting(false);
+        // Silently handle - category might not exist or API might be unavailable
+      }
+    } catch (error) {
+      console.error('Error loading category by ID:', error);
+      setIsAutoSelecting(false);
+      // Silently handle API errors - don't show alerts to users
     }
   };
 
@@ -70,6 +104,48 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
     loadCategories();
   }, []);
 
+  // Auto-select category when selectedCategoryId is provided
+  useEffect(() => {
+    console.log('Auto-select effect triggered:', { selectedCategoryId, hasAutoSelected, categoriesLength: categories.length, loading });
+    
+    // Only attempt auto-selection if we have a category ID, categories are loaded, and we haven't auto-selected yet
+    if (selectedCategoryId && !hasAutoSelected && categories.length > 0 && !loading) {
+      // Show loading state during auto-selection
+      setIsAutoSelecting(true);
+      
+      // Add timeout to prevent infinite loading if API fails
+      const timeout = setTimeout(() => {
+        setIsAutoSelecting(false);
+      }, 3000); // 3 second timeout
+      
+      const category = categories.find(cat => cat.id === selectedCategoryId);
+      console.log('Found category for auto-selection:', category);
+      
+      if (category) {
+        // Set the selected category and load its products
+        setSelectedCategory(category);
+        setCurrentPage(1);
+        loadCategoryProducts(category.id, 1);
+        setHasAutoSelected(true);
+        setIsAutoSelecting(false);
+        clearTimeout(timeout);
+      } else {
+        console.log('Category not found with ID:', selectedCategoryId);
+        // Try to load the category directly since it might be a subcategory or not in the main list
+        loadCategoryById(selectedCategoryId).then(() => {
+          clearTimeout(timeout);
+        });
+      }
+    }
+  }, [selectedCategoryId, hasAutoSelected, categories, loading]);
+
+  // Reset auto-selection flag when selectedCategoryId changes
+  useEffect(() => {
+    if (selectedCategoryId) {
+      setHasAutoSelected(false);
+    }
+  }, [selectedCategoryId]);
+
   const handleRefresh = async () => {
     if (selectedCategory) {
       setCurrentPage(1);
@@ -91,6 +167,7 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
     setSubcategories([]);
     setCurrentPage(1);
     setHasMoreProducts(true);
+    setHasAutoSelected(false);
   };
 
   const handleLoadMore = () => {
@@ -101,7 +178,7 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
     }
   };
 
-  if (loading) {
+  if (loading || isAutoSelecting) {
     return <LoadingSpinner />;
   }
 

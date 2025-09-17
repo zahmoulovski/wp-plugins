@@ -7,6 +7,7 @@ import { CategoriesPage } from './components/pages/CategoriesPage';
 import { SearchPage } from './components/pages/SearchPage';
 import { CartPage } from './components/pages/CartPage';
 import { CheckoutPage } from './components/pages/CheckoutPage';
+import { ThankYouPage } from './components/pages/ThankYouPage';
 import { ProfilePage } from './components/pages/ProfilePage';
 import { ProductModal } from './components/common/ProductModal';
 import { Product } from './types';
@@ -14,9 +15,14 @@ import { Product } from './types';
 function AppContent() {
   const [currentPage, setCurrentPage] = useState('home');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 
   const handlePageChange = (page: string) => {
     setCurrentPage(page);
+    // Clear selected category when navigating away from categories (with delay to allow auto-selection)
+    if (page !== 'categories') {
+      setTimeout(() => setSelectedCategoryId(null), 1000);
+    }
   };
 
   const handleProductClick = (product: Product) => {
@@ -24,8 +30,9 @@ function AppContent() {
   };
 
   const handleCategoryClick = (categoryId: number) => {
+    console.log('handleCategoryClick called with categoryId:', categoryId);
+    setSelectedCategoryId(categoryId);
     setCurrentPage('categories');
-    // You might want to pass the categoryId to CategoriesPage to auto-select it
   };
 
   const handleCheckout = () => {
@@ -36,18 +43,27 @@ function AppContent() {
     setCurrentPage('cart');
   };
 
+  const handleOrderSuccess = (order: any, subtotal: string) => {
+    console.log('Order success triggered:', { order, subtotal });
+    setCurrentPage('thank-you');
+    // Store order details for thank you page
+    (window as any).orderDetails = { order, subtotal };
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       case 'home':
         return <HomePage onProductClick={handleProductClick} />;
       case 'categories':
-        return <CategoriesPage onProductClick={handleProductClick} />;
+        return <CategoriesPage onProductClick={handleProductClick} selectedCategoryId={selectedCategoryId} />;
       case 'search':
         return <SearchPage onProductClick={handleProductClick} />;
       case 'cart':
         return <CartPage onCheckout={handleCheckout} />;
       case 'checkout':
-        return <CheckoutPage onBack={handleBackToCart} />;
+        return <CheckoutPage onBack={handleBackToCart} onOrderSuccess={handleOrderSuccess} />;
+      case 'thank-you':
+        return <ThankYouPage orderDetails={(window as any).orderDetails} onBackToHome={() => setCurrentPage('home')} onContinueShopping={() => setCurrentPage('categories')} />;
       case 'profile':
         return <ProfilePage />;
       default:

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, ShoppingCart, Heart, Plus, Minus } from 'lucide-react';
+import { X, ShoppingCart, Heart, Plus, Minus, MessageCircleCode } from 'lucide-react';
 import { Product } from '../../types';
 import { useApp } from '../../contexts/AppContext';
 
@@ -15,6 +15,8 @@ export function ProductModal({ product, isOpen, onClose, onCategoryClick }: Prod
   const { dispatch } = useApp();
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [showWhatsAppEmail, setShowWhatsAppEmail] = useState(false);
+  const [whatsappEmail, setWhatsappEmail] = useState('');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -44,6 +46,29 @@ export function ProductModal({ product, isOpen, onClose, onCategoryClick }: Prod
 
   const addToCart = () => {
     dispatch({ type: 'ADD_TO_CART', payload: { product, quantity } });
+    onClose();
+  };
+
+  const handleWhatsAppOrder = () => {
+    setShowWhatsAppEmail(true);
+  };
+
+  const sendWhatsAppOrder = () => {
+    if (!whatsappEmail.trim()) {
+      alert('Veuillez entrer votre email.');
+      return;
+    }
+
+    const whatsappNumber = '+21698134873';
+    const productName = product.name;
+    const productSku = product.sku || 'N/A';
+    const productUrl = window.location.href;
+    
+    const message = `3asléma, n7éb n3adi commande fi : ${productName} (RÉF : ${productSku}) - ${productUrl} Quantité: ${quantity} Email : ${whatsappEmail}`;
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+    
+    window.open(whatsappUrl, '_blank');
     onClose();
   };
 
@@ -166,6 +191,7 @@ export function ProductModal({ product, isOpen, onClose, onCategoryClick }: Prod
                   <span
                     key={category.id}
                     onClick={() => {
+                      console.log('ProductModal category clicked:', category.id);
                       if (onCategoryClick) {
                         onCategoryClick(category.id);
                         onClose();
@@ -224,19 +250,48 @@ export function ProductModal({ product, isOpen, onClose, onCategoryClick }: Prod
           </div>
 
           {/* Action Buttons */}
-          <div className="flex space-x-3">
-            <button
-              onClick={addToCart}
-              disabled={product.stock_status === 'outofstock'}
-              className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white py-3 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-colors duration-200"
-            >
-              <ShoppingCart className="h-5 w-5" />
-              <span>Ajouter au panier</span>
-            </button>
+          <div className="space-y-3">
+            <div className="flex space-x-3">
+              <button
+                onClick={addToCart}
+                disabled={product.stock_status === 'outofstock'}
+                className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white py-3 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-colors duration-200"
+              >
+                <ShoppingCart className="h-5 w-5" />
+                <span>Ajouter au panier</span>
+              </button>
 
-            <button className="p-3 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
-              <Heart className="h-5 w-5" />
-            </button>
+              <button className="p-3 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
+                <Heart className="h-5 w-5" />
+              </button>
+            </div>
+
+            {!showWhatsAppEmail ? (
+              <button
+                onClick={handleWhatsAppOrder}
+                disabled={product.stock_status === 'outofstock'}
+                className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white py-3 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-colors duration-200"
+              >
+                <MessageCircleCode className="h-5 w-5" />
+                <span>Commander par WHATSAPP</span>
+              </button>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <input
+                  type="email"
+                  placeholder="Entrez votre email"
+                  value={whatsappEmail}
+                  onChange={(e) => setWhatsappEmail(e.target.value)}
+                  className="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+                <button
+                  onClick={sendWhatsAppOrder}
+                  className="bg-green-500 hover:bg-green-600 text-white p-3 rounded-lg transition-colors duration-200"
+                >
+                  <MessageCircleCode className="h-5 w-5" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Descriptions */}
