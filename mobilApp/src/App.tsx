@@ -16,12 +16,16 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState('home');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [navigationHistory, setNavigationHistory] = useState<string[]>(['home']);
 
   const handlePageChange = (page: string) => {
     setCurrentPage(page);
-    // Clear selected category when navigating away from categories (with delay to allow auto-selection)
+    // Update navigation history
+    setNavigationHistory(prev => [...prev, page]);
+    // Clear selected category when navigating away from categories immediately
+    // This prevents timing issues with category loading
     if (page !== 'categories') {
-      setTimeout(() => setSelectedCategoryId(null), 1000);
+      setSelectedCategoryId(null);
     }
   };
 
@@ -33,6 +37,7 @@ function AppContent() {
     console.log('handleCategoryClick called with categoryId:', categoryId);
     setSelectedCategoryId(categoryId);
     setCurrentPage('categories');
+    setNavigationHistory(prev => [...prev, 'categories']);
   };
 
   const handleCheckout = () => {
@@ -50,12 +55,27 @@ function AppContent() {
     (window as any).orderDetails = { order, subtotal };
   };
 
+  const handleBackNavigation = () => {
+    console.log('handleBackNavigation called, current history:', navigationHistory);
+    
+    // Always navigate back to home and reset category selection
+    setCurrentPage('home');
+    setSelectedCategoryId(null);
+    setNavigationHistory(['home']);
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       case 'home':
         return <HomePage onProductClick={handleProductClick} />;
       case 'categories':
-        return <CategoriesPage onProductClick={handleProductClick} selectedCategoryId={selectedCategoryId} />;
+        return (
+          <CategoriesPage 
+            onProductClick={handleProductClick} 
+            selectedCategoryId={selectedCategoryId}
+            onBack={handleBackNavigation}
+          />
+        );
       case 'search':
         return <SearchPage onProductClick={handleProductClick} />;
       case 'cart':

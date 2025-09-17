@@ -9,9 +9,10 @@ import { PullToRefresh } from '../common/PullToRefresh';
 interface CategoriesPageProps {
   onProductClick: (product: Product) => void;
   selectedCategoryId?: number;
+  onBack?: () => void;
 }
 
-export function CategoriesPage({ onProductClick, selectedCategoryId }: CategoriesPageProps) {
+export function CategoriesPage({ onProductClick, selectedCategoryId, onBack }: CategoriesPageProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [categoryProducts, setCategoryProducts] = useState<Product[]>([]);
@@ -24,12 +25,34 @@ export function CategoriesPage({ onProductClick, selectedCategoryId }: Categorie
   const [hasAutoSelected, setHasAutoSelected] = useState(false);
   const [isAutoSelecting, setIsAutoSelecting] = useState(false);
 
+  // Debug component lifecycle
+  useEffect(() => {
+    console.log('CategoriesPage mounted/updated', { selectedCategoryId, selectedCategory });
+    return () => {
+      console.log('CategoriesPage unmounting');
+    };
+  }, [selectedCategoryId, selectedCategory]);
+
   const loadCategories = async () => {
     try {
       setLoading(true);
       const data = await api.getCategories();
-      // Filter out categories with 0 count and parent categories
-      setCategories(data.filter(cat => cat.count > 0 && cat.parent === 0));
+      console.log('Loaded categories from API:', data.length, 'total categories');
+      
+      // Filter categories but be more permissive - include categories with 0 count for navigation
+      // and include both parent and child categories
+      const filteredCategories = data.filter(cat => {
+        // Include all categories except those that are clearly invalid
+        return cat && cat.id && cat.name; // Basic validation
+      });
+      
+      console.log('Filtered categories:', filteredCategories.length, 'categories');
+      
+      // For main view, show only parent categories (parent === 0) but include those with 0 count
+      // This ensures all main categories are visible even if they have no products directly
+      const mainCategories = filteredCategories.filter(cat => cat.parent === 0);
+      
+      setCategories(mainCategories);
     } catch (error) {
       console.error('Error loading categories:', error);
     } finally {
@@ -39,9 +62,17 @@ export function CategoriesPage({ onProductClick, selectedCategoryId }: Categorie
 
   const loadCategoryById = async (categoryId: number) => {
     try {
-      // Try to get the category directly from the API
-      const allCategories = await api.getCategories();
-      const category = allCategories.find(cat => cat.id === categoryId);
+      console.log('Attempting to load category by ID:', categoryId);
+      
+      // Try multiple approaches to find the category
+      let category = categories.find(cat => cat.id === categoryId);
+      
+      if (!category) {
+        // Try to get the category directly from the API
+        const allCategories = await api.getCategories();
+        category = allCategories.find(cat => cat.id === categoryId);
+        console.log('Found category in full API response:', category);
+      }
       
       if (category) {
         console.log('Found category via API:', category);
@@ -70,6 +101,8 @@ export function CategoriesPage({ onProductClick, selectedCategoryId }: Categorie
 
   const loadCategoryProducts = async (categoryId: number, page: number = 1, append: boolean = false) => {
     try {
+      console.log('Loading category products for category:', categoryId, 'page:', page);
+      
       if (page === 1) {
         setProductsLoading(true);
       } else {
@@ -81,6 +114,8 @@ export function CategoriesPage({ onProductClick, selectedCategoryId }: Categorie
         page === 1 ? api.getCategories().then(cats => cats.filter(cat => cat.parent === categoryId && cat.count > 0)) : Promise.resolve([])
       ]);
       
+      console.log('Loaded products:', products.length, 'subcategories:', subcats.length);
+      
       if (page === 1) {
         setCategoryProducts(products);
         setSubcategories(subcats);
@@ -91,6 +126,11 @@ export function CategoriesPage({ onProductClick, selectedCategoryId }: Categorie
       setHasMoreProducts(products.length === 10);
     } catch (error) {
       console.error('Error loading category products:', error);
+      // Reset products on error
+      if (page === 1) {
+        setCategoryProducts([]);
+        setSubcategories([]);
+      }
     } finally {
       if (page === 1) {
         setProductsLoading(false);
@@ -106,7 +146,18 @@ export function CategoriesPage({ onProductClick, selectedCategoryId }: Categorie
 
   // Auto-select category when selectedCategoryId is provided
   useEffect(() => {
-    console.log('Auto-select effect triggered:', { selectedCategoryId, hasAutoSelected, categoriesLength: categories.length, loading });
+    console.log('Auto-select effect triggered:', { selectedCategoryId, hasAutoSelected, categoriesLength: categories.length, loading, selectedCategory });
+    
+    // Reset auto-selection when selectedCategoryId changes to null (back navigation)
+    if (!selectedCategoryId) {
+      console.log('selectedCategoryId is null, resetting auto-selection');
+      setHasAutoSelected(false);
+      setSelectedCategory(null);
+      setCategoryProducts([]);
+      setSubcategories([]);
+      setIsAutoSelecting(false);
+      return;
+    }
     
     // Only attempt auto-selection if we have a category ID, categories are loaded, and we haven't auto-selected yet
     if (selectedCategoryId && !hasAutoSelected && categories.length > 0 && !loading) {
@@ -162,12 +213,22 @@ export function CategoriesPage({ onProductClick, selectedCategoryId }: Categorie
   };
 
   const handleBackToCategories = () => {
-    setSelectedCategory(null);
-    setCategoryProducts([]);
-    setSubcategories([]);
-    setCurrentPage(1);
-    setHasMoreProducts(true);
-    setHasAutoSelected(false);
+    console.log('handleBackToCategories called', { selectedCategory, onBack });
+    
+    // If we have a selected category, clear it first
+    if (selectedCategory) {
+      console.log('Clearing selected category');
+      setSelectedCategory(null);
+      setCategoryProducts([]);
+      setSubcategories([]);
+      setCurrentPage(1);
+      setHasMoreProducts(true);
+      setHasAutoSelected(false);
+    } else if (onBack) {
+      // Only call onBack if we're already at the top level of categories
+      console.log('Calling onBack() from top level');
+      onBack();
+    }
   };
 
   const handleLoadMore = () => {
