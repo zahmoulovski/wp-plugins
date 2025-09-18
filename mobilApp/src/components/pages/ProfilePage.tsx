@@ -405,8 +405,7 @@ export function ProfilePage() {
   };
 
   const menuItems = [
-    { icon: BoxArrowInRight, label: 'Suivre les Commandes', action: () => {} },
-    { icon: Gear, label: 'Paramètres', action: () => {} },
+    // Menu items removed as requested
   ];
 
   return (

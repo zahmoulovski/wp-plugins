@@ -37,6 +37,24 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
     paymentMethod: '',
   });
 
+  // Auto-fill form data when user is logged in
+  useEffect(() => {
+    if (state.customer) {
+      setFormData(prev => ({
+        ...prev,
+        firstName: state.customer?.first_name || prev.firstName,
+        lastName: state.customer?.last_name || prev.lastName,
+        email: state.customer?.email || prev.email,
+        phone: state.customer?.billing?.phone || prev.phone,
+        address: state.customer?.billing?.address_1 || prev.address,
+        city: state.customer?.billing?.city || prev.city,
+        state: state.customer?.billing?.state || prev.state,
+        zipCode: state.customer?.billing?.postcode || prev.zipCode,
+        country: state.customer?.billing?.country || prev.country,
+      }));
+    }
+  }, [state.customer]);
+
   useEffect(() => {
     const loadCheckoutData = async () => {
       try {
@@ -262,7 +280,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
 
     try {
       // ---- Create WooCommerce order ----
-      const orderData = {
+      const orderData: any = {
         payment_method: formData.paymentMethod,
         payment_method_title:
           formData.paymentMethod === 'flouci' ? 'Flouci' : formData.paymentMethod,
@@ -297,6 +315,11 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
         }] : [],
         fee_lines: [{ name: 'Timbre', total: '1.00', tax_status: 'none' }],
       };
+
+      // Link order to logged-in customer
+      if (state.customer) {
+        orderData.customer_id = state.customer.id;
+      }
 
       const order = await api.createOrder(orderData);
 

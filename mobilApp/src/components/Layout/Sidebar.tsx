@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { X, ChevronDown, ChevronRight, House, Grid3x3, Search, Cart, Person, Box, Heart, ChatDots, Gear, BoxArrowUpRight } from 'react-bootstrap-icons';
+import { X, ChevronDown, ChevronRight, House, Grid3x3, Search, Cart, Person, ChatDots, Gear, BoxArrowUpRight } from 'react-bootstrap-icons';
 import { decodeHTMLEntities } from '../../utils/htmlUtils';
 import { Category } from '../../types';
 import { api } from '../../services/api';
@@ -183,6 +183,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const mainMenuItems = [
     { path: '/', icon: House, label: 'Accueil' },
+    { path: '/contact', icon: ChatDots, label: 'Contact' },
     { path: '/categories', icon: Grid3x3, label: 'Catégories' },
     { path: '/search', icon: Search, label: 'Recherche' },
     { path: '/cart', icon: Cart, label: 'Panier', badge: cartItemsCount },
@@ -190,9 +191,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   ];
 
   const secondaryMenuItems = [
-    { path: '/orders', icon: Box, label: 'Mes Commandes' },
-    { path: '/favorites', icon: Heart, label: 'Favoris' },
-    { path: '/contact', icon: ChatDots, label: 'Contact' },
     { path: '/settings', icon: Gear, label: 'Paramètres' },
   ];
 

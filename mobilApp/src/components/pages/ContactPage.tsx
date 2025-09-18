@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GeoAlt, Telephone, Envelope, Facebook, Twitter, Instagram, Tiktok,Pinterest, Youtube, Whatsapp, Send } from 'react-bootstrap-icons';
 
 interface ContactFormData {
@@ -34,26 +34,40 @@ export const ContactPage: React.FC = () => {
     setFormMessage('');
 
     try {
-      // Simulate form submission
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Import email service
+      const { emailService } = await import('../../services/emailService');
       
-      // Here you would typically send the form data to your backend
-      console.log('Form submitted:', formData);
-      
-      setFormMessage('Votre message a été envoyé avec succès!');
-      setFormData({
-        name: '',
-        company: '',
-        email: '',
-        phone: '',
-        message: ''
+      // Configure email service with EmailJS settings from environment variables
+      emailService.setConfig({
+        serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
+        templateId: import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+        publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY
       });
+      
+      // Send the email directly using the simplified service
+      const result = await emailService.sendContactEmail(formData);
+      
+      if (result.success) {
+        setFormMessage(result.message);
+        setFormData({
+          name: '',
+          company: '',
+          email: '',
+          phone: '',
+          message: ''
+        });
+      } else {
+        setFormMessage(result.message);
+      }
     } catch (error) {
+      console.error('Error submitting form:', error);
       setFormMessage('Une erreur s\'est produite. Veuillez réessayer.');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+
 
   const socialLinks = [
     { name: 'Facebook', url: 'https://www.facebook.com/klarrionsarl', icon: Facebook, color: 'bg-blue-600' },

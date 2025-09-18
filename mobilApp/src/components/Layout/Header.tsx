@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { Sun, Moon } from 'react-bootstrap-icons';
+import { Sun, Moon, Person } from 'react-bootstrap-icons';
 import { useApp } from '../../contexts/AppContext';
 
 interface HeaderProps {
@@ -64,17 +64,31 @@ export function Header({ currentPage, onPageChange, onMenuClick, isMenuOpen = fa
           </Link>
         </div>
 
-        <button
-          onClick={toggleDarkMode}
-          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          aria-label="Basculer le mode sombre"
-        >
-          {state.darkMode ? (
-            <Sun className="h-5 w-5 text-yellow-500" />
-          ) : (
-            <Moon className="h-5 w-5 text-gray-600" />
+        <div className="flex items-center space-x-2">
+          {/* Profile Link */}
+          {state.customer && (
+            <Link
+              to="/profile"
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Profil"
+            >
+              <Person className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            </Link>
           )}
-        </button>
+
+          {/* Dark Mode Toggle */}
+          <button
+            onClick={toggleDarkMode}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Basculer le mode sombre"
+          >
+            {state.darkMode ? (
+              <Sun className="h-5 w-5 text-yellow-500" />
+            ) : (
+              <Moon className="h-5 w-5 text-gray-600" />
+            )}
+          </button>
+        </div>
       </div>
     </header>
   );
