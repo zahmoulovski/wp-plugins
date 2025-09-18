@@ -335,7 +335,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
 
   const StepIndicator = () => {
     const steps = [
-      { id: 1, title: 'Informations', icon: User },
+      { id: 1, title: 'Informations', icon: Person },
       { id: 2, title: 'Livraison', icon: Truck },
       { id: 3, title: 'Paiement', icon: CreditCard },
     ];

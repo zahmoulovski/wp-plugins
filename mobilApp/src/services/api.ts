@@ -24,7 +24,18 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    let errorMessage = `API request failed: ${response.status} ${response.statusText}`;
+    try {
+      const errorData = await response.json();
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (errorData.error) {
+        errorMessage = errorData.error;
+      }
+    } catch (e) {
+      // If we can't parse the error response, use the default message
+    }
+    throw new Error(errorMessage);
   }
   return response.json();
 }
@@ -192,6 +203,55 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(customerData),
     });
+  },
+
+  async uploadProfilePicture(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('title', 'Profile Picture');
+    
+    // Upload to WordPress media endpoint
+    const response = await fetch('https://klarrion.com/wp-json/wp/v2/media', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        // WordPress expects the file in FormData format, not JSON
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Profile picture upload failed: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.source_url; // Return the URL of the uploaded image
+  },
+
+  async updateCustomerPassword(customerId: number, currentPassword: string, newPassword: string): Promise<boolean> {
+    try {
+      // WordPress/WooCommerce password update typically requires the current password
+      const response = await fetch(`https://klarrion.com/wp-json/wp/v2/users/${customerId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password: newPassword,
+          current_password: currentPassword // Some WordPress setups require this
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Password update failed: ${response.status} ${response.statusText}`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Password update error:', error);
+      throw error;
+    }
   },
 
   async createOrder(orderData: any): Promise<Order> {

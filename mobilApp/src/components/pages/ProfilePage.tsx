@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Person, Gear, Heart, BoxArrowInLeft, BoxArrowRight, BoxArrowInRight, Key, PersonPlus, Eye, EyeSlash } from 'react-bootstrap-icons';
+import { Person, Gear, Heart, BoxArrowInLeft, BoxArrowRight, BoxArrowInRight, Key, PersonPlus, Eye, EyeSlash, Pencil } from 'react-bootstrap-icons';
 import { useApp } from '../../contexts/AppContext';
 import { api } from '../../services/api';
 import { Order, Customer } from '../../types';
@@ -12,6 +12,19 @@ export function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [showSignUpForm, setShowSignUpForm] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editProfileData, setEditProfileData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [profilePicture, setProfilePicture] = useState<string>('');
+  const [uploadingPicture, setUploadingPicture] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [loginData, setLoginData] = useState({
     emailOrUsername: '',
     password: '',
@@ -175,7 +188,7 @@ export function ProfilePage() {
           first_name: signUpData.firstName,
           last_name: signUpData.lastName,
           email: signUpData.email,
-          phone: signUpData.phone,
+          phone: signUpData.phone || undefined, // Only include phone if provided
           company: '',
           address_1: '',
           address_2: '',
@@ -206,12 +219,17 @@ export function ProfilePage() {
       
     } catch (error: any) {
       console.error('Sign up error:', error);
-      if (error.message?.includes('email')) {
+      const errorMessage = error.message || error.toString();
+      if (errorMessage?.includes('email')) {
         toast.error('Cet email est déjà utilisé');
-      } else if (error.message?.includes('username')) {
+      } else if (errorMessage?.includes('username')) {
         toast.error('Ce nom d\'utilisateur est déjà pris');
+      } else if (errorMessage?.includes('phone')) {
+        toast.error('Numéro de téléphone invalide');
+      } else if (errorMessage?.includes('400')) {
+        toast.error('Données invalides. Vérifiez vos informations.');
       } else {
-        toast.error('Erreur lors de la création du compte. Veuillez réessayer.');
+        toast.error(`Erreur: ${errorMessage}`);
       }
     } finally {
       setLoading(false);
@@ -231,12 +249,162 @@ export function ProfilePage() {
     });
   };
 
+  const handleEditProfile = () => {
+    if (state.customer) {
+      setEditProfileData({
+        firstName: state.customer.first_name || '',
+        lastName: state.customer.last_name || '',
+        email: state.customer.email || '',
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      setProfilePicture(state.customer.avatar_url || '');
+      setIsEditingProfile(true);
+    }
+  };
+
+  const handleProfilePictureUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !state.customer) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingPicture(true);
+    
+    try {
+      // Show preview immediately
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setProfilePicture(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+
+      // Upload to WordPress
+      const uploadedUrl = await api.uploadProfilePicture(file);
+      setProfilePicture(uploadedUrl);
+      
+      // Update customer with new avatar URL
+      const updatedCustomer = await api.updateCustomer(state.customer.id, {
+        avatar_url: uploadedUrl
+      });
+      
+      dispatch({ type: 'SET_CUSTOMER', payload: updatedCustomer });
+      toast.success('Profile picture updated successfully!');
+      
+    } catch (error) {
+      console.error('Profile picture upload error:', error);
+      toast.error('Failed to upload profile picture');
+      // Revert to previous picture
+      setProfilePicture(state.customer.avatar_url || '');
+    } finally {
+      setUploadingPicture(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!state.customer) return;
+
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editProfileData.email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    // Validate password if being changed
+    if (editProfileData.newPassword) {
+      if (editProfileData.newPassword.length < 6) {
+        toast.error('New password must be at least 6 characters');
+        return;
+      }
+      if (editProfileData.newPassword !== editProfileData.confirmPassword) {
+        toast.error('New passwords do not match');
+        return;
+      }
+      if (!editProfileData.currentPassword) {
+        toast.error('Please enter your current password');
+        return;
+      }
+    }
+
+    setLoading(true);
+    
+    try {
+      // Update basic profile info
+      const updatedCustomer = await api.updateCustomer(state.customer.id, {
+        first_name: editProfileData.firstName,
+        last_name: editProfileData.lastName,
+        email: editProfileData.email,
+        avatar_url: profilePicture
+      });
+
+      // Update password if provided
+      if (editProfileData.newPassword && editProfileData.currentPassword) {
+        await api.updateCustomerPassword(
+          state.customer.id,
+          editProfileData.currentPassword,
+          editProfileData.newPassword
+        );
+        toast.success('Password updated successfully!');
+      }
+
+      dispatch({ type: 'SET_CUSTOMER', payload: updatedCustomer });
+      setIsEditingProfile(false);
+      toast.success('Profile updated successfully!');
+      
+    } catch (error: any) {
+      console.error('Profile update error:', error);
+      if (error.message?.includes('password')) {
+        toast.error('Current password is incorrect');
+      } else if (error.message?.includes('email')) {
+        toast.error('This email is already in use');
+      } else {
+        toast.error('Failed to update profile');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingProfile(false);
+    setEditProfileData({
+      firstName: state.customer?.first_name || '',
+      lastName: state.customer?.last_name || '',
+      email: state.customer?.email || '',
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setProfilePicture(state.customer?.avatar_url || '');
+  };
+
+  const handleOrderClick = (order: Order) => {
+    setSelectedOrder(order);
+    setShowOrderDetails(true);
+  };
+
+  const handleCloseOrderDetails = () => {
+    setShowOrderDetails(false);
+    setSelectedOrder(null);
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
   };
 
   const menuItems = [
-    { icon: Heart, label: 'Liste de Souhaits', action: () => {} },
     { icon: BoxArrowInRight, label: 'Suivre les Commandes', action: () => {} },
     { icon: Gear, label: 'Paramètres', action: () => {} },
   ];
@@ -284,7 +452,7 @@ export function ProfilePage() {
                     </button>
                     <button
                       onClick={() => setShowSignUpForm(true)}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-semibold transition-colors duration-200"
+                      className="w-full bg-green-400 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-semibold transition-colors duration-200"
                     >
                       <PersonPlus className="inline h-5 w-5 mr-2" />
                       Créer un Compte
@@ -447,27 +615,154 @@ export function ProfilePage() {
               <div>
                 {/* User Info */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
-                      <Person className="h-8 w-8 text-primary-600 dark:text-primary-400" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                        {state.customer.first_name} {state.customer.last_name}
-                      </h2>
-                      <p className="text-gray-500 dark:text-gray-400">
-                        {state.customer.email}
-                      </p>
-                    </div>
-                  </div>
+                  {isEditingProfile ? (
+                    <div className="space-y-4">
+                      {/* Profile Picture Upload */}
+                      <div className="text-center">
+                        <div className="relative inline-block">
+                          <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">
+                            {profilePicture ? (
+                              <img 
+                                src={profilePicture} 
+                                alt="Profile" 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Person className="h-8 w-8 text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+                          <label className="absolute bottom-0 right-0 bg-primary-600 hover:bg-primary-700 text-white p-2 rounded-full cursor-pointer transition-colors duration-200">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleProfilePictureUpload}
+                              className="hidden"
+                              disabled={uploadingPicture}
+                            />
+                            {uploadingPicture ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            ) : (
+                              <Pencil className="h-4 w-4" />
+                            )}
+                          </label>
+                        </div>
+                      </div>
 
-                  <button
-                    onClick={handleLogout}
-                    className="mt-4 flex items-center text-red-500 hover:text-red-600"
-                  >
-                    <BoxArrowRight className="h-4 w-4 mr-2" />
-                   Se Déconnecter
-                  </button>
+                      {/* Editable Fields */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <input
+                          type="text"
+                          placeholder="First Name"
+                          value={editProfileData.firstName}
+                          onChange={(e) => setEditProfileData({...editProfileData, firstName: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Last Name"
+                          value={editProfileData.lastName}
+                          onChange={(e) => setEditProfileData({...editProfileData, lastName: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                      </div>
+                      
+                      <input
+                        type="email"
+                        placeholder="Email Address"
+                        value={editProfileData.email}
+                        onChange={(e) => setEditProfileData({...editProfileData, email: e.target.value})}
+                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+
+                      {/* Password Change Section */}
+                      <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Change Password (Optional)</h4>
+                        <div className="space-y-3">
+                          <input
+                            type="password"
+                            placeholder="Current Password"
+                            value={editProfileData.currentPassword}
+                            onChange={(e) => setEditProfileData({...editProfileData, currentPassword: e.target.value})}
+                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          />
+                          <input
+                            type="password"
+                            placeholder="New Password"
+                            value={editProfileData.newPassword}
+                            onChange={(e) => setEditProfileData({...editProfileData, newPassword: e.target.value})}
+                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          />
+                          <input
+                            type="password"
+                            placeholder="Confirm New Password"
+                            value={editProfileData.confirmPassword}
+                            onChange={(e) => setEditProfileData({...editProfileData, confirmPassword: e.target.value})}
+                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex space-x-3 pt-4">
+                        <button
+                          onClick={handleCancelEdit}
+                          disabled={loading}
+                          className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveProfile}
+                          disabled={loading}
+                          className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-2 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {loading ? 'Saving...' : 'Save Changes'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <button
+                        onClick={handleEditProfile}
+                        className="w-full flex items-center space-x-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
+                      >
+                        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">
+                          {state.customer.avatar_url ? (
+                            <img 
+                              src={state.customer.avatar_url} 
+                              alt="Profile" 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Person className="h-8 w-8 text-primary-600 dark:text-primary-400" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 text-left">
+                          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                            {state.customer.first_name} {state.customer.last_name}
+                          </h2>
+                          <p className="text-gray-500 dark:text-gray-400">
+                            {state.customer.email}
+                          </p>
+                        </div>
+                        <Pencil className="h-5 w-5 text-gray-400" />
+                      </button>
+
+                      <div className="flex space-x-3 mt-4">
+                        <button
+                          onClick={handleLogout}
+                          className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                        >
+                          <BoxArrowRight className="h-4 w-4 mr-2" />
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Menu Items */}
@@ -500,7 +795,11 @@ export function ProfilePage() {
                   ) : orders.length > 0 ? (
                     <div className="space-y-3">
                       {orders.slice(0, 5).map((order) => (
-                        <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        <button
+                          key={order.id}
+                          onClick={() => handleOrderClick(order)}
+                          className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200 text-left"
+                        >
                           <div>
                             <p className="font-semibold text-gray-900 dark:text-white">
                              Commande #{order.id}
@@ -517,7 +816,7 @@ export function ProfilePage() {
                               {order.status}
                             </p>
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   ) : (
@@ -531,6 +830,135 @@ export function ProfilePage() {
           </div>
         </div>
       </PullToRefresh>
+
+      {/* Order Details Modal */}
+      {showOrderDetails && selectedOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Commande #{selectedOrder.id}
+                </h2>
+                <button
+                  onClick={handleCloseOrderDetails}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* Order Status */}
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  Date: {formatDate(selectedOrder.date_created)}
+                </span>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  selectedOrder.status === 'completed' ? 'bg-green-100 text-green-800' :
+                  selectedOrder.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                  selectedOrder.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {selectedOrder.status}
+                </span>
+              </div>
+
+              {/* Order Items */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  Articles commandés
+                </h3>
+                <div className="space-y-4">
+                  {selectedOrder.line_items.map((item) => (
+                    <div key={item.id} className="flex justify-between items-start p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900 dark:text-white">{item.name}</h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Quantité: {item.quantity}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          {item.total} {selectedOrder.currency}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Billing Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    Information de facturation
+                  </h3>
+                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg space-y-2">
+                    <p className="text-gray-900 dark:text-white">
+                      <span className="font-medium">Nom:</span> {selectedOrder.billing.first_name} {selectedOrder.billing.last_name}
+                    </p>
+                    <p className="text-gray-900 dark:text-white">
+                      <span className="font-medium">Email:</span> {selectedOrder.billing.email}
+                    </p>
+                    <p className="text-gray-900 dark:text-white">
+                      <span className="font-medium">Téléphone:</span> {selectedOrder.billing.phone}
+                    </p>
+                    <p className="text-gray-900 dark:text-white">
+                      <span className="font-medium">Adresse:</span> {selectedOrder.billing.address_1}
+                    </p>
+                    {selectedOrder.billing.address_2 && (
+                      <p className="text-gray-900 dark:text-white">{selectedOrder.billing.address_2}</p>
+                    )}
+                    <p className="text-gray-900 dark:text-white">
+                      {selectedOrder.billing.city}, {selectedOrder.billing.state} {selectedOrder.billing.postcode}
+                    </p>
+                    <p className="text-gray-900 dark:text-white">
+                      {selectedOrder.billing.country}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    Information de livraison
+                  </h3>
+                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg space-y-2">
+                    <p className="text-gray-900 dark:text-white">
+                      <span className="font-medium">Nom:</span> {selectedOrder.shipping.first_name} {selectedOrder.shipping.last_name}
+                    </p>
+                    <p className="text-gray-900 dark:text-white">
+                      <span className="font-medium">Adresse:</span> {selectedOrder.shipping.address_1}
+                    </p>
+                    {selectedOrder.shipping.address_2 && (
+                      <p className="text-gray-900 dark:text-white">{selectedOrder.shipping.address_2}</p>
+                    )}
+                    <p className="text-gray-900 dark:text-white">
+                      {selectedOrder.shipping.city}, {selectedOrder.shipping.state} {selectedOrder.shipping.postcode}
+                    </p>
+                    <p className="text-gray-900 dark:text-white">
+                      {selectedOrder.shipping.country}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Order Total */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                <div className="flex justify-between items-center">
+                  <span className="text-xl font-semibold text-gray-900 dark:text-white">
+                    Total de la commande:
+                  </span>
+                  <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                    {selectedOrder.total} {selectedOrder.currency}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
