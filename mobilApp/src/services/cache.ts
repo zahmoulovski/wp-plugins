@@ -64,8 +64,8 @@ class CacheService {
     return this.get('categories');
   }
 
-  setProducts(products: Product[], params?: any): void {
-    this.set('products', products, params, this.PRODUCTS_EXPIRY);
+  setProducts(products: Product[], params: Record<string, any> = {}, customExpiry?: number): void {
+    this.set('products', products, params, customExpiry || this.PRODUCTS_EXPIRY);
   }
 
   getProducts(params?: any): Product[] | null {

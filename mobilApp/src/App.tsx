@@ -11,6 +11,7 @@ import { CartPage } from './components/pages/CartPage';
 import { CheckoutPage } from './components/pages/CheckoutPage';
 import { ThankYouPage } from './components/pages/ThankYouPage';
 import { ProfilePage } from './components/pages/ProfilePage';
+import { ContactPage } from './components/pages/ContactPage';
 import { ProductModal } from './components/common/ProductModal';
 import { Product } from './types';
 
@@ -81,6 +82,7 @@ function AppContent() {
             } 
           />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

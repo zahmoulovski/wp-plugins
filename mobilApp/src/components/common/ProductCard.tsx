@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ShoppingCart, Heart } from 'lucide-react';
+import { Cart, Heart } from 'react-bootstrap-icons';
 import { Product } from '../../types';
 import { useApp } from '../../contexts/AppContext';
 
@@ -35,7 +35,7 @@ export function ProductCard({ product, onProductClick }: ProductCardProps) {
     if (numPrice === 0) {
       return 'Prix : Sur Demande';
     }
-    return `${numPrice.toFixed(2)} TND`;
+    return `${numPrice.toFixed(3)} TND`;
   };
 
   const mainImage = product.images?.[0]?.src || '/api/placeholder/300/300';
@@ -95,12 +95,12 @@ export function ProductCard({ product, onProductClick }: ProductCardProps) {
                 <span className="text-xs text-red-500 line-through">
                   {formatPrice(product.regular_price)}
                 </span>
-                <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
+                <span className="text-base font-bold text-primary-600 dark:text-primary-400">
                   {formatPrice(product.sale_price || product.price)}
                 </span>
               </div>
             ) : (
-              <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
+              <span className="text-base font-bold text-primary-600 dark:text-primary-400">
                 {formatPrice(product.price)}
               </span>
             )}
@@ -110,7 +110,7 @@ export function ProductCard({ product, onProductClick }: ProductCardProps) {
             onClick={addToCart}
             className="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors duration-200"
           >
-            <ShoppingCart className="h-4 w-4" />
+            <Cart className="h-4 w-4" />
           </button>
         </div>
       </div>

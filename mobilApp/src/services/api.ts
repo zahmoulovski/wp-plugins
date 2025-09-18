@@ -38,7 +38,14 @@ export const api = {
       return cachedProducts;
     }
 
-    const queryParams = new URLSearchParams(params as Record<string, string>).toString();
+    // Increase limit for better randomization (WooCommerce doesn't support orderby=rand by default)
+    const enhancedParams = {
+      ...params,
+      per_page: params.per_page || 500,   // Increase from 20 to 50 for more variety
+      order: params.order || 'desc'
+    };
+
+    const queryParams = new URLSearchParams(enhancedParams as Record<string, string>).toString();
     const products = await apiRequest(`/products?${queryParams}`);
     
     // Cache the results
@@ -66,6 +73,58 @@ export const api = {
       return apiRequest(`/products?sku=${encodeURIComponent(query)}`);
     }
     return searchResults;
+  },
+
+  async searchCustomers(query: string): Promise<Customer[]> {
+    // First, try the standard WooCommerce customer search
+    const searchResults = await apiRequest(`/customers?search=${encodeURIComponent(query)}`);
+    if (searchResults.length > 0) {
+      return searchResults;
+    }
+
+    // If no results, try searching by email specifically
+    try {
+      const emailResults = await apiRequest(`/customers?email=${encodeURIComponent(query)}`);
+      if (emailResults.length > 0) {
+        return emailResults;
+      }
+    } catch (error) {
+      console.error('Error searching customers by email:', error);
+    }
+
+    // If still no results, try searching by username specifically
+    try {
+      // Get all customers and filter by username
+      const allCustomers = await apiRequest(`/customers?per_page=100`);
+      const usernameMatches = allCustomers.filter((customer: Customer) => 
+        customer.username?.toLowerCase() === query.toLowerCase()
+      );
+      if (usernameMatches.length > 0) {
+        return usernameMatches;
+      }
+    } catch (error) {
+      console.error('Error searching customers by username:', error);
+    }
+
+    // If still no results, check if the query might be "admin" and try common admin patterns
+    if (query.toLowerCase() === 'admin' || query.toLowerCase().includes('admin')) {
+      try {
+        // Try to get customer with ID 1 (often the admin)
+        const adminCustomer = await apiRequest(`/customers/1`);
+        if (adminCustomer && (
+          adminCustomer.username?.toLowerCase().includes('admin') ||
+          adminCustomer.email?.toLowerCase().includes('admin') ||
+          adminCustomer.first_name?.toLowerCase().includes('admin') ||
+          adminCustomer.last_name?.toLowerCase().includes('admin')
+        )) {
+          return [adminCustomer];
+        }
+      } catch (error) {
+        console.error('Error checking admin customer:', error);
+      }
+    }
+
+    return [];
   },
 
   async getCategories(): Promise<Category[]> {

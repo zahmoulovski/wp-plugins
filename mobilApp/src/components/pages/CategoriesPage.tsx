@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Plus } from 'lucide-react';
+import { ChevronRight, Plus } from 'react-bootstrap-icons';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Category, Product } from '../../types';
 import { api } from '../../services/api';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { ProductCard } from '../common/ProductCard';
 import { PullToRefresh } from '../common/PullToRefresh';
+import { decodeHTMLEntities } from '../../utils/htmlUtils';
 
 interface CategoriesPageProps {
   onProductClick: (product: Product) => void;
@@ -167,13 +168,13 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
                       {category.image && (
                         <img
                           src={category.image.src}
-                          alt={category.name}
+                          alt={decodeHTMLEntities(category.name)}
                           className="w-12 h-12 rounded-lg object-cover"
                         />
                       )}
                       <div>
                         <h3 className="font-semibold text-gray-900 dark:text-white">
-                          {category.name}
+                          {decodeHTMLEntities(category.name)}
                         </h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                           {category.count} produits
@@ -189,15 +190,15 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
         ) : (
           <>
             <div className="flex items-center mb-6">
-              <Link
-                to="/categories"
-                className="text-primary-600 dark:text-primary-400 mr-4"
+              <button
+                onClick={() => navigate(-1)}
+                className="text-primary-600 dark:text-primary-400 mr-4 flex items-center"
               >
                 ← Retour
-              </Link>
+              </button>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {selectedCategory.name}
-              </h1>
+                 {decodeHTMLEntities(selectedCategory.name)}
+               </h1>
             </div>
 
             {productsLoading ? (
@@ -222,13 +223,13 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
                               {subcategory.image && (
                                 <img
                                   src={subcategory.image.src}
-                                  alt={subcategory.name}
+                                  alt={decodeHTMLEntities(subcategory.name)}
                                   className="w-10 h-10 rounded-lg object-cover"
                                 />
                               )}
                               <div>
                                 <h3 className="font-semibold text-gray-900 dark:text-white">
-                                  {subcategory.name}
+                                  {decodeHTMLEntities(subcategory.name)}
                                 </h3>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
                                   {subcategory.count} produits

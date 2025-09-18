@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, ShoppingCart, Heart, Plus, Minus, MessageCircleCode } from 'lucide-react';
+import { X, Cart, Heart, Plus, Dash, ChatDots } from 'react-bootstrap-icons';
 import { Link } from 'react-router-dom';
 import { Product } from '../../types';
 import { useApp } from '../../contexts/AppContext';
+import { decodeHTMLEntities } from '../../utils/htmlUtils';
 
 
 interface ProductModalProps {
@@ -63,7 +64,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const formatPrice = (price: string) => {
     const numPrice = parseFloat(price);
     if (numPrice === 0) return 'Prix : Sur Demande';
-    return `${numPrice.toFixed(2)} TND`;
+    return `${numPrice.toFixed(3)} TND`;
   };
 
   const addToCart = () => {
@@ -178,12 +179,12 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
                   <span className="text-sm text-red-500 line-through">
                     {formatPrice(product.regular_price)}
                   </span>
-                  <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                  <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
                     {formatPrice(product.sale_price || product.price)}
                   </span>
                 </>
               ) : (
-                <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
                   {formatPrice(product.price)}
                 </span>
               )}
@@ -216,7 +217,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
                     onClick={onClose}
                     className="px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors inline-block"
                   >
-                    {category.name}
+                    {decodeHTMLEntities(category.name)}
                   </Link>
                 ))}
               </div>
@@ -245,7 +246,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
                   className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
                 >
-                  <Minus className="h-4 w-4" />
+                  <Dash className="h-4 w-4" />
                 </button>
                 <span className="font-semibold text-lg w-8 text-center">{quantity}</span>
                 <button
@@ -274,7 +275,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
                 disabled={product.stock_status === 'outofstock'}
                 className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white py-3 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-colors duration-200"
               >
-                <ShoppingCart className="h-5 w-5" />
+                <Cart className="h-5 w-5" />
                 <span>Ajouter au panier</span>
               </button>
 
@@ -289,7 +290,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
                 disabled={product.stock_status === 'outofstock'}
                 className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white py-3 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-colors duration-200"
               >
-                <MessageCircleCode className="h-5 w-5" />
+                <ChatDots className="h-5 w-5" />
                 <span>Commander par WHATSAPP</span>
               </button>
             ) : (
@@ -305,7 +306,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
                   onClick={sendWhatsAppOrder}
                   className="bg-green-500 hover:bg-green-600 text-white p-3 rounded-lg transition-colors duration-200"
                 >
-                  <MessageCircleCode className="h-5 w-5" />
+                  <ChatDots className="h-5 w-5" />
                 </button>
               </div>
             )}

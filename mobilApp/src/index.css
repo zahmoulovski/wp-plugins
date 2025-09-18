@@ -5,3 +5,28 @@
     0% { transform: translateX(100%); }
     100% { transform: translateX(-100%); }
   }
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 2px;
+  height: 2px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #f5a316; /* secondary-500 color */
+  border-radius: 1px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #d9800e; /* secondary-600 color */
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #f5a316 transparent;
+}

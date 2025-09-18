@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { X, ChevronDown, ChevronRight, Home, Grid3X3, Search, ShoppingCart, User, Package, Heart, MessageCircle, Settings, ArrowUpRight } from 'lucide-react';
+import { X, ChevronDown, ChevronRight, House, Grid3x3, Search, Cart, Person, Box, Heart, ChatDots, Gear, BoxArrowUpRight } from 'react-bootstrap-icons';
+import { decodeHTMLEntities } from '../../utils/htmlUtils';
 import { Category } from '../../types';
 import { api } from '../../services/api';
 import { cacheService } from '../../services/cache';
@@ -132,7 +133,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 {category.image && (
                   <img
                     src={category.image.src}
-                    alt={category.name}
+                    alt={decodeHTMLEntities(category.name)}
                     className="w-6 h-6 rounded object-cover"
                   />
                 )}
@@ -141,7 +142,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   onClick={onClose}
                   className="flex-1 text-gray-900 dark:text-white font-medium group-hover:text-primary-600 dark:group-hover:text-primary-400"
                 >
-                  {category.name}
+                  {decodeHTMLEntities(category.name)}
                 </Link>
                 {hasSubcategories(category.id) && (
                   <button
@@ -181,18 +182,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const cartItemsCount = state.cart.reduce((total, item) => total + item.quantity, 0);
 
   const mainMenuItems = [
-    { path: '/', icon: Home, label: 'Accueil' },
-    { path: '/categories', icon: Grid3X3, label: 'Catégories' },
+    { path: '/', icon: House, label: 'Accueil' },
+    { path: '/categories', icon: Grid3x3, label: 'Catégories' },
     { path: '/search', icon: Search, label: 'Recherche' },
-    { path: '/cart', icon: ShoppingCart, label: 'Panier', badge: cartItemsCount },
-    { path: '/profile', icon: User, label: 'Profil' },
+    { path: '/cart', icon: Cart, label: 'Panier', badge: cartItemsCount },
+    { path: '/profile', icon: Person, label: 'Profil' },
   ];
 
   const secondaryMenuItems = [
-    { path: '/orders', icon: Package, label: 'Mes Commandes' },
+    { path: '/orders', icon: Box, label: 'Mes Commandes' },
     { path: '/favorites', icon: Heart, label: 'Favoris' },
-    { path: '/contact', icon: MessageCircle, label: 'Contact' },
-    { path: '/settings', icon: Settings, label: 'Paramètres' },
+    { path: '/contact', icon: ChatDots, label: 'Contact' },
+    { path: '/settings', icon: Gear, label: 'Paramètres' },
   ];
 
   return (

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { RefreshCw, ChevronDown, X, RotateCcw } from 'lucide-react';
+import { ArrowClockwise, ChevronDown, X, ArrowRepeat } from 'react-bootstrap-icons';
 
 
 interface PullToRefreshProps {
@@ -43,13 +43,13 @@ export function PullToRefresh({
       case 'pulling':
         return <ChevronDown {...iconProps} />;
       case 'ready':
-        return <RotateCcw {...iconProps} />;
+        return <ArrowRepeat {...iconProps} />;
       case 'refreshing':
-        return <RefreshCw {...iconProps} className={`${iconProps.className} animate-spin`} />;
+        return <ArrowClockwise {...iconProps} className={`${iconProps.className} animate-spin`} />;
       case 'canceling':
         return <X {...iconProps} />;
       default:
-        return <RefreshCw {...iconProps} />;
+        return <ArrowClockwise {...iconProps} />;
     }
   };
 
@@ -184,7 +184,7 @@ export function PullToRefresh({
     return {
       height: `${Math.max(currentPull, state === 'refreshing' ? triggerDistance : 0)}px`,
       transform: `translateY(${Math.max(0, triggerDistance - currentPull)}px)`,
-      top: `-${triggerDistance}px`,
+      top: `60px`,
       opacity: opacity,
       '--pull-progress': `${(currentPull / triggerDistance) * 100}%`
     } as React.CSSProperties;

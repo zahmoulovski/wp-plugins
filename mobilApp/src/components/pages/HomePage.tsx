@@ -40,29 +40,45 @@ export function HomePage({ onProductClick }: HomePageProps) {
       setLoading(true);
       setError(null);
 
-      // Check cache first
-      const cachedFeatured = cacheService.getProducts({ per_page: 20, featured: true });
-      const cachedNonFeatured = cacheService.getProducts({ per_page: 20, featured: false });
+      // Generate unique cache keys for each session to allow refresh on page reload
+      const sessionId = Date.now().toString().slice(-6); // 6-digit session identifier
+      const featuredCacheKey = { per_page: 100, featured: true, session: sessionId };
+      const nonFeaturedCacheKey = { per_page: 100, featured: false, session: sessionId };
+
+      // Check cache first with session-specific keys
+      const cachedFeatured = cacheService.getProducts(featuredCacheKey);
+      const cachedNonFeatured = cacheService.getProducts(nonFeaturedCacheKey);
 
       let featured = cachedFeatured;
       let nonFeatured = cachedNonFeatured;
 
-      // If not in cache, fetch from API
+      // If not in cache, fetch from API with larger pool (WooCommerce doesn't support orderby=rand)
       if (!featured || !nonFeatured) {
         [nonFeatured, featured] = await Promise.all([
-          api.getProducts({ per_page: 20, featured: false }),
-          api.getProducts({ per_page: 20, featured: true })
+          api.getProducts({ per_page: 100, featured: false }),
+          api.getProducts({ per_page: 100, featured: true })
         ]);
+
+        // Cache with session-specific keys (shorter cache time for more frequent updates)
+        cacheService.setProducts(nonFeatured, nonFeaturedCacheKey, 2 * 60 * 1000); // 2 minutes
+        cacheService.setProducts(featured, featuredCacheKey, 2 * 60 * 1000); // 2 minutes
       }
 
-      // 🔀 Shuffle before setting state
+      // 🔀 Shuffle and select random subset for display
+      const randomFeatured = shuffleArray(featured).slice(0, 20);
+      const randomNonFeatured = shuffleArray(nonFeatured).slice(0, 20);
+
       setProducts({
-        featured: shuffleArray(featured),
-        nonFeatured: shuffleArray(nonFeatured),
+        featured: randomFeatured,
+        nonFeatured: randomNonFeatured,
       });
     } catch (err) {
       console.error('Error loading products:', err);
-      setError('Failed to load products');
+      // If we have cached products from previous sessions, show them as fallback
+      if (products.featured.length === 0 && products.nonFeatured.length === 0) {
+        setError('Failed to load products');
+      }
+      // Otherwise, keep showing existing products
     } finally {
       setLoading(false);
     }
@@ -74,23 +90,28 @@ export function HomePage({ onProductClick }: HomePageProps) {
       setError(null);
 
       const results: Record<string, Product[]> = {};
+      const sessionId = Date.now().toString().slice(-6); // Same session ID as loadProducts
+      
       for (const cat of CATEGORIES) {
-        // Check cache first for each category
-        const cacheKey = `category_${cat.id}_products`;
-        let cachedProducts = cacheService.get(cacheKey);
+        // Generate session-specific cache key for each category
+        const cacheKey = { per_page: 100, category: cat.id, session: sessionId };
+        let cachedProducts = cacheService.getProducts(cacheKey);
         
         if (!cachedProducts) {
-          cachedProducts = await api.getProducts({ per_page: 20, category: cat.id });
-          cacheService.set(cacheKey, cachedProducts, 10 * 60 * 1000); // Cache for 10 minutes
+          // Fetch more products (100 instead of 20) for better randomization
+          cachedProducts = await api.getProducts({ per_page: 100, category: cat.id });
+          // Cache with shorter expiry for more frequent updates
+          cacheService.setProducts(cachedProducts, cacheKey, 2 * 60 * 1000); // 2 minutes
         }
         
-        // 🔀 Shuffle each category list
-        results[cat.title] = shuffleArray(cachedProducts);
+        // 🔀 Shuffle and select random subset for display (20 products)
+        results[cat.title] = shuffleArray(cachedProducts).slice(0, 20);
       }
       setCategoryProducts(results);
     } catch (err) {
       console.error('Error loading category products:', err);
-      setError('Failed to load products');
+      // Don't set error for category products - show empty state instead
+      // This allows the main products to display even if categories fail
     } finally {
       setLoading(false);
     }
@@ -102,6 +123,9 @@ export function HomePage({ onProductClick }: HomePageProps) {
   }, []);
 
   const handleRefresh = async () => {
+    // Clear current cache entries to force fresh fetch with new random products
+    setProducts({ featured: [], nonFeatured: [] });
+    setCategoryProducts({});
     await loadProducts();
     await loadCategories();
   };

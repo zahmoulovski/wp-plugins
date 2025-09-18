@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, CreditCard, Truck, User, CheckCircle } from 'lucide-react';
+import { ArrowLeft, CreditCard, Truck, Person, CheckCircle } from 'react-bootstrap-icons';
 
 import { useApp } from '../../contexts/AppContext';
 import { api } from '../../services/api';
@@ -408,7 +408,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
             {currentStep === 1 && (
               <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center mb-4">
-                  <User className="h-5 w-5 text-primary-600 dark:text-primary-400 mr-2" />
+                  <Person className="h-5 w-5 text-primary-600 dark:text-primary-400 mr-2" />
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                     Informations Personnelles
                   </h2>

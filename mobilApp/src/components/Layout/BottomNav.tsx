@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Grid3X3, Search, ShoppingCart, User } from 'lucide-react';
+import { House, Grid3x3, Search, Cart, Person, ChatDots } from 'react-bootstrap-icons';
 import { useApp } from '../../contexts/AppContext';
 
 export function BottomNav() {
@@ -9,11 +9,11 @@ export function BottomNav() {
   const cartItemsCount = state.cart.reduce((total, item) => total + item.quantity, 0);
 
   const navItems = [
-    { path: '/', icon: Home, label: 'Accueil' },
-    { path: '/categories', icon: Grid3X3, label: 'Catégories' },
+    { path: '/', icon: House, label: 'Accueil' },
+    { path: '/categories', icon: Grid3x3, label: 'Catégories' },
+    { path: '/cart', icon: Cart, label: 'Panier', badge: cartItemsCount },
     { path: '/search', icon: Search, label: 'Recherche' },
-    { path: '/cart', icon: ShoppingCart, label: 'Panier', badge: cartItemsCount },
-    { path: '/profile', icon: User, label: 'Profil' },
+    { path: '/contact', icon: ChatDots, label: 'Contact' },
   ];
 
   return (

@@ -75,6 +75,8 @@ export interface Customer {
     postcode: string;
     country: string;
   };
+  avatar_url?: string;
+  is_wp_user?: boolean;
 }
 
 export interface Order {

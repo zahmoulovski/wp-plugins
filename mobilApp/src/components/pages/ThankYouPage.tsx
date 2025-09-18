@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle, Home, ShoppingBag } from 'lucide-react';
+import { CheckCircle, House, Bag } from 'react-bootstrap-icons';
 
 interface OrderProduct {
   id: string;
@@ -171,14 +171,14 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
           onClick={onBackToHome}
           className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-3 px-4 rounded-xl font-semibold transition-colors duration-200 flex items-center justify-center gap-2"
         >
-          <Home className="h-5 w-5" />
+          <House className="h-5 w-5" />
           Retour à l'accueil
         </button>
         <button
           onClick={onContinueShopping}
           className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 px-4 rounded-xl font-semibold transition-colors duration-200 flex items-center justify-center gap-2"
         >
-          <ShoppingBag className="h-5 w-5" />
+          <Bag className="h-5 w-5" />
           Continuer vos achats
         </button>
         </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Minus, Trash2, ShoppingBag } from 'lucide-react';
+import { Plus, Dash, Trash, Bag } from 'react-bootstrap-icons';
 import { useApp } from '../../contexts/AppContext';
 import { PullToRefresh } from '../common/PullToRefresh';
 
@@ -23,7 +23,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
     if (numPrice === 0) {
       return 'Prix : Sur Demande';
     }
-    return `${numPrice.toFixed(2)} TND`;
+    return `${numPrice.toFixed(3)} TND`;
   };
 
   const calculateTotal = () => {
@@ -56,7 +56,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
           </h1>
           
           <div className="text-center py-12">
-            <ShoppingBag className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <Bag className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-500 dark:text-gray-400 text-lg mb-2">
               Votre panier est vide
             </p>
@@ -97,7 +97,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
                         onClick={() => updateQuantity(item.id, item.quantity - 1)}
                         className="p-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
                       >
-                        <Minus className="h-4 w-4" />
+                        <Dash className="h-4 w-4" />
                       </button>
                       
                       <span className="font-semibold text-lg">{item.quantity}</span>
@@ -119,7 +119,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
                         onClick={() => removeFromCart(item.id)}
                         className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash className="h-4 w-4" />
                       </button>
                     </div>
                   </div>

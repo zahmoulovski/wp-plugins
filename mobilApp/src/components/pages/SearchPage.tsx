@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X } from 'react-bootstrap-icons';
 import { Product } from '../../types';
 import { api } from '../../services/api';
 import { ProductCard } from '../common/ProductCard';

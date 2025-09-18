@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon } from 'react-bootstrap-icons';
 import { useApp } from '../../contexts/AppContext';
 
 interface HeaderProps {
