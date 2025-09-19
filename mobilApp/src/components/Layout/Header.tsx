@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Sun, Moon, Person } from 'react-bootstrap-icons';
 import { useApp } from '../../contexts/AppContext';
@@ -12,6 +12,16 @@ interface HeaderProps {
 
 export function Header({ currentPage, onPageChange, onMenuClick, isMenuOpen = false }: HeaderProps) {
   const { state, dispatch } = useApp();
+  const [profilePicture, setProfilePicture] = useState<string>('');
+
+  // Load profile picture from WordPress when customer changes
+  useEffect(() => {
+    if (state.customer) {
+      setProfilePicture(state.customer.avatar_url || '');
+    } else {
+      setProfilePicture('');
+    }
+  }, [state.customer]);
 
   const toggleDarkMode = () => {
     const isDarkMode = document.documentElement.classList.toggle('dark');
@@ -69,10 +79,18 @@ export function Header({ currentPage, onPageChange, onMenuClick, isMenuOpen = fa
           {state.customer && (
             <Link
               to="/profile"
-              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               aria-label="Profil"
             >
-              <Person className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              {profilePicture ? (
+                <img
+                  src={profilePicture}
+                  alt="Profile"
+                  className="h-8 w-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+                />
+              ) : (
+                <Person className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              )}
             </Link>
           )}
 

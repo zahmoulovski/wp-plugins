@@ -4,7 +4,6 @@ import { api } from '../../services/api';
 import { cacheService } from '../../services/cache';
 import { ProductCard } from '../common/ProductCard';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-import { PullToRefresh } from '../common/PullToRefresh';
 
 interface HomePageProps {
   onProductClick: (product: Product) => void;
@@ -122,14 +121,6 @@ export function HomePage({ onProductClick }: HomePageProps) {
     loadCategories();
   }, []);
 
-  const handleRefresh = async () => {
-    // Clear current cache entries to force fresh fetch with new random products
-    setProducts({ featured: [], nonFeatured: [] });
-    setCategoryProducts({});
-    await loadProducts();
-    await loadCategories();
-  };
-
   if (loading) return <LoadingSpinner />;
   if (error) {
     return (
@@ -146,43 +137,41 @@ export function HomePage({ onProductClick }: HomePageProps) {
   }
 
   return (
-    <PullToRefresh onRefresh={handleRefresh}>
-      <div className="p-4 pb-20">
-        {products.featured.length > 0 && (
-          <section>
-            <h2 className="text-xl font-bold mb-4 dark:text-white">Produits vedettes</h2>
+    <div className="p-4 pb-20">
+      {products.featured.length > 0 && (
+        <section>
+          <h2 className="text-xl font-bold mb-4 dark:text-white">Produits vedettes</h2>
+          <div className="grid grid-cols-2 gap-4">
+            {products.featured.map(product => (
+              <ProductCard key={product.id} product={product} onProductClick={onProductClick} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {products.nonFeatured.length > 0 && (
+        <section>
+          <br></br><h2 className="text-xl font-bold mb-4 dark:text-white">Nouveaux produits</h2>
+          <div className="grid grid-cols-2 gap-4">
+            {products.nonFeatured.map(product => (
+              <ProductCard key={product.id} product={product} onProductClick={onProductClick} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {Object.entries(categoryProducts).map(([title, prods]) =>
+        prods.length > 0 && (
+          <section key={title}>
+            <br></br><h2 className="text-xl font-bold mb-4 dark:text-white">{title}</h2>
             <div className="grid grid-cols-2 gap-4">
-              {products.featured.map(product => (
+              {prods.map(product => (
                 <ProductCard key={product.id} product={product} onProductClick={onProductClick} />
               ))}
             </div>
           </section>
-        )}
-
-        {products.nonFeatured.length > 0 && (
-          <section>
-            <br></br><h2 className="text-xl font-bold mb-4 dark:text-white">Nouveaux produits</h2>
-            <div className="grid grid-cols-2 gap-4">
-              {products.nonFeatured.map(product => (
-                <ProductCard key={product.id} product={product} onProductClick={onProductClick} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {Object.entries(categoryProducts).map(([title, prods]) =>
-          prods.length > 0 && (
-            <section key={title}>
-              <br></br><h2 className="text-xl font-bold mb-4 dark:text-white">{title}</h2>
-              <div className="grid grid-cols-2 gap-4">
-                {prods.map(product => (
-                  <ProductCard key={product.id} product={product} onProductClick={onProductClick} />
-                ))}
-              </div>
-            </section>
-          )
-        )}
-      </div>
-    </PullToRefresh>
+        )
+      )}
+    </div>
   );
 }

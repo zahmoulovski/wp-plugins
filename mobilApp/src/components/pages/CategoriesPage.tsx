@@ -5,7 +5,6 @@ import { Category, Product } from '../../types';
 import { api } from '../../services/api';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { ProductCard } from '../common/ProductCard';
-import { PullToRefresh } from '../common/PullToRefresh';
 import { decodeHTMLEntities } from '../../utils/htmlUtils';
 
 interface CategoriesPageProps {
@@ -116,15 +115,6 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
     }
   }, [categorySlug]);
 
-  const handleRefresh = async () => {
-    if (selectedCategory) {
-      setCurrentPage(1);
-      await loadCategoryProducts(selectedCategory.id, 1);
-    } else {
-      await loadCategories();
-    }
-  };
-
   const handleCategoryClick = (category: Category) => {
     navigate(`/categories/${category.slug}`);
   };
@@ -148,150 +138,148 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
   }
 
   return (
-    <PullToRefresh onRefresh={handleRefresh}>
-      <div className="p-4 pb-20">
-        {!selectedCategory ? (
-          <>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-              Catégories
-            </h1>
-            
-            <div className="space-y-3">
-              {categories.map((category) => (
-                <Link
-                  key={category.id}
-                  to={`/categories/${category.slug}`}
-                  className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 cursor-pointer hover:shadow-md transition-all duration-200 block"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      {category.image && (
-                        <img
-                          src={category.image.src}
-                          alt={decodeHTMLEntities(category.name)}
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
-                      )}
-                      <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-white">
-                          {decodeHTMLEntities(category.name)}
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {category.count} produits
-                        </p>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-gray-400" />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center mb-6">
-              <button
-                onClick={() => navigate(-1)}
-                className="text-primary-600 dark:text-primary-400 mr-4 flex items-center"
+    <div className="p-4 pb-20">
+      {!selectedCategory ? (
+        <>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+            Catégories
+          </h1>
+          
+          <div className="space-y-3">
+            {categories.map((category) => (
+              <Link
+                key={category.id}
+                to={`/categories/${category.slug}`}
+                className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 cursor-pointer hover:shadow-md transition-all duration-200 block"
               >
-                ← Retour
-              </button>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                 {decodeHTMLEntities(selectedCategory.name)}
-               </h1>
-            </div>
-
-            {productsLoading ? (
-              <LoadingSpinner />
-            ) : (
-              <>
-                {/* Subcategories */}
-                {subcategories.length > 0 && (
-                  <div className="mb-6">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                      Sous-catégories
-                    </h2>
-                    <div className="space-y-3">
-                      {subcategories.map((subcategory) => (
-                        <Link
-                          key={subcategory.id}
-                          to={`/categories/${subcategory.id}`}
-                          className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 cursor-pointer hover:shadow-md transition-all duration-200 block"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                              {subcategory.image && (
-                                <img
-                                  src={subcategory.image.src}
-                                  alt={decodeHTMLEntities(subcategory.name)}
-                                  className="w-10 h-10 rounded-lg object-cover"
-                                />
-                              )}
-                              <div>
-                                <h3 className="font-semibold text-gray-900 dark:text-white">
-                                  {decodeHTMLEntities(subcategory.name)}
-                                </h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  {subcategory.count} produits
-                                </p>
-                              </div>
-                            </div>
-                            <ChevronRight className="h-5 w-5 text-gray-400" />
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Products */}
-                {categoryProducts.length > 0 && (
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                      Produits
-                    </h2>
-                    <div className="grid grid-cols-2 gap-4">
-                      {categoryProducts.map((product) => (
-                        <ProductCard
-                          key={product.id}
-                          product={product}
-                          onProductClick={onProductClick}
-                        />
-                      ))}
-                    </div>
-
-                    {/* Load More Button */}
-                    {hasMoreProducts && (
-                      <div className="mt-6 text-center">
-                        <button
-                          onClick={handleLoadMore}
-                          disabled={loadingMore}
-                          className="bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-xl font-semibold transition-colors duration-200 flex items-center justify-center mx-auto"
-                        >
-                          {loadingMore ? (
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                          ) : (
-                            <Plus className="h-5 w-5 mr-2" />
-                          )}
-                          {loadingMore ? 'Chargement...' : 'Charger Plus'}
-                        </button>
-                      </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    {category.image && (
+                      <img
+                        src={category.image.src}
+                        alt={decodeHTMLEntities(category.name)}
+                        className="w-12 h-12 rounded-lg object-cover"
+                      />
                     )}
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">
+                        {decodeHTMLEntities(category.name)}
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {category.count} produits
+                      </p>
+                    </div>
                   </div>
-                )}
+                  <ChevronRight className="h-5 w-5 text-gray-400" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex items-center mb-6">
+            <button
+              onClick={() => navigate(-1)}
+              className="text-primary-600 dark:text-primary-400 mr-4 flex items-center"
+            >
+              ← Retour
+            </button>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+               {decodeHTMLEntities(selectedCategory.name)}
+             </h1>
+          </div>
 
-                {categoryProducts.length === 0 && subcategories.length === 0 && (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500 dark:text-gray-400">
-                      Aucun produit trouvé dans cette catégorie.
-                    </p>
+          {productsLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <>
+              {/* Subcategories */}
+              {subcategories.length > 0 && (
+                <div className="mb-6">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Sous-catégories
+                  </h2>
+                  <div className="space-y-3">
+                    {subcategories.map((subcategory) => (
+                      <Link
+                        key={subcategory.id}
+                        to={`/categories/${subcategory.id}`}
+                        className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 cursor-pointer hover:shadow-md transition-all duration-200 block"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            {subcategory.image && (
+                              <img
+                                src={subcategory.image.src}
+                                alt={decodeHTMLEntities(subcategory.name)}
+                                className="w-10 h-10 rounded-lg object-cover"
+                              />
+                            )}
+                            <div>
+                              <h3 className="font-semibold text-gray-900 dark:text-white">
+                                {decodeHTMLEntities(subcategory.name)}
+                              </h3>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {subcategory.count} produits
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-gray-400" />
+                        </div>
+                      </Link>
+                    ))}
                   </div>
-                )}
-              </>
-            )}
-          </>
-        )}
-      </div>
-    </PullToRefresh>
+                </div>
+              )}
+
+              {/* Products */}
+              {categoryProducts.length > 0 && (
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Produits
+                  </h2>
+                  <div className="grid grid-cols-2 gap-4">
+                    {categoryProducts.map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        onProductClick={onProductClick}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Load More Button */}
+                  {hasMoreProducts && (
+                    <div className="mt-6 text-center">
+                      <button
+                        onClick={handleLoadMore}
+                        disabled={loadingMore}
+                        className="bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-xl font-semibold transition-colors duration-200 flex items-center justify-center mx-auto"
+                      >
+                        {loadingMore ? (
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        ) : (
+                          <Plus className="h-5 w-5 mr-2" />
+                        )}
+                        {loadingMore ? 'Chargement...' : 'Charger Plus'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {categoryProducts.length === 0 && subcategories.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Aucun produit trouvé dans cette catégorie.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+    </div>
   );
 }

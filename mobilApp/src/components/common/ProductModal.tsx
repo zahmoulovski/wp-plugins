@@ -19,6 +19,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const [showWhatsAppEmail, setShowWhatsAppEmail] = useState(false);
   const [whatsappEmail, setWhatsappEmail] = useState('');
 
+
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -96,7 +97,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   };
 
   const getThumbnail = (url: string) => {
-    if (!url) return '/api/placeholder/300/300';
+    if (!url) return '/api/placeholder/600/600';
     const dotIndex = url.lastIndexOf('.');
     if (dotIndex === -1) return url;
     return `${url.slice(0, dotIndex)}-300x300${url.slice(dotIndex)}`;
@@ -108,7 +109,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
           ...img,
           src: getThumbnail(img.src),
         }))
-      : [{ id: 0, src: '/api/placeholder/300/300', alt: product.name }];
+      : [{ id: 0, src: '/api/placeholder/600/600', alt: product.name }];
 
 
   return (
@@ -141,34 +142,35 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
         <div className="p-6">
           {/* Product Images */}
           <div className="mb-6">
-            <img
-              src={images[selectedImageIndex]?.src}
-              alt={product.name}
-              className="w-full h-full object-cover rounded-lg"
-            />
+            <div className="relative">
+              <img
+                src={images[selectedImageIndex]?.src}
+                alt={product.name}
+                className="w-full h-full object-cover rounded-lg"
+              />
+            </div>
 
-{images.length > 1 && (
-  <div className="flex space-x-2 mt-3 overflow-x-auto">
-    {images.map((image, index) => (
-      <div
-        key={image.id}
-        className={`w-full h-full object-cover rounded-lg border-2 overflow-hidden cursor-pointer ${
-          selectedImageIndex === index
-            ? 'border-primary-500'
-            : 'border-gray-200 dark:border-gray-700'
-        }`}
-        onClick={() => setSelectedImageIndex(index)}
-      >
-        <img
-          src={image.src}
-          alt={`${product.name} ${index + 1}`}
-          className="w-full h-full object-cover"
-        />
-      </div>
-    ))}
-  </div>
-)}
-
+            {images.length > 1 && (
+              <div className="flex space-x-2 mt-3 overflow-x-auto">
+                {images.map((image, index) => (
+                  <div
+                    key={image.id}
+                    className={`w-20 h-20 object-cover rounded-lg border-2 overflow-hidden cursor-pointer ${
+                      selectedImageIndex === index
+                        ? 'border-primary-500'
+                        : 'border-gray-200 dark:border-gray-700'
+                    }`}
+                    onClick={() => setSelectedImageIndex(index)}
+                  >
+                    <img
+                      src={image.src}
+                      alt={`${product.name} ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Price and Sale Badge */}
@@ -278,10 +280,6 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
                 <Cart className="h-5 w-5" />
                 <span>Ajouter au panier</span>
               </button>
-
-              <button className="p-3 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
-                <Heart className="h-5 w-5" />
-              </button>
             </div>
 
             {!showWhatsAppEmail ? (
@@ -326,6 +324,8 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
           )}
         </div>
       </div>
+
+
     </div>
   );
 }

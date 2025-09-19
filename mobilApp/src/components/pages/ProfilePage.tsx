@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Person, Gear, Heart, BoxArrowInLeft, BoxArrowRight, BoxArrowInRight, Key, PersonPlus, Eye, EyeSlash, Pencil } from 'react-bootstrap-icons';
+import { Person, Gear, Heart, BoxArrowInLeft, BoxArrowRight, BoxArrowInRight,Calendar, Key, PersonPlus, Eye, EyeSlash, Pencil } from 'react-bootstrap-icons';
 import { useApp } from '../../contexts/AppContext';
 import { api } from '../../services/api';
 import { Order, Customer } from '../../types';
-import { PullToRefresh } from '../common/PullToRefresh';
 import { Toaster, toast } from 'react-hot-toast';
 
 export function ProfilePage() {
@@ -13,6 +12,7 @@ export function ProfilePage() {
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [showSignUpForm, setShowSignUpForm] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isEditingAddresses, setIsEditingAddresses] = useState(false);
   const [editProfileData, setEditProfileData] = useState({
     firstName: '',
     lastName: '',
@@ -21,8 +21,31 @@ export function ProfilePage() {
     newPassword: '',
     confirmPassword: ''
   });
-  const [profilePicture, setProfilePicture] = useState<string>('');
-  const [uploadingPicture, setUploadingPicture] = useState(false);
+  const [editBillingData, setEditBillingData] = useState({
+    first_name: '',
+    last_name: '',
+    company: '',
+    address_1: '',
+    address_2: '',
+    city: '',
+    state: '',
+    postcode: '',
+    country: 'TN',
+    email: '',
+    phone: ''
+  });
+  const [editShippingData, setEditShippingData] = useState({
+    first_name: '',
+    last_name: '',
+    company: '',
+    address_1: '',
+    address_2: '',
+    city: '',
+    state: '',
+    postcode: '',
+    country: 'TN'
+  });
+
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [loginData, setLoginData] = useState({
@@ -59,10 +82,6 @@ export function ProfilePage() {
       loadOrders();
     }
   }, [state.customer]);
-
-  const handleRefresh = async () => {
-    await loadOrders();
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -243,8 +262,10 @@ export function ProfilePage() {
   };
 
   const handlePasswordReset = () => {
-    toast('Cette fonctionnalité sera bientôt disponible', {
-      icon: '🔧',
+    // Redirect to WordPress password reset page
+    window.open('https://klarrion.com/wp-login.php?action=lostpassword', '_blank');
+    toast('Redirection vers la page de récupération de mot de passe...', {
+      icon: '🔑',
       duration: 3000
     });
   };
@@ -259,58 +280,41 @@ export function ProfilePage() {
         newPassword: '',
         confirmPassword: ''
       });
-      setProfilePicture(state.customer.avatar_url || '');
       setIsEditingProfile(true);
     }
   };
 
-  const handleProfilePictureUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !state.customer) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB');
-      return;
-    }
-
-    setUploadingPicture(true);
-    
-    try {
-      // Show preview immediately
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setProfilePicture(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-
-      // Upload to WordPress
-      const uploadedUrl = await api.uploadProfilePicture(file);
-      setProfilePicture(uploadedUrl);
-      
-      // Update customer with new avatar URL
-      const updatedCustomer = await api.updateCustomer(state.customer.id, {
-        avatar_url: uploadedUrl
+  const handleEditAddresses = () => {
+    if (state.customer) {
+      setEditBillingData({
+        first_name: state.customer.billing?.first_name || '',
+        last_name: state.customer.billing?.last_name || '',
+        company: state.customer.billing?.company || '',
+        address_1: state.customer.billing?.address_1 || '',
+        address_2: state.customer.billing?.address_2 || '',
+        city: state.customer.billing?.city || '',
+        state: state.customer.billing?.state || '',
+        postcode: state.customer.billing?.postcode || '',
+        country: state.customer.billing?.country || 'TN',
+        email: state.customer.billing?.email || state.customer.email || '',
+        phone: state.customer.billing?.phone || ''
       });
-      
-      dispatch({ type: 'SET_CUSTOMER', payload: updatedCustomer });
-      toast.success('Profile picture updated successfully!');
-      
-    } catch (error) {
-      console.error('Profile picture upload error:', error);
-      toast.error('Failed to upload profile picture');
-      // Revert to previous picture
-      setProfilePicture(state.customer.avatar_url || '');
-    } finally {
-      setUploadingPicture(false);
+      setEditShippingData({
+        first_name: state.customer.shipping?.first_name || '',
+        last_name: state.customer.shipping?.last_name || '',
+        company: state.customer.shipping?.company || '',
+        address_1: state.customer.shipping?.address_1 || '',
+        address_2: state.customer.shipping?.address_2 || '',
+        city: state.customer.shipping?.city || '',
+        state: state.customer.shipping?.state || '',
+        postcode: state.customer.shipping?.postcode || '',
+        country: state.customer.shipping?.country || 'TN'
+      });
+      setIsEditingAddresses(true);
     }
   };
+
+
 
   const handleSaveProfile = async () => {
     if (!state.customer) return;
@@ -387,7 +391,79 @@ export function ProfilePage() {
       newPassword: '',
       confirmPassword: ''
     });
-    setProfilePicture(state.customer?.avatar_url || '');
+  };
+
+  const handleSaveAddresses = async () => {
+    if (!state.customer) return;
+
+    // Validate required fields
+    if (!editBillingData.first_name || !editBillingData.last_name || !editBillingData.email) {
+      toast.error('Please fill in all required billing fields (first name, last name, email)');
+      return;
+    }
+
+    if (!editBillingData.address_1 || !editBillingData.city || !editBillingData.postcode) {
+      toast.error('Please fill in all required address fields (address, city, postcode)');
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editBillingData.email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      // Update customer with new billing and shipping addresses
+      const updatedCustomer = await api.updateCustomer(state.customer.id, {
+        billing: editBillingData,
+        shipping: editShippingData
+      });
+
+      dispatch({ type: 'SET_CUSTOMER', payload: updatedCustomer });
+      setIsEditingAddresses(false);
+      toast.success('Addresses updated successfully!');
+      
+    } catch (error: any) {
+      console.error('Address update error:', error);
+      toast.error('Failed to update addresses');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelAddressEdit = () => {
+    setIsEditingAddresses(false);
+    // Reset form data to current customer data
+    if (state.customer) {
+      setEditBillingData({
+        first_name: state.customer.billing?.first_name || '',
+        last_name: state.customer.billing?.last_name || '',
+        company: state.customer.billing?.company || '',
+        address_1: state.customer.billing?.address_1 || '',
+        address_2: state.customer.billing?.address_2 || '',
+        city: state.customer.billing?.city || '',
+        state: state.customer.billing?.state || '',
+        postcode: state.customer.billing?.postcode || '',
+        country: state.customer.billing?.country || 'TN',
+        email: state.customer.billing?.email || state.customer.email || '',
+        phone: state.customer.billing?.phone || ''
+      });
+      setEditShippingData({
+        first_name: state.customer.shipping?.first_name || '',
+        last_name: state.customer.shipping?.last_name || '',
+        company: state.customer.shipping?.company || '',
+        address_1: state.customer.shipping?.address_1 || '',
+        address_2: state.customer.shipping?.address_2 || '',
+        city: state.customer.shipping?.city || '',
+        state: state.customer.shipping?.state || '',
+        postcode: state.customer.shipping?.postcode || '',
+        country: state.customer.shipping?.country || 'TN'
+      });
+    }
   };
 
   const handleOrderClick = (order: Order) => {
@@ -411,8 +487,7 @@ export function ProfilePage() {
   return (
     <>
       <Toaster position="top-center" />
-      <PullToRefresh onRefresh={handleRefresh}>
-        <div className="p-4 pb-20 relative min-h-screen">
+      <div className="p-4 pb-20 relative min-h-screen">
           {/* Klarrion Logo Background */}
           <div 
             className="fixed inset-0 pointer-events-none z-0"
@@ -428,7 +503,7 @@ export function ProfilePage() {
           
           <div className="relative z-10">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-              Profil
+              Mon compte
             </h1>
 
             {!state.customer ? (
@@ -475,7 +550,7 @@ export function ProfilePage() {
                           value={loginData.password}
                           onChange={(e) => setLoginData({...loginData, password: e.target.value})}
                           required
-                          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent pr-10"
+                          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
                         <button
                           type="button"
@@ -616,13 +691,13 @@ export function ProfilePage() {
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
                   {isEditingProfile ? (
                     <div className="space-y-4">
-                      {/* Profile Picture Upload */}
+                      {/* Profile Picture Display */}
                       <div className="text-center">
                         <div className="relative inline-block">
                           <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">
-                            {profilePicture ? (
+                            {state.customer?.avatar_url ? (
                               <img 
-                                src={profilePicture} 
+                                src={state.customer.avatar_url} 
                                 alt="Profile" 
                                 className="w-full h-full object-cover"
                               />
@@ -632,20 +707,6 @@ export function ProfilePage() {
                               </div>
                             )}
                           </div>
-                          <label className="absolute bottom-0 right-0 bg-primary-600 hover:bg-primary-700 text-white p-2 rounded-full cursor-pointer transition-colors duration-200">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleProfilePictureUpload}
-                              className="hidden"
-                              disabled={uploadingPicture}
-                            />
-                            {uploadingPicture ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            ) : (
-                              <Pencil className="h-4 w-4" />
-                            )}
-                          </label>
                         </div>
                       </div>
 
@@ -705,13 +766,7 @@ export function ProfilePage() {
 
                       {/* Action Buttons */}
                       <div className="flex space-x-3 pt-4">
-                        <button
-                          onClick={handleCancelEdit}
-                          disabled={loading}
-                          className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Cancel
-                        </button>
+                       
                         <button
                           onClick={handleSaveProfile}
                           disabled={loading}
@@ -719,50 +774,279 @@ export function ProfilePage() {
                         >
                           {loading ? 'Saving...' : 'Save Changes'}
                         </button>
+                         <button
+                          onClick={handleCancelEdit}
+                          disabled={loading}
+                          className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Cancel
+                        </button>
                       </div>
                     </div>
                   ) : (
                     <div>
-                      <button
-                        onClick={handleEditProfile}
-                        className="w-full flex items-center space-x-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
-                      >
-                        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">
-                          {state.customer.avatar_url ? (
-                            <img 
-                              src={state.customer.avatar_url} 
-                              alt="Profile" 
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Person className="h-8 w-8 text-primary-600 dark:text-primary-400" />
+                      {/* Profile Info Section */}
+                      {!isEditingProfile ? (
+                        <div>
+                          <div className="flex items-center space-x-4 p-4">
+                            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">
+                              {state.customer.avatar_url ? (
+                                <img 
+                                  src={state.customer.avatar_url} 
+                                  alt="Profile" 
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Person className="h-8 w-8 text-primary-600 dark:text-primary-400" />
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        <div className="flex-1 text-left">
-                          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                            {state.customer.first_name} {state.customer.last_name}
-                          </h2>
-                          <p className="text-gray-500 dark:text-gray-400">
-                            {state.customer.email}
-                          </p>
-                        </div>
-                        <Pencil className="h-5 w-5 text-gray-400" />
-                      </button>
+                            <div className="flex-1 text-left">
+                              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                                {state.customer.first_name} {state.customer.last_name}
+                              </h2>
+                              <p className="text-gray-500 dark:text-gray-400">
+                                {state.customer.email}
+                              </p>
+                            </div>
+                          </div>
 
-                      <div className="flex space-x-3 mt-4">
+                          {/* Action Buttons */}
+                          <div className="flex flex-col space-y-3 px-4 pb-4">
+                            <button
+                              onClick={handleEditProfile}
+                              className="w-full flex items-center justify-center p-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                            >
+                              <Pencil className="h-4 w-4 mr-2 text-gray-500" />
+                              Edit Name, Email & Password
+                            </button>
+                            <button
+                              onClick={handleEditAddresses}
+                              className="w-full flex items-center justify-center p-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                            >
+                              <Person className="h-4 w-4 mr-2 text-gray-500" />
+                              Add/Edit Addresses
+                            </button>
+                            <button
+                              onClick={handleLogout}
+                              className="w-full flex items-center justify-center p-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                            >
+                              <BoxArrowRight className="h-4 w-4 mr-2 text-gray-500" />
+                              Logout
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
                         <button
-                          onClick={handleLogout}
-                          className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                          onClick={handleEditProfile}
+                          className="w-full flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
                         >
-                          <BoxArrowRight className="h-4 w-4 mr-2" />
-                          Logout
+                          <div className="flex-1 text-left">
+                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                              {state.customer.first_name} {state.customer.last_name}
+                            </h2>
+                            <p className="text-gray-500 dark:text-gray-400">
+                              {state.customer.email}
+                            </p>
+                          </div>
+                          <Pencil className="h-5 w-5 text-gray-400" />
                         </button>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
+
+                {/* Address Editing Section */}
+                {isEditingAddresses && (
+                  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                      Edit Addresses
+                    </h3>
+                    
+                    {/* Billing Address */}
+                    <div className="mb-6">
+                      <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-3">Billing Address</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input
+                          type="text"
+                          placeholder="First Name *"
+                          value={editBillingData.first_name}
+                          onChange={(e) => setEditBillingData({...editBillingData, first_name: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Last Name *"
+                          value={editBillingData.last_name}
+                          onChange={(e) => setEditBillingData({...editBillingData, last_name: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="email"
+                          placeholder="Email *"
+                          value={editBillingData.email}
+                          onChange={(e) => setEditBillingData({...editBillingData, email: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="tel"
+                          placeholder="Phone"
+                          value={editBillingData.phone}
+                          onChange={(e) => setEditBillingData({...editBillingData, phone: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Company"
+                          value={editBillingData.company}
+                          onChange={(e) => setEditBillingData({...editBillingData, company: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Address Line 1 *"
+                          value={editBillingData.address_1}
+                          onChange={(e) => setEditBillingData({...editBillingData, address_1: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Address Line 2"
+                          value={editBillingData.address_2}
+                          onChange={(e) => setEditBillingData({...editBillingData, address_2: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="City *"
+                          value={editBillingData.city}
+                          onChange={(e) => setEditBillingData({...editBillingData, city: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="State *"
+                          value={editBillingData.state}
+                          onChange={(e) => setEditBillingData({...editBillingData, state: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Postcode *"
+                          value={editBillingData.postcode}
+                          onChange={(e) => setEditBillingData({...editBillingData, postcode: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <select
+                          value={editBillingData.country}
+                          onChange={(e) => setEditBillingData({...editBillingData, country: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        >
+                          <option value="TN">Tunisia</option>
+                          <option value="FR">France</option>
+                          <option value="DE">Germany</option>
+                          <option value="IT">Italy</option>
+                          <option value="US">United States</option>
+                          <option value="CA">Canada</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Shipping Address */}
+                    <div className="mb-6">
+                      <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-3">Shipping Address</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input
+                          type="text"
+                          placeholder="First Name"
+                          value={editShippingData.first_name}
+                          onChange={(e) => setEditShippingData({...editShippingData, first_name: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Last Name"
+                          value={editShippingData.last_name}
+                          onChange={(e) => setEditShippingData({...editShippingData, last_name: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Company"
+                          value={editShippingData.company}
+                          onChange={(e) => setEditShippingData({...editShippingData, company: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Address Line 1"
+                          value={editShippingData.address_1}
+                          onChange={(e) => setEditShippingData({...editShippingData, address_1: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Address Line 2"
+                          value={editShippingData.address_2}
+                          onChange={(e) => setEditShippingData({...editShippingData, address_2: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="City"
+                          value={editShippingData.city}
+                          onChange={(e) => setEditShippingData({...editShippingData, city: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="State"
+                          value={editShippingData.state}
+                          onChange={(e) => setEditShippingData({...editShippingData, state: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Postcode"
+                          value={editShippingData.postcode}
+                          onChange={(e) => setEditShippingData({...editShippingData, postcode: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <select
+                          value={editShippingData.country}
+                          onChange={(e) => setEditShippingData({...editShippingData, country: e.target.value})}
+                          className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        >
+                          <option value="TN">Tunisia</option>
+                          <option value="FR">France</option>
+                          <option value="DE">Germany</option>
+                          <option value="IT">Italy</option>
+                          <option value="US">United States</option>
+                          <option value="CA">Canada</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={handleSaveAddresses}
+                        disabled={loading}
+                        className="flex-1 bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? 'Saving...' : 'Save Addresses'}
+                      </button>
+                      <button
+                        onClick={handleCancelAddressEdit}
+                        disabled={loading}
+                        className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Menu Items */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6">
@@ -811,9 +1095,16 @@ export function ProfilePage() {
                             <p className="font-semibold text-primary-600 dark:text-primary-400">
                              {order.total} TND
                             </p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">
+                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                              order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                              order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                              order.status === 'on-hold' ? 'bg-orange-100 text-orange-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
                               {order.status}
-                            </p>
+                            </span>
                           </div>
                         </button>
                       ))}
@@ -828,8 +1119,6 @@ export function ProfilePage() {
             )}
           </div>
         </div>
-      </PullToRefresh>
-
       {/* Order Details Modal */}
       {showOrderDetails && selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[9999]">
@@ -852,12 +1141,15 @@ export function ProfilePage() {
               {/* Order Status */}
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500 dark:text-gray-400">
+                  <Calendar className="inline h-4 w-4 mr-1" />
                   Date: {formatDate(selectedOrder.date_created)}
                 </span>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                   selectedOrder.status === 'completed' ? 'bg-green-100 text-green-800' :
                   selectedOrder.status === 'processing' ? 'bg-blue-100 text-blue-800' :
                   selectedOrder.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  selectedOrder.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                  selectedOrder.status === 'on-hold' ? 'bg-orange-100 text-orange-800' :
                   'bg-gray-100 text-gray-800'
                 }`}>
                   {selectedOrder.status}

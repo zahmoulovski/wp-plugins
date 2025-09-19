@@ -183,11 +183,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const mainMenuItems = [
     { path: '/', icon: House, label: 'Accueil' },
-    { path: '/contact', icon: ChatDots, label: 'Contact' },
     { path: '/categories', icon: Grid3x3, label: 'Catégories' },
     { path: '/search', icon: Search, label: 'Recherche' },
     { path: '/cart', icon: Cart, label: 'Panier', badge: cartItemsCount },
-    { path: '/profile', icon: Person, label: 'Profil' },
+    { path: '/contact', icon: ChatDots, label: 'Contact' },
+    { path: '/profile', icon: Person, label: 'Mon Compte' },
   ];
 
   const secondaryMenuItems = [

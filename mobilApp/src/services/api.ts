@@ -205,27 +205,84 @@ export const api = {
     });
   },
 
-  async uploadProfilePicture(file: File): Promise<string> {
+  async uploadProfilePicture(file: File, customerId: number): Promise<string> {
+    try {
+      // Upload to WordPress media library
+      const wordpressUrl = await this.uploadToWordPressMedia(file, customerId);
+      
+      // Update customer's avatar_url in WooCommerce
+      try {
+        await this.updateCustomer(customerId, { avatar_url: wordpressUrl });
+      } catch (error) {
+        console.warn('Failed to update customer avatar URL:', error);
+      }
+      
+      return wordpressUrl;
+    } catch (error) {
+      console.error('Profile picture upload error:', error);
+      throw new Error('Profile picture upload failed: ' + error.message);
+    }
+  },
+
+  async uploadToWordPressMedia(file: File, customerId: number): Promise<string> {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('title', 'Profile Picture');
-    
-    // Upload to WordPress media endpoint
-    const response = await fetch('https://klarrion.com/wp-json/wp/v2/media', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        // WordPress expects the file in FormData format, not JSON
-      },
-      body: formData,
-    });
+    formData.append('title', `Profile Picture - Customer ${customerId}`);
+    formData.append('alt_text', `Profile picture for customer ${customerId}`);
 
-    if (!response.ok) {
-      throw new Error(`Profile picture upload failed: ${response.status} ${response.statusText}`);
+    try {
+      // Upload to WordPress media library
+      const response = await fetch('https://klarrion.com/wp-json/wp/v2/media', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          // Don't set Content-Type for FormData, let browser set it with boundary
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Media upload failed: ${response.status} ${response.statusText}`);
+      }
+
+      const mediaData = await response.json();
+      
+      // Update user meta with the media ID
+      try {
+        await this.updateWordPressUserMeta(customerId, 'wp_user_avatar', mediaData.id);
+      } catch (error) {
+        console.warn('Failed to update user meta:', error);
+      }
+
+      return mediaData.source_url;
+    } catch (error) {
+      console.error('WordPress media upload error:', error);
+      throw error;
     }
+  },
 
-    const data = await response.json();
-    return data.source_url; // Return the URL of the uploaded image
+  async updateWordPressUserMeta(userId: number, metaKey: string, metaValue: any): Promise<void> {
+    try {
+      const response = await fetch(`https://klarrion.com/wp-json/wp/v2/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          meta: {
+            [metaKey]: metaValue
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`User meta update failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('WordPress user meta update error:', error);
+      throw error;
+    }
   },
 
   async updateCustomerPassword(customerId: number, currentPassword: string, newPassword: string): Promise<boolean> {

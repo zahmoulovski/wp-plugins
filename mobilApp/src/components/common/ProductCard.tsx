@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Cart, Heart } from 'react-bootstrap-icons';
+import { Cart } from 'react-bootstrap-icons';
 import { Product } from '../../types';
 import { useApp } from '../../contexts/AppContext';
 
@@ -38,7 +38,7 @@ export function ProductCard({ product, onProductClick }: ProductCardProps) {
     return `${numPrice.toFixed(3)} TND`;
   };
 
-  const mainImage = product.images?.[0]?.src || '/api/placeholder/300/300';
+  const mainImage = product.images?.[0]?.src || '/api/placeholder/600/600';
 
   return (
     <div 
@@ -57,10 +57,6 @@ export function ProductCard({ product, onProductClick }: ProductCardProps) {
             Promo
           </div>
         )}
-        
-        <button className="absolute top-2 right-2 p-2 bg-white dark:bg-gray-800 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <Heart className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-        </button>
       </div>
       
       <div className="p-4">
