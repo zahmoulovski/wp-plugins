@@ -76,23 +76,21 @@ export function Header({ currentPage, onPageChange, onMenuClick, isMenuOpen = fa
 
         <div className="flex items-center space-x-2">
           {/* Profile Link */}
-          {state.customer && (
-            <Link
-              to="/profile"
-              className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              aria-label="Profil"
-            >
-              {profilePicture ? (
-                <img
-                  src={profilePicture}
-                  alt="Profile"
-                  className="h-8 w-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
-                />
-              ) : (
-                <Person className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-              )}
-            </Link>
-          )}
+          <Link
+            to="/profile"
+            className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Profil"
+          >
+            {state.customer && profilePicture ? (
+              <img
+                src={profilePicture}
+                alt="Profile"
+                className="h-8 w-8 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
+              />
+            ) : (
+              <Person className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            )}
+          </Link>
 
           {/* Dark Mode Toggle */}
           <button

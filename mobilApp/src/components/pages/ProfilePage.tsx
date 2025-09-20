@@ -19,7 +19,8 @@ export function ProfilePage() {
     email: '',
     currentPassword: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    logoutFromEverywhere: false
   });
   const [editBillingData, setEditBillingData] = useState({
     first_name: '',
@@ -314,18 +315,14 @@ export function ProfilePage() {
     }
   };
 
-
-
   const handleSaveProfile = async () => {
     if (!state.customer) return;
-
     // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(editProfileData.email)) {
       toast.error('Please enter a valid email address');
       return;
     }
-
     // Validate password if being changed
     if (editProfileData.newPassword) {
       if (editProfileData.newPassword.length < 6) {
@@ -341,26 +338,34 @@ export function ProfilePage() {
         return;
       }
     }
-
     setLoading(true);
-    
+  
     try {
       // Update basic profile info
       const updatedCustomer = await api.updateCustomer(state.customer.id, {
         first_name: editProfileData.firstName,
         last_name: editProfileData.lastName,
-        email: editProfileData.email,
-        avatar_url: profilePicture
+        email: editProfileData.email
       });
 
       // Update password if provided
-      if (editProfileData.newPassword && editProfileData.currentPassword) {
+      if ((editProfileData.newPassword && editProfileData.currentPassword) || editProfileData.logoutFromEverywhere) {
+        const newPassword = editProfileData.logoutFromEverywhere ? generateRandomPassword() : editProfileData.newPassword;
+        const currentPassword = editProfileData.currentPassword;
+        
         await api.updateCustomerPassword(
           state.customer.id,
-          editProfileData.currentPassword,
-          editProfileData.newPassword
+          currentPassword,
+          newPassword
         );
-        toast.success('Password updated successfully!');
+        
+        if (editProfileData.logoutFromEverywhere) {
+          toast.success('Password changed and logged out from all other devices!');
+          // Clear the flag
+          setEditProfileData(prev => ({...prev, logoutFromEverywhere: false}));
+        } else {
+          toast.success('Password updated successfully!');
+        }
       }
 
       dispatch({ type: 'SET_CUSTOMER', payload: updatedCustomer });
@@ -381,6 +386,15 @@ export function ProfilePage() {
     }
   };
 
+  const generateRandomPassword = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
   const handleCancelEdit = () => {
     setIsEditingProfile(false);
     setEditProfileData({
@@ -389,7 +403,8 @@ export function ProfilePage() {
       email: state.customer?.email || '',
       currentPassword: '',
       newPassword: '',
-      confirmPassword: ''
+      confirmPassword: '',
+      logoutFromEverywhere: false
     });
   };
 
@@ -520,13 +535,13 @@ export function ProfilePage() {
                   <div className="space-y-4">
                     <button
                       onClick={() => setShowLoginForm(true)}
-                      className="w-full bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-xl font-semibold transition-colors duration-200"
+                      className="w-50 bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-xl font-semibold transition-colors duration-200"
                     >
                       Se Connecter
-                    </button>
+                    </button><br/>
                     <button
                       onClick={() => setShowSignUpForm(true)}
-                      className="w-full bg-green-400 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-semibold transition-colors duration-200"
+                      className="w-50 bg-secondary-500 hover:bg-secondary-600 text-white px-8 py-3 rounded-xl font-semibold transition-colors duration-200"
                     >
                       <PersonPlus className="inline h-5 w-5 mr-2" />
                       Créer un Compte
@@ -689,7 +704,66 @@ export function ProfilePage() {
               <div>
                 {/* User Info */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
-                  {isEditingProfile ? (
+                  <div>
+                    {/* Profile Info Section */}
+                    <div className="flex items-center space-x-4 p-4">
+                      <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">
+                        {state.customer.avatar_url ? (
+                          <img 
+                            src={state.customer.avatar_url} 
+                            alt="Profile" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Person className="h-8 w-8 text-primary-600 dark:text-primary-400" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 text-left">
+                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                          {state.customer.first_name} {state.customer.last_name}
+                        </h2>
+                        <p className="text-gray-500 dark:text-gray-400">
+                          {state.customer.email}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-col space-y-3 px-4 pb-4">
+                      <button
+                        onClick={handleEditProfile}
+                        className="w-full flex items-center justify-center p-3 border border-gray-300 dark:border-gray-600 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        <Pencil className="h-4 w-4 mr-2 dark:text-white text-gray-500" />
+                        Détails du compte
+                      </button>
+                      <button
+                        onClick={handleEditAddresses}
+                        className="w-full flex items-center justify-center p-3 border border-gray-300 dark:border-gray-600 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        <Person className="h-4 w-4 mr-2 text-gray-500 dark:text-white" />
+                        Ajouter/modifier des adresses
+                      </button>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center justify-center p-3 border border-gray-300 dark:text-white dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                      >
+                        <BoxArrowRight className="h-4 w-4 mr-2 text-gray-500 dark:text-white" />
+                        Logout
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Profile Editing Section */}
+                {isEditingProfile && (
+                  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                      Edit Profile Details
+                    </h3>
+                    
                     <div className="space-y-4">
                       {/* Profile Picture Display */}
                       <div className="text-center">
@@ -761,12 +835,31 @@ export function ProfilePage() {
                             onChange={(e) => setEditProfileData({...editProfileData, confirmPassword: e.target.value})}
                             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                           />
-                        </div>
-                      </div>
+                         </div>
+                       </div>
 
-                      {/* Action Buttons */}
+                       {/* Logout from everywhere else */}
+                       <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
+                         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Security Options</h4>
+                         <div className="flex items-center">
+                           <input
+                             type="checkbox"
+                             id="logoutFromEverywhere"
+                             checked={editProfileData.logoutFromEverywhere}
+                             onChange={(e) => setEditProfileData({...editProfileData, logoutFromEverywhere: e.target.checked})}
+                             disabled={!editProfileData.newPassword || !editProfileData.confirmPassword}
+                             className="form-checkbox h-5 w-5 text-primary-600 transition duration-150 ease-in-out"
+                           />
+                           <label htmlFor="logoutFromEverywhere" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
+                             Logout from all other devices
+                           </label>
+                         </div>
+                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                           This will change your password and log you out from all other devices
+                         </p>
+                       </div>
+                       {/* Action Buttons */}
                       <div className="flex space-x-3 pt-4">
-                       
                         <button
                           onClick={handleSaveProfile}
                           disabled={loading}
@@ -774,7 +867,7 @@ export function ProfilePage() {
                         >
                           {loading ? 'Saving...' : 'Save Changes'}
                         </button>
-                         <button
+                        <button
                           onClick={handleCancelEdit}
                           disabled={loading}
                           className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -783,79 +876,8 @@ export function ProfilePage() {
                         </button>
                       </div>
                     </div>
-                  ) : (
-                    <div>
-                      {/* Profile Info Section */}
-                      {!isEditingProfile ? (
-                        <div>
-                          <div className="flex items-center space-x-4 p-4">
-                            <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">
-                              {state.customer.avatar_url ? (
-                                <img 
-                                  src={state.customer.avatar_url} 
-                                  alt="Profile" 
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <Person className="h-8 w-8 text-primary-600 dark:text-primary-400" />
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex-1 text-left">
-                              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                                {state.customer.first_name} {state.customer.last_name}
-                              </h2>
-                              <p className="text-gray-500 dark:text-gray-400">
-                                {state.customer.email}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Action Buttons */}
-                          <div className="flex flex-col space-y-3 px-4 pb-4">
-                            <button
-                              onClick={handleEditProfile}
-                              className="w-full flex items-center justify-center p-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
-                            >
-                              <Pencil className="h-4 w-4 mr-2 text-gray-500" />
-                              Edit Name, Email & Password
-                            </button>
-                            <button
-                              onClick={handleEditAddresses}
-                              className="w-full flex items-center justify-center p-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
-                            >
-                              <Person className="h-4 w-4 mr-2 text-gray-500" />
-                              Add/Edit Addresses
-                            </button>
-                            <button
-                              onClick={handleLogout}
-                              className="w-full flex items-center justify-center p-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
-                            >
-                              <BoxArrowRight className="h-4 w-4 mr-2 text-gray-500" />
-                              Logout
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={handleEditProfile}
-                          className="w-full flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
-                        >
-                          <div className="flex-1 text-left">
-                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                              {state.customer.first_name} {state.customer.last_name}
-                            </h2>
-                            <p className="text-gray-500 dark:text-gray-400">
-                              {state.customer.email}
-                            </p>
-                          </div>
-                          <Pencil className="h-5 w-5 text-gray-400" />
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Address Editing Section */}
                 {isEditingAddresses && (
@@ -924,13 +946,38 @@ export function ProfilePage() {
                           onChange={(e) => setEditBillingData({...editBillingData, city: e.target.value})}
                           className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
-                        <input
-                          type="text"
-                          placeholder="State *"
+                        <select
                           value={editBillingData.state}
                           onChange={(e) => setEditBillingData({...editBillingData, state: e.target.value})}
+                          required
                           className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
+                        >
+                          <option value="">Sélectionner Gouvernorat *</option>
+                          <option value="Ariana">Ariana</option>
+                          <option value="Béja">Béja</option>
+                          <option value="Ben Arous">Ben Arous</option>
+                          <option value="Bizerte">Bizerte</option>
+                          <option value="Gabès">Gabès</option>
+                          <option value="Gafsa">Gafsa</option>
+                          <option value="Jendouba">Jendouba</option>
+                          <option value="Kairouan">Kairouan</option>
+                          <option value="Kasserine">Kasserine</option>
+                          <option value="Kebili">Kebili</option>
+                          <option value="Kef">Kef</option>
+                          <option value="Mahdia">Mahdia</option>
+                          <option value="Manouba">Manouba</option>
+                          <option value="Medenine">Medenine</option>
+                          <option value="Monastir">Monastir</option>
+                          <option value="Nabeul">Nabeul</option>
+                          <option value="Sfax">Sfax</option>
+                          <option value="Sidi Bouzid">Sidi Bouzid</option>
+                          <option value="Siliana">Siliana</option>
+                          <option value="Sousse">Sousse</option>
+                          <option value="Tataouine">Tataouine</option>
+                          <option value="Tozeur">Tozeur</option>
+                          <option value="Tunis">Tunis</option>
+                          <option value="Zaghouan">Zaghouan</option>
+                        </select>
                         <input
                           type="text"
                           placeholder="Postcode *"
@@ -944,11 +991,6 @@ export function ProfilePage() {
                           className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         >
                           <option value="TN">Tunisia</option>
-                          <option value="FR">France</option>
-                          <option value="DE">Germany</option>
-                          <option value="IT">Italy</option>
-                          <option value="US">United States</option>
-                          <option value="CA">Canada</option>
                         </select>
                       </div>
                     </div>
@@ -999,13 +1041,37 @@ export function ProfilePage() {
                           onChange={(e) => setEditShippingData({...editShippingData, city: e.target.value})}
                           className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
-                        <input
-                          type="text"
-                          placeholder="State"
+                        <select
                           value={editShippingData.state}
                           onChange={(e) => setEditShippingData({...editShippingData, state: e.target.value})}
                           className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
+                        >
+                          <option value="">Sélectionner Gouvernorat</option>
+                          <option value="Ariana">Ariana</option>
+                          <option value="Béja">Béja</option>
+                          <option value="Ben Arous">Ben Arous</option>
+                          <option value="Bizerte">Bizerte</option>
+                          <option value="Gabès">Gabès</option>
+                          <option value="Gafsa">Gafsa</option>
+                          <option value="Jendouba">Jendouba</option>
+                          <option value="Kairouan">Kairouan</option>
+                          <option value="Kasserine">Kasserine</option>
+                          <option value="Kebili">Kebili</option>
+                          <option value="Kef">Kef</option>
+                          <option value="Mahdia">Mahdia</option>
+                          <option value="Manouba">Manouba</option>
+                          <option value="Medenine">Medenine</option>
+                          <option value="Monastir">Monastir</option>
+                          <option value="Nabeul">Nabeul</option>
+                          <option value="Sfax">Sfax</option>
+                          <option value="Sidi Bouzid">Sidi Bouzid</option>
+                          <option value="Siliana">Siliana</option>
+                          <option value="Sousse">Sousse</option>
+                          <option value="Tataouine">Tataouine</option>
+                          <option value="Tozeur">Tozeur</option>
+                          <option value="Tunis">Tunis</option>
+                          <option value="Zaghouan">Zaghouan</option>
+                        </select>
                         <input
                           type="text"
                           placeholder="Postcode"
@@ -1019,11 +1085,6 @@ export function ProfilePage() {
                           className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         >
                           <option value="TN">Tunisia</option>
-                          <option value="FR">France</option>
-                          <option value="DE">Germany</option>
-                          <option value="IT">Italy</option>
-                          <option value="US">United States</option>
-                          <option value="CA">Canada</option>
                         </select>
                       </div>
                     </div>
