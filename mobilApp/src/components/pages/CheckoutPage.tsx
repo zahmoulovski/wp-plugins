@@ -12,6 +12,7 @@ interface CheckoutPageProps {
 export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
   const { state, dispatch } = useApp();
   const [loading, setLoading] = useState(false);
+  const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [shippingMethods, setShippingMethods] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -134,6 +135,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
     const calculateShipping = async () => {
       // Use address-specific calculation when address is complete
       if (formData.city && formData.state && formData.zipCode) {
+        setIsCalculatingShipping(true);
         try {
           const shippingAddress = {
             city: formData.city,
@@ -172,6 +174,8 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
           } catch (fallbackError) {
             console.error('Error loading fallback shipping methods:', fallbackError);
           }
+        } finally {
+          setIsCalculatingShipping(false);
         }
       }
     };
@@ -276,6 +280,19 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
       return;
     }
     
+    // Validate form data before submission
+    if (!formData.email || !formData.firstName || !formData.lastName || !formData.phone) {
+      alert('Veuillez remplir tous les champs obligatoires.');
+      setCurrentStep(1);
+      return;
+    }
+    
+    if (!selectedShipping) {
+      alert('Veuillez sélectionner une méthode de livraison.');
+      setCurrentStep(2);
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -350,7 +367,20 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
       onOrderSuccess(order, calculateSubtotal());
     } catch (error) {
       console.error('Error creating order:', error);
-      alert('Error placing order. Please try again.');
+      // More user-friendly error messages
+      let errorMessage = 'Erreur lors de la validation de la commande. Veuillez réessayer.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('network')) {
+          errorMessage = 'Problème de connexion. Veuillez vérifier votre connexion internet.';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'La requête a pris trop de temps. Veuillez réessayer.';
+        } else if (error.message.includes('validation')) {
+          errorMessage = 'Veuillez vérifier les informations saisies.';
+        }
+      }
+      
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -549,7 +579,12 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
                     Méthode de Livraison
                   </h2>
                 </div>
-                {shippingMethods.length > 0 ? (
+                {isCalculatingShipping ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mr-3"></div>
+                    <span className="text-gray-600 dark:text-gray-400">Calcul des frais de livraison...</span>
+                  </div>
+                ) : shippingMethods.length > 0 ? (
                   <div className="space-y-4">
                     {shippingMethods.map(method => (
                       <label key={method.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
@@ -574,7 +609,11 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 dark:text-gray-400 text-lg">Chargement des méthodes de livraison...</p>
+                  <div className="text-center py-8">
+                    <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500 dark:text-gray-400 text-lg mb-2">Aucune méthode de livraison disponible</p>
+                    <p className="text-sm text-gray-400">Veuillez vérifier votre adresse de livraison</p>
+                  </div>
                 )}
               </div>
             )}

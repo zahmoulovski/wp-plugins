@@ -1,3 +1,12 @@
+export interface ProductAttribute {
+  id: number;
+  name: string;
+  slug: string;
+  position: number;
+  visible: boolean;
+  options: string[];
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -24,6 +33,7 @@ export interface Product {
   stock_quantity: number;
   on_sale: boolean;
   featured: boolean;
+  attributes?: ProductAttribute[];
 }
 
 export interface Category {
@@ -43,6 +53,7 @@ export interface CartItem {
   id: number;
   product: Product;
   quantity: number;
+  attributes?: Record<string, string>;
 }
 
 export interface Customer {
@@ -94,4 +105,39 @@ export interface Order {
     quantity: number;
     total: string;
   }>;
+}
+
+export interface BlogPost {
+  id: number;
+  title: {
+    rendered: string;
+  };
+  content: {
+    rendered: string;
+  };
+  excerpt: {
+    rendered: string;
+  };
+  date: string;
+  modified: string;
+  slug: string;
+  status: string;
+  type: string;
+  link: string;
+  featured_media: number;
+  author: number;
+  categories: number[];
+  tags: number[];
+  _embedded?: {
+    'wp:featuredmedia'?: Array<{
+      source_url: string;
+      alt_text: string;
+    }>;
+    author?: Array<{
+      name: string;
+      avatar_urls?: {
+        '48': string;
+      };
+    }>;
+  };
 }

@@ -9,7 +9,16 @@ interface AppState {
 }
 
 type AppAction = 
-  | { type: 'ADD_TO_CART'; payload: { product: Product; quantity: number } }
+  | { type: 'ADD_TO_CART'; payload: { 
+      id: number; 
+      name: string; 
+      price: string; 
+      quantity: number; 
+      image: string; 
+      sku?: string; 
+      attributes?: Record<string, string>;
+      product: Product;
+    }}
   | { type: 'REMOVE_FROM_CART'; payload: number }
   | { type: 'UPDATE_CART_ITEM'; payload: { id: number; quantity: number } }
   | { type: 'CLEAR_CART' }
@@ -27,20 +36,21 @@ const initialState: AppState = {
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'ADD_TO_CART': {
-      const existingItem = state.cart.find(item => item.id === action.payload.product.id);
+      const existingItem = state.cart.find(item => item.id === action.payload.id);
       let newCart;
       
       if (existingItem) {
         newCart = state.cart.map(item =>
-          item.id === action.payload.product.id
+          item.id === action.payload.id
             ? { ...item, quantity: item.quantity + action.payload.quantity }
             : item
         );
       } else {
         newCart = [...state.cart, {
-          id: action.payload.product.id,
+          id: action.payload.id,
           product: action.payload.product,
-          quantity: action.payload.quantity
+          quantity: action.payload.quantity,
+          attributes: action.payload.attributes
         }];
       }
       

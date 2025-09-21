@@ -16,11 +16,7 @@ export function ProfilePage() {
   const [editProfileData, setEditProfileData] = useState({
     firstName: '',
     lastName: '',
-    email: '',
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-    logoutFromEverywhere: false
+    email: ''
   });
   const [editBillingData, setEditBillingData] = useState({
     first_name: '',
@@ -68,11 +64,25 @@ export function ProfilePage() {
     
     try {
       setLoading(true);
+      console.log('Loading orders for customer ID:', state.customer.id);
       const customerOrders = await api.getOrders(state.customer.id);
+      console.log('Orders loaded successfully:', customerOrders);
       setOrders(customerOrders);
     } catch (error) {
       console.error('Error loading orders:', error);
-      toast.error('Erreur lors du chargement des commandes');
+      console.error('Customer ID:', state.customer.id);
+      console.error('Customer data:', state.customer);
+      
+      // More specific error messages
+      if (error.message?.includes('404')) {
+        toast.error('Aucune commande trouvée');
+      } else if (error.message?.includes('403')) {
+        toast.error('Accès refusé aux commandes');
+      } else if (error.message?.includes('401')) {
+        toast.error('Authentification requise pour voir les commandes');
+      } else {
+        toast.error('Erreur lors du chargement des commandes: ' + (error.message || 'Erreur inconnue'));
+      }
     } finally {
       setLoading(false);
     }
@@ -100,82 +110,58 @@ export function ProfilePage() {
     try {
       setLoading(true);
       
-      // Search for customers (including WordPress users now)
-      const customers = await api.searchCustomers(loginData.emailOrUsername);
+      // Use proper authentication that verifies password
+      const authenticatedCustomer = await api.authenticateUser(loginData.emailOrUsername, loginData.password);
       
-      if (customers.length === 0) {
-        toast.error('Aucun compte trouvé avec cet email ou nom d\'utilisateur');
-        return;
-      }
-      
-      // Find the exact customer that matches the email or username
-      let foundCustomer = null;
-      
-      // First, try to find an exact match
-      for (const customer of customers) {
-        if (customer.email === loginData.emailOrUsername || customer.username === loginData.emailOrUsername) {
-          foundCustomer = customer;
-          break;
+      if (authenticatedCustomer) {
+        // For WordPress users, we need to handle them differently
+        // Since WordPress users don't have billing/shipping info by default, we should add basic info
+        if (authenticatedCustomer.is_wp_user && (!authenticatedCustomer.billing || !authenticatedCustomer.billing.email)) {
+          authenticatedCustomer.billing = {
+            first_name: authenticatedCustomer.first_name,
+            last_name: authenticatedCustomer.last_name,
+            email: authenticatedCustomer.email,
+            phone: '',
+            company: '',
+            address_1: '',
+            address_2: '',
+            city: '',
+            state: '',
+            postcode: '',
+            country: 'TN',
+          };
+          authenticatedCustomer.shipping = {
+            first_name: authenticatedCustomer.first_name,
+            last_name: authenticatedCustomer.last_name,
+            company: '',
+            address_1: '',
+            address_2: '',
+            city: '',
+            state: '',
+            postcode: '',
+            country: 'TN',
+          };
         }
+        
+        // Set the customer in state
+        dispatch({ type: 'SET_CUSTOMER', payload: authenticatedCustomer });
+        setShowLoginForm(false);
+        setLoginData({ emailOrUsername: '', password: '' });
+        
+        toast.success('Connexion réussie !');
+      } else {
+        throw new Error('Authentication failed');
       }
-      
-      // If no exact match found, but we have results, use the first result
-      // This handles cases like "admin" finding the admin user, or "contact@klarrion.com" not returning results
-      if (!foundCustomer && customers.length > 0) {
-        // Prioritize customers with admin-like characteristics
-        foundCustomer = customers.find(customer => 
-          customer.id === 1 || // Customer ID 1 is often the admin
-          customer.username?.toLowerCase().includes('admin') ||
-          customer.email?.toLowerCase().includes('admin') ||
-          customer.first_name?.toLowerCase().includes('admin') ||
-          customer.last_name?.toLowerCase().includes('admin')
-        ) || customers[0]; // If no admin-like customer found, use the first result
-      }
-
-      if (!foundCustomer) {
-        toast.error('Aucun compte trouvé avec cet email ou nom d\'utilisateur');
-        return;
-      }
-      
-      // For WordPress users, we need to handle them differently
-      // Since WordPress users don't have billing/shipping info by default, we should add basic info
-      if (foundCustomer.is_wp_user && (!foundCustomer.billing || !foundCustomer.billing.email)) {
-        foundCustomer.billing = {
-          first_name: foundCustomer.first_name,
-          last_name: foundCustomer.last_name,
-          email: foundCustomer.email,
-          phone: '',
-          company: '',
-          address_1: '',
-          address_2: '',
-          city: '',
-          state: '',
-          postcode: '',
-          country: 'TN',
-        };
-        foundCustomer.shipping = {
-          first_name: foundCustomer.first_name,
-          last_name: foundCustomer.last_name,
-          company: '',
-          address_1: '',
-          address_2: '',
-          city: '',
-          state: '',
-          postcode: '',
-          country: 'TN',
-        };
-      }
-      
-      // Set the customer in state
-      dispatch({ type: 'SET_CUSTOMER', payload: foundCustomer });
-      setShowLoginForm(false);
-      setLoginData({ emailOrUsername: '', password: '' });
-      
-      toast.success('Connexion réussie !');
       
     } catch (error) {
       console.error('Login error:', error);
-      toast.error('Erreur lors de la connexion. Veuillez réessayer.');
+      if (error.message === 'Invalid password') {
+        toast.error('Mot de passe incorrect. Veuillez réessayer.');
+      } else if (error.message === 'User not found') {
+        toast.error('Aucun compte trouvé avec cet email ou nom d\'utilisateur');
+      } else {
+        toast.error('Erreur lors de la connexion. Veuillez réessayer.');
+      }
     } finally {
       setLoading(false);
     }
@@ -276,10 +262,7 @@ export function ProfilePage() {
       setEditProfileData({
         firstName: state.customer.first_name || '',
         lastName: state.customer.last_name || '',
-        email: state.customer.email || '',
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
+        email: state.customer.email || ''
       });
       setIsEditingProfile(true);
     }
@@ -323,50 +306,15 @@ export function ProfilePage() {
       toast.error('Please enter a valid email address');
       return;
     }
-    // Validate password if being changed
-    if (editProfileData.newPassword) {
-      if (editProfileData.newPassword.length < 6) {
-        toast.error('New password must be at least 6 characters');
-        return;
-      }
-      if (editProfileData.newPassword !== editProfileData.confirmPassword) {
-        toast.error('New passwords do not match');
-        return;
-      }
-      if (!editProfileData.currentPassword) {
-        toast.error('Please enter your current password');
-        return;
-      }
-    }
     setLoading(true);
   
     try {
-      // Update basic profile info
+      // Update basic profile info only (no password handling)
       const updatedCustomer = await api.updateCustomer(state.customer.id, {
         first_name: editProfileData.firstName,
         last_name: editProfileData.lastName,
         email: editProfileData.email
       });
-
-      // Update password if provided
-      if ((editProfileData.newPassword && editProfileData.currentPassword) || editProfileData.logoutFromEverywhere) {
-        const newPassword = editProfileData.logoutFromEverywhere ? generateRandomPassword() : editProfileData.newPassword;
-        const currentPassword = editProfileData.currentPassword;
-        
-        await api.updateCustomerPassword(
-          state.customer.id,
-          currentPassword,
-          newPassword
-        );
-        
-        if (editProfileData.logoutFromEverywhere) {
-          toast.success('Password changed and logged out from all other devices!');
-          // Clear the flag
-          setEditProfileData(prev => ({...prev, logoutFromEverywhere: false}));
-        } else {
-          toast.success('Password updated successfully!');
-        }
-      }
 
       dispatch({ type: 'SET_CUSTOMER', payload: updatedCustomer });
       setIsEditingProfile(false);
@@ -374,12 +322,10 @@ export function ProfilePage() {
       
     } catch (error: any) {
       console.error('Profile update error:', error);
-      if (error.message?.includes('password')) {
-        toast.error('Current password is incorrect');
-      } else if (error.message?.includes('email')) {
+      if (error.message?.includes('email')) {
         toast.error('This email is already in use');
       } else {
-        toast.error('Failed to update profile');
+        toast.error('Failed to update profile: ' + (error.message || 'Unknown error'));
       }
     } finally {
       setLoading(false);
@@ -395,16 +341,18 @@ export function ProfilePage() {
     return password;
   };
 
+  const handlePasswordRedirect = () => {
+    // Simple redirect to WordPress password change page
+    window.open('https://klarrion.com/mon-compte/modifier-le-compte/', '_blank');
+    toast.success('Redirecting to password change page...');
+  };
+
   const handleCancelEdit = () => {
     setIsEditingProfile(false);
     setEditProfileData({
       firstName: state.customer?.first_name || '',
       lastName: state.customer?.last_name || '',
-      email: state.customer?.email || '',
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
-      logoutFromEverywhere: false
+      email: state.customer?.email || ''
     });
   };
 
@@ -810,54 +758,22 @@ export function ProfilePage() {
                         className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       />
 
-                      {/* Password Change Section */}
+                      {/* Password Change Section - Redirect to WordPress */}
                       <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
-                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Change Password (Optional)</h4>
-                        <div className="space-y-3">
-                          <input
-                            type="password"
-                            placeholder="Current Password"
-                            value={editProfileData.currentPassword}
-                            onChange={(e) => setEditProfileData({...editProfileData, currentPassword: e.target.value})}
-                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                          />
-                          <input
-                            type="password"
-                            placeholder="New Password"
-                            value={editProfileData.newPassword}
-                            onChange={(e) => setEditProfileData({...editProfileData, newPassword: e.target.value})}
-                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                          />
-                          <input
-                            type="password"
-                            placeholder="Confirm New Password"
-                            value={editProfileData.confirmPassword}
-                            onChange={(e) => setEditProfileData({...editProfileData, confirmPassword: e.target.value})}
-                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                          />
-                         </div>
-                       </div>
-
-                       {/* Logout from everywhere else */}
-                       <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
-                         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Security Options</h4>
-                         <div className="flex items-center">
-                           <input
-                             type="checkbox"
-                             id="logoutFromEverywhere"
-                             checked={editProfileData.logoutFromEverywhere}
-                             onChange={(e) => setEditProfileData({...editProfileData, logoutFromEverywhere: e.target.checked})}
-                             disabled={!editProfileData.newPassword || !editProfileData.confirmPassword}
-                             className="form-checkbox h-5 w-5 text-primary-600 transition duration-150 ease-in-out"
-                           />
-                           <label htmlFor="logoutFromEverywhere" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
-                             Logout from all other devices
-                           </label>
-                         </div>
-                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                           This will change your password and log you out from all other devices
-                         </p>
-                       </div>
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Change Password</h4>
+                        <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-4">
+                          <p className="text-sm text-primary-800 dark:text-primary-200 mb-3">
+                            Pour votre sécurité, la modification du mot de passe se fait directement sur notre site web.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handlePasswordRedirect()}
+                            className="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 px-4 rounded-lg transition-colors duration-200 text-sm font-medium"
+                          >
+                            Changer le mot de passe
+                          </button>
+                        </div>
+                      </div>
                        {/* Action Buttons */}
                       <div className="flex space-x-3 pt-4">
                         <button

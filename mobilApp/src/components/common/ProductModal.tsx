@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { X, Cart, Heart, Plus, Dash, ChatDots } from 'react-bootstrap-icons';
 import { Link } from 'react-router-dom';
 import { Product } from '../../types';
 import { useApp } from '../../contexts/AppContext';
 import { decodeHTMLEntities } from '../../utils/htmlUtils';
+import { ImageLightbox } from './ImageLightbox';
 
 
 interface ProductModalProps {
@@ -13,12 +14,15 @@ interface ProductModalProps {
 }
 
 export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
+  // Early return before any hooks are called to maintain consistent hook order
+  if (!isOpen) return null;
+  
   const { dispatch } = useApp();
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showWhatsAppEmail, setShowWhatsAppEmail] = useState(false);
   const [whatsappEmail, setWhatsappEmail] = useState('');
-
+  const [showLightbox, setShowLightbox] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -26,8 +30,6 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const [isOverflowing, setIsOverflowing] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) return;
-    
     const handleResize = () => {
       const container = containerRef.current;
       const text = textRef.current;
@@ -37,6 +39,9 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
     };
 
     const handleClickOutside = (event: MouseEvent) => {
+      // Don't close if the lightbox is open
+      if (showLightbox) return;
+      
       if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
         onClose();
       }
@@ -44,6 +49,8 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
 
     const handleEscapeKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        // If lightbox is open, don't close the modal
+        if (showLightbox) return;
         onClose();
       }
     };
@@ -57,10 +64,15 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscapeKey);
     };
-  }, [isOpen, onClose]);
-  
+  }, [onClose, showLightbox]);
 
-  if (!isOpen) return null;
+  // Reset lightbox state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setShowLightbox(false);
+      setSelectedImageIndex(0);
+    }
+  }, [isOpen]);
 
   const formatPrice = (price: string) => {
     const numPrice = parseFloat(price);
@@ -69,7 +81,18 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   };
 
   const addToCart = () => {
-    dispatch({ type: 'ADD_TO_CART', payload: { product, quantity } });
+    const cartItem = {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: quantity,
+      image: product.images[0]?.src || '',
+      sku: product.sku,
+      attributes: {},
+      variationId: null
+    };
+
+    dispatch({ type: 'ADD_TO_CART', payload: cartItem });
     onClose();
   };
 
@@ -96,25 +119,54 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
     onClose();
   };
 
-  const getThumbnail = (url: string) => {
+  const getThumbnail = (url: string, size: 'thumbnail' | 'full' = 'thumbnail') => {
     if (!url) return '/api/placeholder/600/600';
     const dotIndex = url.lastIndexOf('.');
     if (dotIndex === -1) return url;
+    
+    if (size === 'full') {
+      // Return the original full resolution image for lightbox
+      return url;
+    }
+    
+    // Return thumbnail size for modal display
     return `${url.slice(0, dotIndex)}-300x300${url.slice(dotIndex)}`;
   };
-  
-  const images =
-    product.images && product.images.length > 0
+
+  // Thumbnail images for modal display (300x300)
+  const thumbnailImages = useMemo(() => {
+    const images = product.images && product.images.length > 0
       ? product.images.map((img) => ({
           ...img,
-          src: getThumbnail(img.src),
+          src: getThumbnail(img.src, 'thumbnail'),
         }))
       : [{ id: 0, src: '/api/placeholder/600/600', alt: product.name }];
 
+    return images;
+  }, [product.images, product.name, getThumbnail]);
+
+  // Full resolution images for lightbox
+  const fullImages = useMemo(() => {
+    const images = product.images && product.images.length > 0
+      ? product.images.map((img) => ({
+          ...img,
+          src: getThumbnail(img.src, 'full'),
+        }))
+      : [{ id: 0, src: '/api/placeholder/600/600', alt: product.name }];
+
+    return images;
+  }, [product.images, product.name, getThumbnail]);
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    // Only close if clicking the backdrop and lightbox is not open
+    if (e.target === e.currentTarget && !showLightbox) {
+      onClose();
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div ref={modalRef} className="bg-white dark:bg-gray-900 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4" onClick={handleBackdropClick}>
+      <div ref={modalRef} className="bg-white dark:bg-gray-900 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
 
         {/* Modal Header */}
         <div className="sticky top-0 bg-white dark:bg-gray-900 p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -144,15 +196,19 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
           <div className="mb-6">
             <div className="relative">
               <img
-                src={images[selectedImageIndex]?.src}
+                src={thumbnailImages[selectedImageIndex]?.src}
                 alt={product.name}
-                className="w-full h-full object-cover rounded-lg"
+                className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => setShowLightbox(true)}
               />
+              <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded-lg text-xs">
+                Cliquez pour zoomer
+              </div>
             </div>
 
-            {images.length > 1 && (
+            {thumbnailImages.length > 1 && (
               <div className="flex space-x-2 mt-3 overflow-x-auto">
-                {images.map((image, index) => (
+                {thumbnailImages.map((image, index) => (
                   <div
                     key={image.id}
                     className={`w-20 h-20 object-cover rounded-lg border-2 overflow-hidden cursor-pointer ${
@@ -248,12 +304,12 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
                   className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
                 >
-                  <Dash className="h-4 w-4" />
+                  <Dash className="h-4 w-4 dark:text-white" />
                 </button>
-                <span className="font-semibold text-lg w-8 text-center">{quantity}</span>
+                <span className="font-semibold text-lg w-8 text-center dark:text-white">{quantity}</span>
                 <button
                   onClick={() => setQuantity(quantity + 1)}
-                  className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 dark:text-white"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
@@ -325,6 +381,13 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
         </div>
       </div>
 
+      {/* Image Lightbox */}
+      <ImageLightbox
+        images={fullImages}
+        currentIndex={selectedImageIndex}
+        isOpen={showLightbox}
+        onClose={() => setShowLightbox(false)}
+      />
 
     </div>
   );

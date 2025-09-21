@@ -83,7 +83,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
                 </h3>
                 
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 dark:text-white">
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
                       className="p-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"

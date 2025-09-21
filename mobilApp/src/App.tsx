@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { AppProvider } from './contexts/AppContext';
+import { AppProvider, useApp } from './contexts/AppContext';
 import { Header } from './components/Layout/Header';
 import { Sidebar } from './components/Layout/Sidebar';
 import { BottomNav } from './components/Layout/BottomNav';
@@ -13,21 +13,29 @@ import { ThankYouPage } from './components/pages/ThankYouPage';
 import { ProfilePage } from './components/pages/ProfilePage';
 import { ContactPage } from './components/pages/ContactPage';
 import { ProductModal } from './components/common/ProductModal';
+import { BlogPage } from './components/pages/BlogPage';
+import { BlogModal } from './components/common/BlogModal';
 import SplashScreen from './components/common/SplashScreen';
-import { Product } from './types';
+import { Product, BlogPost } from './types';
 import { api } from './services/api';
 
 function AppContent() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
 
   const navigate = useNavigate();
   const location = useLocation();
+  const { state } = useApp();
 
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
+  };
+
+  const handleBlogPostClick = (post: BlogPost) => {
+    setSelectedBlogPost(post);
   };
 
   const handleCheckout = () => {
@@ -62,6 +70,23 @@ function AppContent() {
   const handleSidebarClose = () => {
     setIsSidebarOpen(false);
   };
+
+  // Initialize dark mode based on saved preference
+  useEffect(() => {
+    if (state.darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [state.darkMode]);
+
+  // Apply dark mode on initial load
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    if (savedDarkMode) {
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
 
   // Simulate API data loading on app start
   useEffect(() => {
@@ -119,6 +144,7 @@ function AppContent() {
             />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/contact" element={<ContactPage />} />
+            <Route path="/blog" element={<BlogPage onPostClick={handleBlogPostClick} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
@@ -128,6 +154,12 @@ function AppContent() {
           product={selectedProduct}
           isOpen={!!selectedProduct}
           onClose={() => setSelectedProduct(null)}
+        />
+
+        <BlogModal
+          post={selectedBlogPost}
+          isOpen={!!selectedBlogPost}
+          onClose={() => setSelectedBlogPost(null)}
         />
       </div>
     </>
