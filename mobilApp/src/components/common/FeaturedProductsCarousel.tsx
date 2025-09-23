@@ -124,7 +124,7 @@ export function FeaturedProductsCarousel({ products, onProductClick }: FeaturedP
       {/* Products Container */}
       <div 
         ref={containerRef}
-        className="overflow-hidden mx-20 px-0"
+        className="overflow-hidden mx-0 px-0"
       >
         <div 
           className="flex transition-transform duration-300 ease-in-out gap-0"

@@ -7,6 +7,9 @@ const CONSUMER_SECRET = 'cs_39958925e281230d5078b21e722451225056d4ea';
 
 const auth = btoa(`${CONSUMER_KEY}:${CONSUMER_SECRET}`);
 
+// Define a constant for the global shipping zone ID
+const GLOBAL_SHIPPING_ZONE_ID = 3;
+
 // ---- Flouci configuration ----
 // ⚠️ For production move these to server-side env vars!
 export const FLOUCI_PUBLIC_KEY = '40f9dd4f-d834-4742-800d-4db524a24836'; // Replace with your actual key
@@ -318,27 +321,33 @@ export const api = {
   },
 
   async getShippingZones(): Promise<any[]> {
-    return apiRequest('/shipping/zones');
+    const zones = await apiRequest('/shipping/zones');
+    console.log('Raw shipping zones from API:', zones);
+    return zones;
   },
 
   async getShippingZoneMethods(zoneId: number): Promise<any[]> {
     return apiRequest(`/shipping/zones/${zoneId}/methods`);
   },
 
+  async getShippingMethodInstance(zoneId: number, instanceId: number): Promise<any> {
+    return apiRequest(`/shipping/zones/${zoneId}/methods/${instanceId}`);
+  },
+
   async getAllShippingMethods(): Promise<any[]> {
     try {
       // Get all shipping zones
-      const zones = await this.getShippingZones();
-      const allMethods: any[] = [];
+      const allMethods: ShippingMethod[] = [];
       
-      // Get methods for each zone
-      for (const zone of zones) {
+      const shippingZones = (await this.getShippingZones()).filter(zone => zone.id !== 0);
+      
+      for (const zone of shippingZones) {
         try {
           const methods = await this.getShippingZoneMethods(zone.id);
           const enabledMethods = methods.filter(method => method.enabled);
           
-          // Format methods for frontend use
           enabledMethods.forEach(method => {
+            console.log('Inspecting method before push:', method.id, method.instance_id);
             let cost = '0.00';
             if (method.settings && method.settings.cost) {
               cost = method.settings.cost.value || '0.00';
@@ -352,7 +361,8 @@ export const api = {
               cost: cost,
               method_id: method.method_id,
               zone_id: zone.id,
-              zone_name: zone.name
+              zone_name: zone.name,
+              instance_id: method.instance_id
             });
           });
         } catch (error) {
@@ -362,10 +372,11 @@ export const api = {
       
       // Also get global methods (zone 0)
       try {
-        const globalMethods = await this.getShippingZoneMethods(0);
+        const globalMethods = await this.getShippingZoneMethods(GLOBAL_SHIPPING_ZONE_ID);
         const enabledGlobalMethods = globalMethods.filter(method => method.enabled);
         
         enabledGlobalMethods.forEach(method => {
+          console.log('Inspecting global method before push:', method.id, method.instance_id);
           let cost = '0.00';
           if (method.settings && method.settings.cost) {
             cost = method.settings.cost.value || '0.00';
@@ -378,8 +389,9 @@ export const api = {
             title: method.title,
             cost: cost,
             method_id: method.method_id,
-            zone_id: 0,
-            zone_name: 'Global'
+            zone_id: GLOBAL_SHIPPING_ZONE_ID,
+            zone_name: 'Global',
+            instance_id: method.instance_id
           });
         });
       } catch (error) {

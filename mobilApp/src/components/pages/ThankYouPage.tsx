@@ -148,7 +148,7 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
             Informations de Facturation
           </h2>
           
-          <div className="space-y-2 text-gray-700 dark:text-gray-300">
+          <div className="space-y-2 text-gray-700 dark:text-white">
             <p><strong>Nom:</strong> {order.billing.first_name} {order.billing.last_name}</p>
             <p><strong>Email:</strong> {order.billing.email}</p>
             <p><strong>Téléphone:</strong> {order.billing.phone}</p>

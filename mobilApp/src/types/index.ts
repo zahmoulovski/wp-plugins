@@ -141,3 +141,14 @@ export interface BlogPost {
     }>;
   };
 }
+
+
+export interface ShippingMethod {
+  id: string;
+  title: string;
+  cost: string;
+  method_id: string;
+  zone_id: number;
+  zone_name: string;
+  instance_id: number;
+}

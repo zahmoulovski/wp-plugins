@@ -1,13 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, CreditCard, Truck, Person, CheckCircle } from 'react-bootstrap-icons';
-
+import { ArrowLeft , CheckCircleFill , CreditCard , Truck , Person  } from 'react-bootstrap-icons';
 import { useApp } from '../../contexts/AppContext';
 import { api } from '../../services/api';
+import { calculateShipping } from '../../utils/shippingCalculator';
 
 interface CheckoutPageProps {
   onBack: () => void;
   onOrderSuccess: (order: any, subtotal: string) => void;
 }
+
+const StepIndicator = ({ currentStep, stepValidation }: { currentStep: number; stepValidation: { step1: boolean; step2: boolean; step3: boolean; } }) => {
+  const steps = [
+    { id: 1, title: 'Informations', icon: Person },
+    { id: 2, title: 'Livraison', icon: Truck },
+    { id: 3, title: 'Paiement', icon: CreditCard },
+  ];
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center justify-between">
+        {steps.map((step, index) => {
+          const Icon = step.icon;
+          const isActive = currentStep === step.id;
+          const isCompleted = currentStep > step.id || (step.id === 1 && stepValidation.step1) || (step.id === 2 && stepValidation.step2) || (step.id === 3 && stepValidation.step3);
+          
+          return (
+            <React.Fragment key={step.id}>
+              <div className="flex flex-col items-center">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-200 ${isActive ? 'bg-primary-600 border-primary-600 text-white' : isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-gray-200 border-gray-300 text-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400'}`}>
+                  {isCompleted && !isActive ? (
+                    <CheckCircleFill className="h-6 w-6" />
+                  ) : (
+                    <Icon className="h-6 w-6" />
+                  )}
+                </div>
+                <span className={`mt-2 text-sm font-medium transition-colors duration-200 ${isActive ? 'text-primary-600 dark:text-primary-400' : isCompleted ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                  {step.title}
+                </span>
+              </div>
+              {index < steps.length - 1 && (
+                <div className={`flex-1 h-1 mx-4 transition-colors duration-200 ${currentStep > step.id ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
   const { state, dispatch } = useApp();
@@ -109,80 +149,43 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
     validateStep2();
   }, [selectedShipping]);
 
+  const getRestrictedShippingClasses = () => {
+    const restrictions = {
+      'heavy-items': ['local_pickup'],
+      'fragile': ['standard_shipping'],
+      'oversized': ['local_pickup'],
+    };
+
+    const restrictedClasses = new Set<string>();
+    state.cart.forEach(item => {
+      const shippingClass = item.product.shipping_class || '';
+      if (restrictions[shippingClass]) {
+        restrictions[shippingClass].forEach(method => restrictedClasses.add(method));
+      }
+    });
+
+    return restrictedClasses;
+  };
+
   useEffect(() => {
     validateStep3();
   }, [formData.paymentMethod]);
 
   useEffect(() => {
-    const getRestrictedShippingClasses = () => {
-      const restrictions = {
-        'heavy-items': ['local_pickup'],
-        'fragile': ['standard_shipping'],
-        'oversized': ['local_pickup'],
-      };
-
-      const restrictedClasses = new Set<string>();
-      state.cart.forEach(item => {
-        const shippingClass = item.product.shipping_class || '';
-        if (restrictions[shippingClass]) {
-          restrictions[shippingClass].forEach(method => restrictedClasses.add(method));
-        }
+    if (formData.city && formData.state && formData.zipCode) {
+      calculateShipping({
+        api,
+        cart: state.cart,
+        formData,
+        selectedShipping,
+        setShippingMethods,
+        setSelectedShipping,
+        setShippingCost,
+        setIsCalculatingShipping,
+        getRestrictedShippingClasses,
       });
-
-      return restrictedClasses;
-    };
-
-    const calculateShipping = async () => {
-      // Use address-specific calculation when address is complete
-      if (formData.city && formData.state && formData.zipCode) {
-        setIsCalculatingShipping(true);
-        try {
-          const shippingAddress = {
-            city: formData.city,
-            state: formData.state,
-            postcode: formData.zipCode,
-            country: formData.country,
-          };
-
-          const shippingRates = await api.calculateShipping(state.cart, shippingAddress);
-          let availableMethods = shippingRates.shipping_rates || [];
-
-          // Filter out restricted shipping methods
-          const restrictedMethods = getRestrictedShippingClasses();
-          availableMethods = availableMethods.filter(method => 
-            !restrictedMethods.has(method.method_id)
-          );
-
-          setShippingMethods(availableMethods);
-          
-          // Auto-select first method if none selected
-          if (availableMethods.length > 0 && !selectedShipping) {
-            setSelectedShipping(availableMethods[0].id);
-            setShippingCost(parseFloat(availableMethods[0].cost) || 0);
-          }
-        } catch (error) {
-          console.error('Error calculating shipping:', error);
-          // Fallback to all methods if address calculation fails
-          try {
-            const allMethods = await api.getAllShippingMethods();
-            setShippingMethods(allMethods);
-            
-            if (allMethods.length > 0 && !selectedShipping) {
-              setSelectedShipping(allMethods[0].id);
-              setShippingCost(parseFloat(allMethods[0].cost) || 0);
-            }
-          } catch (fallbackError) {
-            console.error('Error loading fallback shipping methods:', fallbackError);
-          }
-        } finally {
-          setIsCalculatingShipping(false);
-        }
-      }
-    };
-
-    // Calculate shipping whenever cart or address changes
-    calculateShipping();
-  }, [formData.city, formData.state, formData.zipCode, formData.country, state.cart]);
+    }
+  }, [formData.city, formData.state, formData.zipCode, formData.country, state.cart, selectedShipping]);
 
   const calculateSubtotal = () => {
     return state.cart.reduce((total, item) => {
@@ -386,59 +389,6 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
     }
   };
 
-  const StepIndicator = () => {
-    const steps = [
-      { id: 1, title: 'Informations', icon: Person },
-      { id: 2, title: 'Livraison', icon: Truck },
-      { id: 3, title: 'Paiement', icon: CreditCard },
-    ];
-
-    return (
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          {steps.map((step, index) => {
-            const Icon = step.icon;
-            const isActive = currentStep === step.id;
-            const isCompleted = currentStep > step.id || (step.id === 1 && stepValidation.step1) || (step.id === 2 && stepValidation.step2) || (step.id === 3 && stepValidation.step3);
-            
-            return (
-              <React.Fragment key={step.id}>
-                <div className="flex flex-col items-center">
-                  <div className={`
-                    w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-200
-                    ${isActive ? 'bg-primary-600 border-primary-600 text-white' : 
-                      isCompleted ? 'bg-green-500 border-green-500 text-white' : 
-                      'bg-gray-200 border-gray-300 text-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400'}
-                  `}>
-                    {isCompleted && !isActive ? (
-                      <CheckCircle className="h-6 w-6" />
-                    ) : (
-                      <Icon className="h-6 w-6" />
-                    )}
-                  </div>
-                  <span className={`
-                    mt-2 text-sm font-medium transition-colors duration-200
-                    ${isActive ? 'text-primary-600 dark:text-primary-400' : 
-                      isCompleted ? 'text-green-600 dark:text-green-400' : 
-                      'text-gray-500 dark:text-gray-400'}
-                  `}>
-                    {step.title}
-                  </span>
-                </div>
-                {index < steps.length - 1 && (
-                  <div className={`
-                    flex-1 h-1 mx-4 transition-colors duration-200
-                    ${currentStep > step.id ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}
-                  `} />
-                )}
-              </React.Fragment>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="p-4 pb-20">
       {pageLoading ? (
@@ -454,7 +404,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Commande</h1>
           </div>
 
-          <StepIndicator />
+          <StepIndicator currentStep={currentStep} stepValidation={stepValidation} />
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Step 1: Customer Information */}
