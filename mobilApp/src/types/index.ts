@@ -152,3 +152,46 @@ export interface ShippingMethod {
   zone_name: string;
   instance_id: number;
 }
+
+export interface ShippingMethodSettings {
+  cost?: {
+    value: string;
+  };
+  class_costs?: {
+    [key: string]: string; // e.g., "class_0", "class_1", "class_2"
+  };
+  min_amount?: {
+    value: string;
+  };
+  type?: {
+    value: string;
+  };
+  [key: string]: any;
+}
+
+export interface ShippingMethodInstance {
+  id: string;
+  method_id: string;
+  instance_id: number;
+  title: string;
+  enabled: boolean;
+  settings: ShippingMethodSettings;
+  zone_id: number;
+}
+
+export interface ShippingZone {
+  id: number;
+  name: string;
+  order: number;
+  enabled: boolean;
+}
+
+export interface ProductShippingInfo {
+  product_id: number;
+  shipping_class_id: number;
+  quantity: number;
+  calculated_cost: number;
+  matched_instance_id: number;
+  shipping_method_title: string;
+  shipping_class_slug?: string;
+}

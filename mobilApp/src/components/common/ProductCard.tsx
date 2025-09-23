@@ -26,7 +26,16 @@ export function ProductCard({ product, onProductClick }: ProductCardProps) {
     e.stopPropagation();
     dispatch({ 
       type: 'ADD_TO_CART', 
-      payload: { product, quantity: 1 }
+      payload: { 
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: 1,
+        image: product.images?.[0]?.src || '',
+        sku: product.sku,
+        attributes: {},
+        product: product
+      }
     });
   };
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft , CheckCircleFill , CreditCard , Truck , Person  } from 'react-bootstrap-icons';
 import { useApp } from '../../contexts/AppContext';
 import { api } from '../../services/api';
-import { calculateShipping } from '../../utils/shippingCalculator';
+import { calculateDynamicShippingCosts } from '../../utils/zoneShippingCalculator';
 
 interface CheckoutPageProps {
   onBack: () => void;
@@ -53,7 +53,6 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
   const { state, dispatch } = useApp();
   const [loading, setLoading] = useState(false);
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
-  const [pageLoading, setPageLoading] = useState(true);
   const [shippingMethods, setShippingMethods] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [selectedShipping, setSelectedShipping] = useState('');
@@ -96,49 +95,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
     }
   }, [state.customer]);
 
-  useEffect(() => {
-    const loadCheckoutData = async () => {
-      try {
-        // Load payment methods and shipping methods in parallel
-        const [payment, shippingMethods] = await Promise.all([
-          api.getPaymentMethods(),
-          api.getAllShippingMethods().catch(() => [
-            { id: 'flat_rate:1', title: 'Livraison standard', cost: '7.00', method_id: 'flat_rate' },
-            { id: 'local_pickup:2', title: 'Retrait en magasin', cost: '0.00', method_id: 'local_pickup' },
-          ])
-        ]);
-        
-        setPaymentMethods(payment.filter(method => method.enabled));
-        setShippingMethods(shippingMethods);
-        
-        // Set defaults - Don't auto-select payment method to prevent automatic submission
-        // if (payment.length > 0) {
-        //   setFormData(prev => ({ ...prev, paymentMethod: payment[0].id }));
-        // }
-        if (shippingMethods.length > 0 && !selectedShipping) {
-          setSelectedShipping(shippingMethods[0].id);
-          setShippingCost(parseFloat(shippingMethods[0].cost) || 0);
-        }
-      } catch (error) {
-        console.error('Error loading checkout data:', error);
-        
-        // Quick fallback
-        const fallbackMethods = [
-          { id: 'flat_rate:1', title: 'Livraison standard', cost: '7.00', method_id: 'flat_rate' },
-          { id: 'local_pickup:2', title: 'Retrait en magasin', cost: '0.00', method_id: 'local_pickup' },
-        ];
-        setShippingMethods(fallbackMethods);
-        
-        if (fallbackMethods.length > 0 && !selectedShipping) {
-          setSelectedShipping(fallbackMethods[0].id);
-          setShippingCost(parseFloat(fallbackMethods[0].cost) || 0);
-        }
-      } finally {
-        setPageLoading(false);
-      }
-    };
-    loadCheckoutData();
-  }, []);
+  
 
   // Validate steps when form data changes
   useEffect(() => {
@@ -173,19 +130,9 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
 
   useEffect(() => {
     if (formData.city && formData.state && formData.zipCode) {
-      calculateShipping({
-        api,
-        cart: state.cart,
-        formData,
-        selectedShipping,
-        setShippingMethods,
-        setSelectedShipping,
-        setShippingCost,
-        setIsCalculatingShipping,
-        getRestrictedShippingClasses,
-      });
+      calculateShippingWithBusinessRules();
     }
-  }, [formData.city, formData.state, formData.zipCode, formData.country, state.cart, selectedShipping]);
+  }, [formData.city, formData.state, formData.zipCode, formData.country, state.cart]);
 
   const calculateSubtotal = () => {
     return state.cart.reduce((total, item) => {
@@ -245,6 +192,53 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
     const isValid = formData.paymentMethod !== '' && hasInteractedWithPayment;
     setStepValidation(prev => ({ ...prev, step3: isValid }));
     return isValid;
+  };
+
+  const calculateShippingWithBusinessRules = async () => {
+    if (!formData.city || !formData.state || !formData.zipCode) return;
+    
+    setIsCalculatingShipping(true);
+    try {
+      // Use only our business shipping rules
+      const destination = {
+        city: formData.city,
+        state: formData.state,
+        postalCode: formData.zipCode,
+        country: formData.country
+      };
+      
+      const result = await calculateDynamicShippingCosts(state.cart, destination);
+      
+      // Create shipping methods from all available methods
+      // Convert millimes to TND (divide by 1000)
+      const methods = result.allAvailableMethods?.map(method => ({
+        id: method.methodId,
+        title: method.methodName,
+        cost: (method.cost / 1000).toString(),
+        method_id: method.methodId
+      })) || [{
+        id: 'business-shipping',
+        title: result.shippingMethodTitle || 'Livraison Standard',
+        cost: (result.totalCost / 1000).toString(),
+        method_id: 'business_shipping'
+      }];
+      
+      setShippingMethods(methods);
+      setShippingCost(result.totalCost / 1000); // Convert millimes to TND
+      
+      // Auto-select the first method if none selected
+      if (!selectedShipping && methods.length > 0) {
+        setSelectedShipping(methods[0].id);
+      }
+      
+    } catch (error) {
+      console.error('Error calculating shipping with business rules:', error);
+      // Fallback to basic shipping cost
+      setShippingCost(0);
+      setShippingMethods([]);
+    } finally {
+      setIsCalculatingShipping(false);
+    }
   };
 
   const handleNextStep = () => {
@@ -391,18 +385,12 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
 
   return (
     <div className="p-4 pb-20">
-      {pageLoading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center mb-6">
-            <button onClick={onBack} className="text-primary-600 dark:text-primary-400 mr-4">
-              <ArrowLeft className="h-6 w-6" />
-            </button>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Commande</h1>
-          </div>
+      <div className="flex items-center mb-6">
+        <button onClick={onBack} className="text-primary-600 dark:text-primary-400 mr-4">
+          <ArrowLeft className="h-6 w-6" />
+        </button>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Commande</h1>
+      </div>
 
           <StepIndicator currentStep={currentStep} stepValidation={stepValidation} />
 
@@ -674,8 +662,6 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
               )}
             </div>
           </form>
-        </>
-      )}
     </div>
   );
 }
