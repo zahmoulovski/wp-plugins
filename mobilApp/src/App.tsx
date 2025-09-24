@@ -126,7 +126,7 @@ function AppContent() {
         <Sidebar isOpen={isSidebarOpen} onClose={handleSidebarClose} />
         <main>
           <Routes>
-            <Route path="/" element={<HomePage onProductClick={handleProductClick} />} />
+            <Route path="/" element={<HomePage onProductClick={handleProductClick} onBlogPostClick={handleBlogPostClick} />} />
             <Route path="/categories" element={<CategoriesPage onProductClick={handleProductClick} />} />
             <Route path="/categories/:categorySlug" element={<CategoriesPage onProductClick={handleProductClick} />} />
             <Route path="/search" element={<SearchPage onProductClick={handleProductClick} />} />

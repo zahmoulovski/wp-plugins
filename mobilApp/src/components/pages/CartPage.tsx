@@ -27,7 +27,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
 
   const calculateTotal = () => {
     const subtotal = state.cart.reduce((total, item) => {
-      const price = parseFloat(item.product.price);
+      const price = parseFloat(item.product?.price || '0');
       return total + (price * item.quantity);
     }, 0);
     const timbre = 1.0; // Fixed Timbre fee
@@ -36,7 +36,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
 
   const calculateSubtotal = () => {
     return state.cart.reduce((total, item) => {
-      const price = parseFloat(item.product.price);
+      const price = parseFloat(item.product?.price || '0');
       return total + (price * item.quantity);
     }, 0).toFixed(2);
   };
@@ -72,14 +72,14 @@ export function CartPage({ onCheckout }: CartPageProps) {
           <div key={item.id} className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex space-x-4">
               <img
-                src={item.product.images?.[0]?.src || '/api/placeholder/80/80'}
-                alt={item.product.name}
+                src={item.product?.images?.[0]?.src || '/api/placeholder/150/150'}
+                alt={item.product?.name || 'Produit'}
                 className="w-20 h-20 rounded-lg object-cover"
               />
               
               <div className="flex-1">
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
-                  {item.product.name}
+                  {item.product?.name}
                 </h3>
                 
                 <div className="flex items-center justify-between">
@@ -103,7 +103,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
                   
                   <div className="flex items-center space-x-3">
                     <span className="font-bold text-primary-600 dark:text-primary-400">
-                      {formatPrice((parseFloat(item.product.price) * item.quantity).toString())}
+                      {formatPrice((parseFloat(item.product?.price || '0') * item.quantity).toString())}
                     </span>
                     
                     <button
@@ -127,7 +127,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
               Sous-total
             </span>
             <span className="font-semibold text-gray-900 dark:text-white">
-              {calculateSubtotal()} TND
+              {calculateSubtotal()} <sup>TND TTC</sup>
             </span>
           </div>
           <div className="flex justify-between items-center">
@@ -144,7 +144,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
                 Total
               </span>
               <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                {calculateTotal()} TND
+                {calculateTotal()} <sup>TND TTC</sup>
               </span>
             </div>
           </div>

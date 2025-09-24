@@ -83,6 +83,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const addToCart = () => {
     const cartItem = {
       id: product.id,
+      product: product, // Ajouter cette ligne
       name: product.name,
       price: product.price,
       quantity: quantity,

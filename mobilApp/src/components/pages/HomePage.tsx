@@ -8,11 +8,13 @@ import { LoadingSpinner } from '../common/LoadingSpinner';
 import { FeaturedProductsCarousel } from '../common/FeaturedProductsCarousel';
 import { Calendar, JournalText, ArrowUp, ArrowRight } from 'react-bootstrap-icons';
 import { Link } from 'react-router-dom';
+import { decodeHTMLEntities } from '../../utils/htmlUtils';
 
 
 
 interface HomePageProps {
   onProductClick: (product: Product) => void;
+  onBlogPostClick: (post: BlogPost) => void;
 }
 
 // 🔀 Utility: shuffle any array
@@ -25,7 +27,7 @@ function shuffleArray<T>(array: T[]): T[] {
   return arr;
 }
 
-export function HomePage({ onProductClick }: HomePageProps) {
+export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
   const [products, setProducts] = useState<{ featured: Product[]; nonFeatured: Product[] }>({
     featured: [],
     nonFeatured: [],
@@ -101,14 +103,17 @@ export function HomePage({ onProductClick }: HomePageProps) {
 
   const loadBlogPosts = async () => {
     try {
+      // Fetch more posts for better randomization
       const posts = await api.getBlogPosts({ 
-        per_page: 3,
+        per_page: 12, // Fetch more posts to randomize from
         orderby: 'date',
         order: 'desc'
       });
       // Only show actual blog posts from WordPress
       if (posts.length > 0) {
-        setBlogPosts(posts);
+        // Shuffle and take only 3 posts for random display on homepage
+        const shuffledPosts = shuffleArray(posts).slice(0, 3);
+        setBlogPosts(shuffledPosts);
       } else {
         // If no posts, show empty state
         setBlogPosts([]);
@@ -224,23 +229,23 @@ export function HomePage({ onProductClick }: HomePageProps) {
                     src={post._embedded['wp:featuredmedia'][0].source_url} 
                     alt={post._embedded['wp:featuredmedia']?.[0]?.alt_text || post.title.rendered}
                     className="w-full h-48 object-cover"
-                    onClick={() => window.location.href = `/blog#post-${post.id}`}
+                    onClick={() => onBlogPostClick(post)}
                   />
                 )}
                 {!post._embedded?.['wp:featuredmedia']?.[0]?.source_url && (
                   <div 
                     className="w-full h-48 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center"
-                    onClick={() => window.location.href = `/blog#post-${post.id}`}
+                    onClick={() => onBlogPostClick(post)}
                   >
                     <JournalText size={48} className="text-white opacity-50" />
                   </div>
                 )}
                 <div className="p-6">
                   <h3 
-                    className="font-semibold text-lg mb-2 text-gray-900 dark:text-white line-clamp-2 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                    onClick={() => window.location.href = `/blog#post-${post.id}`}
+                    className="font-semibold text-lg mb-2 text-gray-900 dark:text-white line-clamp-2 hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
+                    onClick={() => onBlogPostClick(post)}
                   >
-                    {post.title.rendered}
+                    {decodeHTMLEntities(post.title.rendered)}
                   </h3>
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-3">
                     <Calendar size={14} />
@@ -251,7 +256,7 @@ export function HomePage({ onProductClick }: HomePageProps) {
                     dangerouslySetInnerHTML={{ __html: post.excerpt.rendered }}
                   />
                   <button 
-                    onClick={() => window.location.href = `/blog#post-${post.id}`}
+                    onClick={() => onBlogPostClick(post)}
                     className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium text-sm transition-colors"
                   >
                     Lire la suite 

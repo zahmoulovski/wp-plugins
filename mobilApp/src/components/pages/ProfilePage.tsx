@@ -1149,7 +1149,7 @@ export function ProfilePage() {
                       </div>
                       <div className="text-right">
                         <p className="font-semibold text-gray-900 dark:text-white">
-                          {item.total} {selectedOrder.currency}
+                          {item.total} <sup>{selectedOrder.currency} HT</sup>
                         </p>
                       </div>
                     </div>
@@ -1219,7 +1219,7 @@ export function ProfilePage() {
                     Total de la commande:
                   </span>
                   <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                    {selectedOrder.total} {selectedOrder.currency}
+                    {selectedOrder.total} <sup>{selectedOrder.currency} TTC</sup>
                   </span>
                 </div>
               </div>

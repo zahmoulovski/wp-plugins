@@ -12,8 +12,12 @@ export function FeaturedProductsCarousel({ products, onProductClick }: FeaturedP
   const [currentIndex, setCurrentIndex] = useState(0);
   const [itemsPerView, setItemsPerView] = useState(2);
   const [isHovered, setIsHovered] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const autoPlayInterval = useRef<NodeJS.Timeout | null>(null);
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
+  const isDraggingRef = useRef<boolean>(false);
 
   useEffect(() => {
     const updateItemsPerView = () => {
@@ -94,11 +98,43 @@ export function FeaturedProductsCarousel({ products, onProductClick }: FeaturedP
     return products.slice(currentIndex, currentIndex + itemsPerView);
   };
 
+  // Touch event handlers for swipe functionality
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    isDraggingRef.current = true;
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (isDraggingRef.current) {
+      touchEndX.current = e.touches[0].clientX;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDraggingRef.current) return;
+    
+    isDraggingRef.current = false;
+    setIsDragging(false);
+    const swipeThreshold = 50; // Minimum swipe distance
+    const swipeDistance = touchStartX.current - touchEndX.current;
+    
+    if (Math.abs(swipeDistance) > swipeThreshold) {
+      if (swipeDistance > 0) {
+        // Swipe left - next slide
+        nextSlide();
+      } else {
+        // Swipe right - previous slide
+        prevSlide();
+      }
+    }
+  };
+
   if (products.length === 0) return null;
 
   return (
     <div 
-      className="relative"
+      className="relative select-none touch-pan-y"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -125,9 +161,12 @@ export function FeaturedProductsCarousel({ products, onProductClick }: FeaturedP
       <div 
         ref={containerRef}
         className="overflow-hidden mx-0 px-0"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         <div 
-          className="flex transition-transform duration-300 ease-in-out gap-0"
+          className={`flex gap-0 ${isDragging ? '' : 'transition-transform duration-300 ease-in-out'}`}
           style={{ 
             transform: `translateX(-${currentIndex * (100 / itemsPerView)}%)`
           }}
