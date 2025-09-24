@@ -66,6 +66,12 @@ export function ProductCard({ product, onProductClick }: ProductCardProps) {
             Promo
           </div>
         )}
+        
+        {product.stock_status === 'outofstock' && (
+          <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+            Rupture de stock
+          </div>
+        )}
       </div>
       
       <div className="p-4">
