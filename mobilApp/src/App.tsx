@@ -16,6 +16,7 @@ import { ProductModal } from './components/common/ProductModal';
 import { BlogPage } from './components/pages/BlogPage';
 import { BlogModal } from './components/common/BlogModal';
 import SplashScreen from './components/common/SplashScreen';
+import { PageWrapper } from './components/common/PageWrapper';
 import { Product, BlogPost } from './types';
 import { api } from './services/api';
 
@@ -48,9 +49,18 @@ function AppContent() {
 
   const handleOrderSuccess = (order: any, subtotal: string) => {
     console.log('Order success triggered:', { order, subtotal });
-    // Store order details for thank you page
-    (window as any).orderDetails = { order, subtotal };
-    navigate('/thank-you');
+    // Store order details for thank you page with order ID in URL
+    const orderDetails = { order, subtotal };
+    (window as any).orderDetails = orderDetails;
+    
+    // Store in sessionStorage for persistence after refresh
+    if (order?.id) {
+      sessionStorage.setItem(`order_${order.id}`, JSON.stringify(orderDetails));
+      navigate(`/thank-you#${order.id}`);
+    } else {
+      // Fallback if no order ID
+      navigate('/thank-you');
+    }
   };
 
   const handleBackToHome = () => {
@@ -126,25 +136,59 @@ function AppContent() {
         <Sidebar isOpen={isSidebarOpen} onClose={handleSidebarClose} />
         <main>
           <Routes>
-            <Route path="/" element={<HomePage onProductClick={handleProductClick} onBlogPostClick={handleBlogPostClick} />} />
-            <Route path="/categories" element={<CategoriesPage onProductClick={handleProductClick} />} />
-            <Route path="/categories/:categorySlug" element={<CategoriesPage onProductClick={handleProductClick} />} />
-            <Route path="/search" element={<SearchPage onProductClick={handleProductClick} />} />
-            <Route path="/cart" element={<CartPage onCheckout={handleCheckout} />} />
+            <Route path="/" element={
+              <PageWrapper>
+                <HomePage onProductClick={handleProductClick} onBlogPostClick={handleBlogPostClick} />
+              </PageWrapper>
+            } />
+            <Route path="/categories" element={
+              <PageWrapper>
+                <CategoriesPage onProductClick={handleProductClick} />
+              </PageWrapper>
+            } />
+            <Route path="/categories/:categorySlug" element={
+              <PageWrapper>
+                <CategoriesPage onProductClick={handleProductClick} />
+              </PageWrapper>
+            } />
+            <Route path="/search" element={
+              <PageWrapper>
+                <SearchPage onProductClick={handleProductClick} />
+              </PageWrapper>
+            } />
+            <Route path="/cart" element={
+              <PageWrapper>
+                <CartPage onCheckout={handleCheckout} />
+              </PageWrapper>
+            } />
             <Route path="/checkout" element={<CheckoutPage onBack={handleBackToCart} onOrderSuccess={handleOrderSuccess} />} />
             <Route 
               path="/thank-you" 
               element={
-                <ThankYouPage 
-                  orderDetails={(window as any).orderDetails} 
-                  onBackToHome={handleBackToHome} 
-                  onContinueShopping={handleContinueShopping} 
-                />
+                <PageWrapper>
+                  <ThankYouPage 
+                    orderDetails={(window as any).orderDetails} 
+                    onBackToHome={handleBackToHome} 
+                    onContinueShopping={handleContinueShopping} 
+                  />
+                </PageWrapper>
               } 
             />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/blog" element={<BlogPage onPostClick={handleBlogPostClick} />} />
+            <Route path="/profile" element={
+              <PageWrapper>
+                <ProfilePage />
+              </PageWrapper>
+            } />
+            <Route path="/contact" element={
+              <PageWrapper>
+                <ContactPage />
+              </PageWrapper>
+            } />
+            <Route path="/blog" element={
+              <PageWrapper>
+                <BlogPage onPostClick={handleBlogPostClick} />
+              </PageWrapper>
+            } />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

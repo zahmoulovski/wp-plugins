@@ -95,6 +95,38 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
     }
   }, [state.customer]);
 
+  // Load payment methods when component mounts
+  useEffect(() => {
+    const loadPaymentMethods = async () => {
+      try {
+        const methods = await api.getPaymentMethods();
+        // Filter to show only enabled payment methods
+        const enabledMethods = methods.filter((method: any) => method.enabled);
+        setPaymentMethods(enabledMethods);
+        console.log('Loaded payment methods:', enabledMethods);
+      } catch (error) {
+        console.error('Error loading payment methods:', error);
+        // Fallback to default payment methods if API fails
+        setPaymentMethods([
+          {
+            id: 'cod',
+            title: 'Paiement à la livraison',
+            description: 'Payez en espèces à la livraison',
+            enabled: true
+          },
+          {
+            id: 'flouci',
+            title: 'Paiement par Flouci',
+            description: 'Payez en ligne avec Flouci',
+            enabled: true
+          }
+        ]);
+      }
+    };
+
+    loadPaymentMethods();
+  }, []);
+
   
 
   // Validate steps when form data changes
@@ -568,8 +600,8 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
                   </div>
                   <div className="space-y-4">
                     {paymentMethods.map(method => (
-                      <label key={method.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
-                        <div className="flex items-center">
+                      <label key={method.id} className="block p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
+                        <div className="flex items-center mb-2">
                           <input
                             type="radio"
                             name="paymentMethod"
@@ -578,12 +610,12 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
                             onChange={handleInputChange}
                             className="mr-4 h-4 w-4"
                           />
-                          <span className="text-gray-900 dark:text-white text-lg">{method.title}</span>
+                          <span className="text-gray-900 dark:text-white text-lg font-medium">{method.title}</span>
                         </div>
-
-                        {formData.paymentMethod === method.id && (
+                        
+                        {method.description && formData.paymentMethod === method.id && (
                           <div
-                            className="ml-6 mt-1 text-sm text-gray-700 dark:text-gray-300"
+                            className="ml-8 text-sm text-gray-600 dark:text-gray-400"
                             dangerouslySetInnerHTML={{ __html: method.description }}
                           />
                         )}

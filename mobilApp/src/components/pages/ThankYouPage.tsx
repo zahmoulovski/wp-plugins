@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { CheckCircle, House, Bag } from 'react-bootstrap-icons';
+import { api } from '../../services/api';
 
 interface OrderProduct {
   id: string;
@@ -32,10 +33,20 @@ interface PaymentDetails {
 }
 
 interface OrderDetails {
-  id: string;
+  id: number;
   total: string;
-  billing: BillingInfo;
-  line_items: OrderProduct[];
+  status: string;
+  currency: string;
+  date_created: string;
+  billing: any;
+  shipping: any;
+  line_items: Array<{
+    id: number;
+    name: string;
+    product_id: number;
+    quantity: number;
+    total: string;
+  }>;
   fee_lines?: Array<{
     name: string;
     total: string;
@@ -54,20 +65,184 @@ interface ThankYouPageProps {
 }
 
 export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }: ThankYouPageProps) {
-  const { order, subtotal } = orderDetails || {};
+  const [isLoading, setIsLoading] = useState(true);
+  const [orderData, setOrderData] = useState<OrderDetails | null>(null);
+  const [subtotal, setSubtotal] = useState<string>('');
+  const [orderId, setOrderId] = useState<string>('');
+  const [customerEmail, setCustomerEmail] = useState<string>('');
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [emailVerificationError, setEmailVerificationError] = useState<string>('');
+
+  const verifyOrderByEmail = async (email: string, orderId: string) => {
+    setIsLoading(true);
+    setEmailVerificationError('');
+    
+    try {
+      // Try to fetch the order using the API
+      const order = await api.getOrder(parseInt(orderId));
+      
+      // Check if the email matches the order's billing email
+      if (order.billing && order.billing.email === email) {
+        setOrderData(order);
+        setSubtotal(order.line_items.reduce((sum, item) => sum + parseFloat(item.total), 0).toFixed(2));
+        
+        // Store the verified order in sessionStorage for future access
+        sessionStorage.setItem(`order_${orderId}`, JSON.stringify({
+          order: order,
+          subtotal: order.line_items.reduce((sum, item) => sum + parseFloat(item.total), 0).toFixed(2)
+        }));
+        
+        setShowEmailForm(false);
+      } else {
+        setEmailVerificationError('Aucune commande trouvée avec cet email. Veuillez vérifier votre email et réessayer.');
+      }
+    } catch (error) {
+      console.error('Error verifying order by email:', error);
+      setEmailVerificationError('Erreur lors de la vérification de la commande. Veuillez réessayer.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEmailVerification = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (customerEmail && orderId) {
+      verifyOrderByEmail(customerEmail, orderId);
+    }
+  };
+
+  useEffect(() => {
+    const hash = window.location.hash.substring(1);
+    if (hash) setOrderId(hash);
+
+    if (orderDetails?.order) {
+      setOrderData(orderDetails.order);
+      setSubtotal(orderDetails.subtotal);
+      setIsLoading(false);
+    } else if (hash) {
+      const stored = sessionStorage.getItem(`order_${hash}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setOrderData(parsed.order);
+        setSubtotal(parsed.subtotal);
+      } else {
+        // If no stored order data, show email verification form
+        setShowEmailForm(true);
+      }
+      setIsLoading(false);
+    } else {
+      setIsLoading(false);
+    }
+  }, [orderDetails]);
+
+  const order = orderData;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-300">Loading order details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!order && showEmailForm) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-6">
+            <div className="text-blue-500 mb-4">
+              <svg className="w-16 h-16 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              Vérification de Commande
+            </h2>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              Pour accéder à votre commande #{orderId}, veuillez entrer l'adresse email utilisée lors de la commande.
+            </p>
+          </div>
+
+          <form onSubmit={handleEmailVerification} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Adresse Email
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="votre@email.com"
+                required
+              />
+            </div>
+
+            {emailVerificationError && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                <p className="text-red-600 dark:text-red-400 text-sm">{emailVerificationError}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
+              >
+                {isLoading ? 'Vérification...' : 'Vérifier'}
+              </button>
+              <button
+                type="button"
+                onClick={onBackToHome}
+                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
+              >
+                Retour
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Ou <button
+                onClick={() => {
+                  // Redirect to login or show login modal
+                  window.dispatchEvent(new CustomEvent('showLoginModal'));
+                }}
+                className="text-blue-600 hover:text-blue-700 font-medium underline"
+              >
+                connectez-vous à votre compte
+              </button> pour voir toutes vos commandes.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!order) {
     return (
-      <div className="p-4 text-center">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-          Aucune commande trouvée
-        </h1>
-        <button
-          onClick={onBackToHome}
-          className="bg-primary-600 text-white px-6 py-2 rounded-lg"
-        >
-          Retour à l'accueil
-        </button>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="text-red-500 mb-4">
+            <svg className="w-16 h-16 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Commande Non Trouvée</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">Aucune commande trouvée. Veuillez vérifier le numéro de commande ou contactez le support.</p>
+          <button
+            onClick={onBackToHome}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 mx-auto"
+          >
+            <House size={20} />
+            Retour à l'accueil
+          </button>
+        </div>
       </div>
     );
   }
@@ -99,36 +274,37 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
           <div className="space-y-4">
             {order.line_items.map((item) => (
               <div key={item.id} className="flex items-center gap-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                {item.image && (
-                  <img 
-                    src={item.image} 
-                    alt={item.name}
-                    className="w-16 h-16 object-cover rounded-lg bg-gray-100 dark:bg-gray-700"
-                  />
-                )}
+                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                </div>
                 <div className="flex-1">
                   <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
-                  {item.sku && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">SKU: {item.sku}</p>
-                  )}
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     Quantité: {item.quantity}
                   </p>
                 </div>
                 <p className="font-semibold text-gray-900 dark:text-white">
-                  {(parseFloat(item.price) * item.quantity).toFixed(2)} TND
+                  {parseFloat(item.total).toFixed(2)} TND
                 </p>
               </div>
             ))}
           </div>
 
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600 space-y-2">
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:text-white dark:border-gray-600 space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Sous-total</span>
               <span className="font-semibold">{subtotal} TND</span>
             </div>
+            {order.shipping_lines && order.shipping_lines.length > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Livraison</span>
+                <span className="font-semibold">{parseFloat(order.shipping_lines[0].total).toFixed(2)} TND</span>
+              </div>
+            )}
             {order.fee_lines && order.fee_lines.map((fee, index) => (
-              <div key={index} className="flex justify-between">
+              <div key={index} className="flex justify-between dark:text-white">
                 <span className="text-gray-600 dark:text-gray-400">{fee.name}</span>
                 <span className="font-semibold">{fee.total} TND</span>
               </div>
@@ -149,13 +325,17 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
           </h2>
           
           <div className="space-y-2 text-gray-700 dark:text-white">
-            <p><strong>Nom:</strong> {order.billing.first_name} {order.billing.last_name}</p>
-            <p><strong>Email:</strong> {order.billing.email}</p>
-            <p><strong>Téléphone:</strong> {order.billing.phone}</p>
-            <p><strong>Adresse:</strong> {order.billing.address_1}</p>
-            <p><strong>Ville:</strong> {order.billing.city}, {order.billing.state}</p>
-            <p><strong>Code Postal:</strong> {order.billing.postcode}</p>
-            <p><strong>Pays:</strong> {order.billing.country}</p>
+            {order.billing && (
+              <>
+                <p><strong>Nom:</strong> {order.billing.first_name} {order.billing.last_name}</p>
+                <p><strong>Email:</strong> {order.billing.email}</p>
+                <p><strong>Téléphone:</strong> {order.billing.phone}</p>
+                <p><strong>Adresse:</strong> {order.billing.address_1}</p>
+                <p><strong>Ville:</strong> {order.billing.city}, {order.billing.state}</p>
+                <p><strong>Code Postal:</strong> {order.billing.postcode}</p>
+                <p><strong>Pays:</strong> {order.billing.country}</p>
+              </>
+            )}
             {order.shipping_lines && order.shipping_lines.length > 0 && (
               <p><strong>Méthode de livraison:</strong> {order.shipping_lines[0].method_title}</p>
             )}
