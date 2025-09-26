@@ -15,7 +15,7 @@ const GLOBAL_SHIPPING_ZONE_ID = 3;
 // ⚠️ For production move these to server-side env vars!
 export const FLOUCI_PUBLIC_KEY = '40f9dd4f-d834-4742-800d-4db524a24836'; // Replace with your actual key
 export const FLOUCI_PRIVATE_KEY = 'b9390a7a-fc0c-4004-a4fe-7e6be0044a83'; // Replace with your actual key
-const FLOUCI_BASE_URL = 'https://developers.flouci.com/api/v2';
+const FLOUCI_BASE_URL = '/flouci'; // Using Vite proxy to avoid CORS issues
 
 async function apiRequest(endpoint: string, options: RequestInit = {}) {
   const response = await fetch(`${BASE_URL}${endpoint}`, {
@@ -382,22 +382,31 @@ export const api = {
    * Create a Flouci payment session and return { payUrl, payment_id }.
    * amountTnd = total amount in TND, will be converted to millimes internally.
    */
-  async initFlouciPayment(
-    orderId: number,
-    amountInMillimes: number, // Already converted to millimes in CheckoutPage
-    customer: { firstName: string; lastName: string; email: string; phone: string }
-  ): Promise<{ payUrl: string; payment_id: string }> {
-    
+  async initFlouciPayment(paymentData: {
+    amount: number;
+    first_name: string;
+    last_name: string;
+    phone: string;
+    email: string;
+    success_link: string;
+    fail_link: string;
+    session_id: string;
+  }): Promise<{ payUrl: string; paymentId: string }> {
     const currentDomain = window.location.origin;
     
     const body = {
-      amount: amountInMillimes, // Amount in millimes (already converted)
-      success_link: `${currentDomain}/payment-success?order_id=${orderId}`,
-      fail_link: `${currentDomain}/payment-failed?order_id=${orderId}`,
-      webhook: `${currentDomain}/webhook`, // Simplified webhook endpoint
-      developer_tracking_id: `order_${orderId}`
+      amount: paymentData.amount,
+      first_name: paymentData.first_name,
+      last_name: paymentData.last_name,
+      phone: paymentData.phone,
+      email: paymentData.email,
+      success_link: paymentData.success_link,
+      fail_link: paymentData.fail_link,
+      webhook: `${currentDomain}/webhook`,
+      developer_tracking_id: paymentData.session_id,
+      accept_card: true
     };
-
+    
     const response = await fetch(`${FLOUCI_BASE_URL}/generate_payment`, {
       method: 'POST',
       headers: {
@@ -406,12 +415,12 @@ export const api = {
       },
       body: JSON.stringify(body),
     });
-
+    
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
       throw new Error(`Flouci payment initialization failed: ${response.status} ${errorData?.result?.message || response.statusText}`);
     }
-
+    
     const data = await response.json();
     
     return {

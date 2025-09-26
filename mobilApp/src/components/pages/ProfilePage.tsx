@@ -4,6 +4,7 @@ import { useApp } from '../../contexts/AppContext';
 import { api } from '../../services/api';
 import { Order, Customer } from '../../types';
 import { Toaster, toast } from 'react-hot-toast';
+import paymentLogo from '../../services/payment-logo.png';
 
 export function ProfilePage() {
   const { state, dispatch } = useApp();
@@ -460,7 +461,7 @@ export function ProfilePage() {
 
       await api.updateOrderMeta(selectedOrder.id, { flouci_payment_id: payment.paymentId });
 
-      window.location.href = payment.payUrl;
+      window.open(payment.payUrl, '_blank');
     } catch (error) {
       console.error('Payment initiation error:', error);
       toast.error('Erreur lors de l\'initialisation du paiement. Veuillez reessayer.');
@@ -1058,7 +1059,7 @@ export function ProfilePage() {
                     </div>
                   ) : orders.length > 0 ? (
                     <div className="space-y-3">
-                      {orders.slice(0, 5).map((order) => (
+                      {orders.map((order) => (
                         <button
                           key={order.id}
                           onClick={() => handleOrderClick(order)}
@@ -1230,9 +1231,10 @@ export function ProfilePage() {
               {['pending', 'on-hold', 'processing'].includes(selectedOrder.status) && (
                 <button
                   onClick={handlePayOrder}
-                  className="mt-4 w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200"
+                  className="mt-4 w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200 flex flex-col items-center justify-center"
                 >
-                  Payer
+                  Payer En ligne
+                  <img src={paymentLogo} alt="Payment methods" className="h-6 mt-2" />
                 </button>
               )}
             </div>

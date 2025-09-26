@@ -49,7 +49,7 @@ export function SearchPage({ onProductClick }: SearchPageProps) {
 
     const filtered = allProductNames
       .filter(name => name.toLowerCase().includes(query.toLowerCase()))
-      .slice(0, 8); // Limit to 8 suggestions
+      .slice(0, 10); // Limit to 10 suggestions
     
     setSuggestions(filtered);
     setShowSuggestions(filtered.length > 0);

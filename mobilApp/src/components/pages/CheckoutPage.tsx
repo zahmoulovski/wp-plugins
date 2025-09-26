@@ -380,20 +380,26 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
         // Convert TND to millimes (1 TND = 1000 millimes)
         const amountInMillimes = Math.round(totalTnd * 1000);
 
-        // Call Flouci generate payment endpoint
-        const { payment_id, payUrl } = await api.initFlouciPayment(order.id, amountInMillimes, {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
+        // Prepare payment data
+        const paymentData = {
+          amount: amountInMillimes,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
           phone: formData.phone,
-        });
+          email: formData.email,
+          success_link: `${window.location.origin}/payment-success?order_id=${order.id}`,
+          fail_link: `${window.location.origin}/payment-failed?order_id=${order.id}`,
+          session_id: `order_${order.id}`
+        };
+
+        // Call Flouci generate payment endpoint
+        const payment = await api.initFlouciPayment(paymentData);
 
         // Store payment_id with order for tracking
-        await api.updateOrderMeta(order.id, { flouci_payment_id: payment_id });
+        await api.updateOrderMeta(order.id, { flouci_payment_id: payment.payment_id });
 
-        // Direct redirect so browser can't block it
-        window.location.href = payUrl;
-        return; // stop further processing; webhook will mark the order paid
+        // Open payment in new tab
+        window.open(payment.payUrl, '_blank');
       }
 
       // ---- Offline methods (cash, bank transfer, etc.) ----
