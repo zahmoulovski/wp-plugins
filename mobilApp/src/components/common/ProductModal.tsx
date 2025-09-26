@@ -318,11 +318,13 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
             </div>
 
             <div className="text-sm">
-              {product.stock_status !== 'outofstock' ? (
-                <span className="text-green-500 font-semibold">En Stock</span>
-              ) : (
-                <span className="text-red-500 font-semibold">Rupture de stock</span>
-              )}
+              {product.stock_status === 'instock' ? (
+                  <span className="text-green-500 font-semibold">En Stock</span>
+                ) : product.stock_status === 'onbackorder' ? (
+                  <span className="text-yellow-500 font-semibold text-center">Disponible<br/>sur commande</span>
+                ) : (
+                  <span className="text-red-500 font-semibold">Rupture de stock</span>
+                )}
             </div>
           </div>
 

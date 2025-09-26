@@ -103,9 +103,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
         // Filter to show only enabled payment methods
         const enabledMethods = methods.filter((method: any) => method.enabled);
         setPaymentMethods(enabledMethods);
-        console.log('Loaded payment methods:', enabledMethods);
       } catch (error) {
-        console.error('Error loading payment methods:', error);
         // Fallback to default payment methods if API fails
         setPaymentMethods([
           {
@@ -138,6 +136,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
     validateStep2();
   }, [selectedShipping]);
 
+  /*
   const getRestrictedShippingClasses = () => {
     const restrictions = {
       'heavy-items': ['local_pickup'],
@@ -155,6 +154,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
 
     return restrictedClasses;
   };
+*/
 
   useEffect(() => {
     validateStep3();
@@ -170,13 +170,13 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
     return state.cart.reduce((total, item) => {
       const price = parseFloat(item.product.price);
       return total + price * item.quantity;
-    }, 0).toFixed(2);
+    }, 0).toFixed(3);
   };
 
   const calculateTotal = () => {
     const subtotal = parseFloat(calculateSubtotal());
     const timbre = 1.0;
-    return (subtotal + shippingCost + timbre).toFixed(2);
+    return (subtotal + shippingCost + timbre).toFixed(3);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -357,7 +357,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
         shipping_lines: selectedShipping ? [{
           method_id: selectedShipping.split(':')[0],
           method_title: shippingMethods.find(m => m.id === selectedShipping)?.title || 'Livraison',
-          total: shippingCost.toFixed(2),
+          total: shippingCost.toFixed(3),
         }] : [],
         fee_lines: [{ name: 'Timbre', total: '1.00', tax_status: 'none' }],
       };
@@ -368,6 +368,11 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
       }
 
       const order = await api.createOrder(orderData);
+
+      const codMethods = ['cheque', 'cod', 'bacs'];
+      if (codMethods.includes(formData.paymentMethod)) {
+        await api.updateOrder(order.id, { status: 'processing' });
+      }
 
       // ---- FLOUCI online payment branch ----
       if (formData.paymentMethod === 'flouci') {
@@ -558,25 +563,31 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
                   <div className="space-y-4">
                     {shippingMethods.map(method => (
                       <label key={method.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
-                        <div className="flex items-center">
-                          <input
-                            type="radio"
-                            name="shippingMethod"
-                            value={method.id}
-                            checked={selectedShipping === method.id}
-                            onChange={handleShippingChange}
-                            className="mr-4 h-4 w-4"
-                            required
-                          />
-                          <span className="text-gray-900 dark:text-white text-lg">{method.title}</span>
-                        </div>
-                        {method.cost && (
-                          <span className="text-primary-600 dark:text-primary-400 font-semibold text-lg">
-                            {parseFloat(method.cost).toFixed(2)} TND
-                          </span>
-                        )}
-                      </label>
-                    ))}
+  <div className="flex items-center">
+    <input
+      type="radio"
+      name="shippingMethod"
+      value={method.id}
+      checked={selectedShipping === method.id}
+      onChange={handleShippingChange}
+      className="mr-4 h-4 w-4"
+      required
+    />
+    <span className="text-gray-900 dark:text-white text-lg">
+      {method.title === 'Retrait en Showroom' ? (
+        <span>Retrait en Showroom, paiement sur place. <a href="https://maps.app.goo.gl/Ve1KznAC36GBDhAf6" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Google Maps</a></span>
+      ) : (
+        method.title
+      )}
+    </span>
+  </div>
+  {method.cost && method.title !== 'Retrait en Showroom' && (
+    <span className="text-primary-600 dark:text-primary-400 font-semibold text-lg">
+      {parseFloat(method.cost).toFixed(3)} TND
+    </span>
+  )}
+</label>
+    ))}
                   </div>
                 ) : (
                   <div className="text-center py-8">
@@ -636,7 +647,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
                           {item.product.name} × {item.quantity}
                         </span>
                         <span className="text-gray-900 dark:text-white">
-                          {(parseFloat(item.product.price) * item.quantity).toFixed(2)} TND
+                          {(parseFloat(item.product.price) * item.quantity).toFixed(3)} TND
                         </span>
                       </div>
                     ))}
@@ -648,7 +659,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
                     </div>
                     <div className="flex justify-between text-base">
                       <span className="text-gray-600 dark:text-gray-400">Livraison</span>
-                      <span className="text-gray-900 dark:text-white">{shippingCost.toFixed(2)} TND</span>
+                      <span className="text-gray-900 dark:text-white">{shippingCost.toFixed(3)} TND</span>
                     </div>
                     <div className="flex justify-between text-base">
                       <span className="text-gray-600 dark:text-gray-400">Timbre</span>

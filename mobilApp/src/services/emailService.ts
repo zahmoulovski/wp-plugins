@@ -23,7 +23,6 @@ class EmailService {
 
   async sendContactEmail(formData: ContactFormData): Promise<{ success: boolean; message: string }> {
     try {
-      console.log('Starting email send process...');
       
       // Try EmailJS first if configured
       if (this.config && this.config.serviceId && this.config.templateId && this.config.publicKey !== 'your_public_key_here') {
@@ -37,8 +36,6 @@ class EmailService {
           reply_to: formData.email
         };
 
-        console.log('Attempting to send email via EmailJS...');
-        console.log('Template params:', templateParams);
 
         try {
           const response = await emailjs.send(
@@ -48,7 +45,6 @@ class EmailService {
             this.config.publicKey
           );
           
-          console.log('Email sent successfully via EmailJS:', response);
           return { 
             success: true, 
             message: 'Votre message a été envoyé avec succès! Nous vous répondrons rapidement.' 
@@ -60,8 +56,6 @@ class EmailService {
       }
 
       // Fallback: Use a form-based approach that actually works
-      console.log('Falling back to form-based email approach...');
-      console.log('Attempting FormSubmit.co...');
       
       // Create a form and submit it to formsubmit.co (reliable service)
       const formDataToSend = new FormData();
@@ -86,7 +80,6 @@ class EmailService {
 
         if (response.ok) {
           const result = await response.json();
-          console.log('Email sent successfully via FormSubmit:', result);
           return { 
             success: true, 
             message: 'Votre message a été envoyé avec succès! Nous vous répondrons rapidement.' 
@@ -137,7 +130,6 @@ class EmailService {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Email sent successfully via Web3Forms:', result);
         return { 
           success: true, 
           message: 'Votre message a été envoyé avec succès! Nous vous répondrons rapidement.' 

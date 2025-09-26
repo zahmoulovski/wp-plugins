@@ -108,19 +108,16 @@ function calculateProductShippingCost(
   quantity: number,
   shippingMethod: string
 ): number {
-  console.log(`log213 : shippingClassId: ${shippingClassId}, quantity: ${quantity}, shippingMethod: ${shippingMethod}`);
   
   // Get shipping options for this class ID
   const shippingOptions = SHIPPING_BY_CLASS_ID[shippingClassId || 0];
   if (!shippingOptions) {
-    console.log(`No shipping options found for class ID: ${shippingClassId}`);
     return 0;
   }
   
   // Find the selected method
   const selectedOption = shippingOptions.find(option => option.method === shippingMethod);
   if (!selectedOption) {
-    console.log(`Method ${shippingMethod} not found for class ${shippingClassId}`);
     return 0;
   }
   
@@ -163,7 +160,6 @@ function getAvailableShippingMethods(cartItems: CartItem[]): string[] {
     }
   });
   
-  console.log('Cart shipping class IDs:', Array.from(cartShippingClasses));
   
   if (cartShippingClasses.size === 0) {
     // Default methods for products without shipping class
@@ -188,7 +184,6 @@ function getAvailableShippingMethods(cartItems: CartItem[]): string[] {
   });
   
   const availableMethods = firstClassMethods || [];
-  console.log('Available methods for cart:', availableMethods);
   return availableMethods;
 }
 
@@ -202,7 +197,6 @@ function calculateTotalCostForMethod(
   
   cartItems.forEach(item => {
     const shippingClassId = item.product?.shipping_class_id || 0;
-    console.log(`Processing item: ${item.id} (shipping_class: ${shippingClassId})`);
     
     // Special handling for shipping class 0 (no shipping class)
     if (shippingClassId === 0) {
@@ -211,14 +205,11 @@ function calculateTotalCostForMethod(
         const itemCost = calculateProductShippingCost(shippingClassId, 1, shippingMethod);
         classZeroCost = itemCost;
         hasClassZero = true;
-        console.log(`First class 0 item cost: ${itemCost} (will be applied once)`);
       } else {
-        console.log(`Skipping class 0 item (cost already applied)`);
       }
     } else {
       // Normal calculation for other classes
       const itemCost = calculateProductShippingCost(shippingClassId, item.quantity, shippingMethod);
-      console.log(`Item cost: ${itemCost}`);
       totalCost += itemCost;
     }
   });
@@ -226,7 +217,7 @@ function calculateTotalCostForMethod(
   // Add the class 0 cost (applied once)
   totalCost += classZeroCost;
   
-  console.log(`Total cost for method ${shippingMethod}: ${totalCost}`);
+ 
   return totalCost;
 }
 
@@ -234,21 +225,17 @@ export function getBestShippingMethod(
   cartItems: CartItem[],
   destination: Record<string, any>
 ): { method: string; cost: number } | null {
-  console.log(`=== GET BEST SHIPPING METHOD ===`);
-  console.log(`cartItems:`, cartItems);
-  console.log(`destination:`, destination);
   
   const availableMethods = getAvailableShippingMethods(cartItems);
-  console.log(`availableMethods:`, availableMethods);
+  
   
   if (availableMethods.length === 0) {
-    console.log(`No available shipping methods found`);
+    
     return null;
   }
   
   const methodCosts = availableMethods.map(methodName => {
     const totalCost = calculateTotalCostForMethod(cartItems, methodName);
-    console.log(`Method ${methodName}: ${totalCost} TND`);
     return {
       method: methodName,
       cost: totalCost
@@ -258,7 +245,6 @@ export function getBestShippingMethod(
   // Sort by cost (ascending)
   methodCosts.sort((a, b) => a.cost - b.cost);
   
-  console.log(`Best method: ${methodCosts[0].method} at ${methodCosts[0].cost} TND`);
   
   return {
     method: methodCosts[0].method,
@@ -296,9 +282,6 @@ export async function calculateDynamicShippingCosts(
     }));
     
     
-    console.log('=== CALCULATE DYNAMIC SHIPPING COSTS ===');
-    console.log('Available methods:', availableMethods);
-    console.log('Product shipping info:', productShippingInfo);
 
     return {
       productShippingInfo,

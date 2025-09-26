@@ -2,17 +2,24 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Cart } from 'react-bootstrap-icons';
 import { Product } from '../../types';
 import { useApp } from '../../contexts/AppContext';
+import { ProductCardSkeleton } from './SkeletonLoader';
 
 interface ProductCardProps {
   product: Product;
   onProductClick: (product: Product) => void;
+  loading?: boolean;
 }
 
-export function ProductCard({ product, onProductClick }: ProductCardProps) {
+export function ProductCard({ product, onProductClick, loading }: ProductCardProps) {
   const { dispatch } = useApp();
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
+
+  // Show skeleton loader if loading
+  if (loading) {
+    return <ProductCardSkeleton />;
+  }
 
   useEffect(() => {
     const container = containerRef.current;
@@ -70,6 +77,18 @@ export function ProductCard({ product, onProductClick }: ProductCardProps) {
         {product.stock_status === 'outofstock' && (
           <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">
             Rupture de stock
+          </div>
+        )}
+        
+        {product.stock_status === 'instock' && (
+          <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+            En stock
+          </div>
+        )}
+        
+        {product.stock_status === 'onbackorder' && (
+          <div className="absolute top-2 right-2 bg-secondary-500 text-white px-2 py-1 rounded-full text-xs font-bold text-center">
+            Disponible<br/>sur commande
           </div>
         )}
       </div>

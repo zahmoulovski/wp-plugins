@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, House, Bag } from 'react-bootstrap-icons';
+import { CheckCircle, House, Bag, XCircle } from 'react-bootstrap-icons';
 import { api } from '../../services/api';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface OrderProduct {
   id: string;
@@ -72,33 +73,33 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
   const [customerEmail, setCustomerEmail] = useState<string>('');
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [emailVerificationError, setEmailVerificationError] = useState<string>('');
+  const [paymentError, setPaymentError] = useState<string>('');
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const verifyOrderByEmail = async (email: string, orderId: string) => {
     setIsLoading(true);
     setEmailVerificationError('');
-    
+
     try {
-      // Try to fetch the order using the API
       const order = await api.getOrder(parseInt(orderId));
-      
-      // Check if the email matches the order's billing email
+
       if (order.billing && order.billing.email === email) {
         setOrderData(order);
-        setSubtotal(order.line_items.reduce((sum, item) => sum + parseFloat(item.total), 0).toFixed(2));
-        
-        // Store the verified order in sessionStorage for future access
+        setSubtotal(order.line_items.reduce((sum, item) => sum + parseFloat(item.total), 0).toFixed(3));
+
         sessionStorage.setItem(`order_${orderId}`, JSON.stringify({
           order: order,
-          subtotal: order.line_items.reduce((sum, item) => sum + parseFloat(item.total), 0).toFixed(2)
+          subtotal: order.line_items.reduce((sum, item) => sum + parseFloat(item.total), 0).toFixed(3)
         }));
-        
+
         setShowEmailForm(false);
       } else {
-        setEmailVerificationError('Aucune commande trouvée avec cet email. Veuillez vérifier votre email et réessayer.');
+        setEmailVerificationError('Aucune commande trouvée avec cet email. Veuillez vérifier votre email et reessayer.');
       }
     } catch (error) {
       console.error('Error verifying order by email:', error);
-      setEmailVerificationError('Erreur lors de la vérification de la commande. Veuillez réessayer.');
+      setEmailVerificationError('Erreur lors de la vérification de la commande. Veuillez reessayer.');
     } finally {
       setIsLoading(false);
     }
@@ -115,6 +116,19 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
     const hash = window.location.hash.substring(1);
     if (hash) setOrderId(hash);
 
+    if (location.state?.error) {
+      setPaymentError(location.state.error);
+      setIsLoading(false);
+      return;
+    }
+
+    if (location.state?.order) {
+      setOrderData(location.state.order);
+      setSubtotal(location.state.order.line_items.reduce((sum, item) => sum + parseFloat(item.total), 0).toFixed(3));
+      setIsLoading(false);
+      return;
+    }
+
     if (orderDetails?.order) {
       setOrderData(orderDetails.order);
       setSubtotal(orderDetails.subtotal);
@@ -126,14 +140,13 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
         setOrderData(parsed.order);
         setSubtotal(parsed.subtotal);
       } else {
-        // If no stored order data, show email verification form
         setShowEmailForm(true);
       }
       setIsLoading(false);
     } else {
       setIsLoading(false);
     }
-  }, [orderDetails]);
+  }, [orderDetails, location.state]);
 
   const order = orderData;
 
@@ -143,6 +156,41 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-300">Loading order details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (paymentError) {
+    return (
+      <div className="p-4 pb-20">
+        <div className="text-center mb-8">
+          <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Paiement Échoué
+          </h1>
+          <p className="text-lg text-gray-600 dark:text-gray-400 mb-4">
+            {paymentError}
+          </p>
+          <p className="text-lg text-gray-600 dark:text-gray-400">
+            Veuillez réessayer !
+          </p>
+        </div>
+        <div className="flex gap-4">
+          <button
+            onClick={onBackToHome}
+            className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-3 px-4 rounded-xl font-semibold transition-colors duration-200 flex items-center justify-center gap-2"
+          >
+            <House className="h-5 w-5" />
+            Retour à l'accueil
+          </button>
+          <button
+            onClick={() => navigate('/profile')}
+            className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 px-4 rounded-xl font-semibold transition-colors duration-200 flex items-center justify-center gap-2"
+          >
+            <Bag className="h-5 w-5" />
+            Voir mes commandes
+          </button>
         </div>
       </div>
     );
@@ -286,7 +334,7 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
                   </p>
                 </div>
                 <p className="font-semibold text-gray-900 dark:text-white">
-                  {parseFloat(item.total).toFixed(2)} TND
+                  {parseFloat(item.total).toFixed(3)} TND
                 </p>
               </div>
             ))}
@@ -300,7 +348,7 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
             {order.shipping_lines && order.shipping_lines.length > 0 && (
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Livraison</span>
-                <span className="font-semibold">{parseFloat(order.shipping_lines[0].total).toFixed(2)} TND</span>
+                <span className="font-semibold">{parseFloat(order.shipping_lines[0].total).toFixed(3)} TND</span>
               </div>
             )}
             {order.fee_lines && order.fee_lines.map((fee, index) => (

@@ -2,15 +2,22 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Cart } from 'react-bootstrap-icons';
 import { Product } from '../../types';
 import { useApp } from '../../contexts/AppContext';
+import { HorizontalProductCardSkeleton } from './SkeletonLoader';
 
 interface HorizontalProductCardProps {
   product: Product;
   onProductClick: (product: Product) => void;
+  loading?: boolean;
 }
 
-export function HorizontalProductCard({ product, onProductClick }: HorizontalProductCardProps) {
+export function HorizontalProductCard({ product, onProductClick, loading }: HorizontalProductCardProps) {
   const { dispatch } = useApp();
   const [imageError, setImageError] = useState(false);
+
+  // Show skeleton loader if loading
+  if (loading) {
+    return <HorizontalProductCardSkeleton />;
+  }
 
   const addToCart = (e: React.MouseEvent) => {
     e.stopPropagation();

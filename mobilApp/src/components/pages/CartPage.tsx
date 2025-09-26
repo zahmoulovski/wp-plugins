@@ -31,14 +31,14 @@ export function CartPage({ onCheckout }: CartPageProps) {
       return total + (price * item.quantity);
     }, 0);
     const timbre = 1.0; // Fixed Timbre fee
-    return (subtotal + timbre).toFixed(2);
+    return (subtotal + timbre).toFixed(3);
   };
 
   const calculateSubtotal = () => {
     return state.cart.reduce((total, item) => {
       const price = parseFloat(item.product?.price || '0');
       return total + (price * item.quantity);
-    }, 0).toFixed(2);
+    }, 0).toFixed(3);
   };
 
   if (state.cart.length === 0) {

@@ -24,7 +24,8 @@ type AppAction =
   | { type: 'CLEAR_CART' }
   | { type: 'SET_CUSTOMER'; payload: Customer | null }
   | { type: 'TOGGLE_DARK_MODE' }
-  | { type: 'SET_LOADING'; payload: boolean };
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_CART'; payload: CartItem[] };
 
 const initialState: AppState = {
   cart: JSON.parse(localStorage.getItem('cart') || '[]'),
@@ -91,15 +92,21 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
     
+    case 'SET_CART':
+      localStorage.setItem('cart', JSON.stringify(action.payload));
+      return { ...state, cart: action.payload };
+    
     default:
       return state;
   }
 }
 
-const AppContext = createContext<{
+interface AppContextValue {
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
-} | null>(null);
+}
+
+const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
@@ -118,3 +125,5 @@ export function useApp() {
   }
   return context;
 }
+
+export type { AppContextValue };

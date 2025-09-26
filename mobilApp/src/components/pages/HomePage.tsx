@@ -4,11 +4,17 @@ import { BlogPost } from '../../types';
 import { api } from '../../services/api';
 import { cacheService } from '../../services/cache';
 import { ProductCard } from '../common/ProductCard';
-import { LoadingSpinner } from '../common/LoadingSpinner';
 import { FeaturedProductsCarousel } from '../common/FeaturedProductsCarousel';
 import { Calendar, JournalText, ArrowUp, ArrowRight } from 'react-bootstrap-icons';
 import { Link } from 'react-router-dom';
 import { decodeHTMLEntities } from '../../utils/htmlUtils';
+import { 
+  ProductGridSkeleton, 
+  BlogPostGridSkeleton, 
+  CategoryListSkeleton,
+  ImageSkeleton,
+  TextSkeleton 
+} from '../common/SkeletonLoader';
 
 
 
@@ -188,7 +194,49 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
     loadBlogPosts();
   }, []);
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) {
+    return (
+      <div className="p-4 pb-20">
+        {/* Featured products skeleton */}
+        <section>
+          <TextSkeleton width="120px" height="24px" className="mb-4" />
+          <div className="mb-8">
+            <div className="flex overflow-x-auto space-x-4 pb-4">
+              {Array.from({ length: 3 }, (_, i) => (
+                <div key={i} className="flex-shrink-0 w-64">
+                  <ImageSkeleton width="100%" height="200px" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Blog posts skeleton */}
+        <section className="mb-8">
+          <TextSkeleton width="150px" height="24px" className="mb-4" />
+          <BlogPostGridSkeleton count={2} />
+        </section>
+
+        {/* New products skeleton */}
+        <section className="mb-8">
+          <TextSkeleton width="120px" height="24px" className="mb-4" />
+          <ProductGridSkeleton count={6} />
+        </section>
+
+        {/* Category products skeleton */}
+        {CATEGORIES.map((_, index) => (
+          <section key={index} className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <TextSkeleton width="150px" height="24px" />
+              <TextSkeleton width="80px" height="16px" />
+            </div>
+            <ProductGridSkeleton count={6} />
+          </section>
+        ))}
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className="p-4 pb-20 text-center">

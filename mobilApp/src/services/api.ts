@@ -2,6 +2,7 @@ import { Product, Category, Customer, Order, BlogPost } from '../types';
 import { cacheService } from './cache';
 
 const BASE_URL = 'https://klarrion.com/wp-json/wc/v3';
+const STORE_API_URL = 'https://klarrion.com/wp-json/wc/store';
 const CONSUMER_KEY = 'ck_dfe0100c9d01f160659ad10ce926673b08030068';
 const CONSUMER_SECRET = 'cs_39958925e281230d5078b21e722451225056d4ea';
 
@@ -28,6 +29,39 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     let errorMessage = `API request failed: ${response.status} ${response.statusText}`;
+    try {
+      const errorData = await response.json();
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (errorData.error) {
+        errorMessage = errorData.error;
+      }
+    } catch (e) {
+      // If we can't parse the error response, use the default message
+    }
+    throw new Error(errorMessage);
+  }
+  return response.json();
+}
+
+async function storeApiRequest(endpoint: string, options: RequestInit = {}, cartToken?: string) {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+
+  if (cartToken) {
+    headers['X-WC-Store-API-Nonce'] = cartToken;
+  }
+
+  const response = await fetch(`${STORE_API_URL}${endpoint}`, {
+    ...options,
+    headers,
+    credentials: 'include', // Important for session handling
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Store API request failed: ${response.status} ${response.statusText}`;
     try {
       const errorData = await response.json();
       if (errorData.message) {
@@ -152,9 +186,6 @@ export const api = {
       
       const customer = customers[0];
       
-      // For demo purposes, we'll accept any password
-      // In production, you should verify against WooCommerce or WordPress
-      console.log('Customer authenticated:', customer.id);
       return customer;
       
     } catch (error) {
@@ -218,7 +249,6 @@ export const api = {
 
   async createCustomer(customerData: Partial<Customer>): Promise<Customer> {
     try {
-      console.log('Creating customer with data:', customerData);
       
       // Create customer directly through WooCommerce API
       const customerResponse = await apiRequest('/customers', {
@@ -226,7 +256,6 @@ export const api = {
         body: JSON.stringify(customerData),
       });
 
-      console.log('Customer created successfully:', customerResponse.id);
       return customerResponse;
       
     } catch (error: any) {
@@ -259,7 +288,6 @@ export const api = {
   async updateCustomerPassword(customerId: number, currentPassword: string, newPassword: string): Promise<boolean> {
     // Password updates are now handled through the website redirect
     // This function is kept for compatibility but returns success
-    console.log('Password update handled through website redirect');
     return true;
   },
 
@@ -270,25 +298,27 @@ export const api = {
     });
   },
 
+  async updateOrder(id: number, data: any): Promise<Order> {
+    return apiRequest(`/orders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
   async getOrders(customerId?: number): Promise<Order[]> {
     try {
       const params = customerId ? `?customer=${customerId}` : '';
-      console.log('Fetching orders with params:', params);
       const orders = await apiRequest(`/orders${params}`);
-      console.log('Orders fetched successfully:', orders.length, 'orders');
       return orders;
     } catch (error) {
       console.error('Error in getOrders:', error);
       
       // If customer has no orders, return empty array instead of error
       if (error.message?.includes('404') || error.message?.includes('No orders found')) {
-        console.log('No orders found for customer, returning empty array');
         return [];
       }
       
       // If it's a permission error, try alternative approach
       if (error.message?.includes('403') || error.message?.includes('401')) {
-        console.log('Permission error, trying alternative order fetching method');
         
         // Try fetching all orders and filtering by customer email
         try {
@@ -299,7 +329,6 @@ export const api = {
               const customerOrders = allOrders.filter((order: Order) => 
                 order.billing && order.billing.email === customer.email
               );
-              console.log('Found orders by email filter:', customerOrders.length);
               return customerOrders;
             }
           }
@@ -322,7 +351,6 @@ export const api = {
 
   async getShippingZones(): Promise<any[]> {
     const zones = await apiRequest('/shipping/zones');
-    console.log('Raw shipping zones from API:', zones);
     return zones;
   },
 
@@ -485,5 +513,130 @@ export const api = {
     // Cache the result
     cacheService.setProduct(post as any);
     return post;
+  },
+
+  // ---------- WooCommerce Store API Cart ----------
+  async getCartFromSession(): Promise<any> {
+    try {
+      const cartData = await storeApiRequest('/cart');
+      return cartData;
+    } catch (error) {
+      console.error('Error fetching cart from session:', error);
+      return null;
+    }
+  },
+
+  async addItemToCart(productId: number, quantity: number = 1, variationId?: number): Promise<any> {
+    try {
+      const itemData: any = {
+        id: productId,
+        quantity: quantity
+      };
+      
+      if (variationId) {
+        itemData.variation_id = variationId;
+      }
+
+      const response = await storeApiRequest('/cart/add-item', {
+        method: 'POST',
+        body: JSON.stringify(itemData)
+      });
+      
+      return response;
+    } catch (error) {
+      console.error('Error adding item to cart:', error);
+      throw error;
+    }
+  },
+
+  async removeItemFromCart(cartItemKey: string): Promise<any> {
+    try {
+      const response = await storeApiRequest('/cart/remove-item', {
+        method: 'POST',
+        body: JSON.stringify({ key: cartItemKey })
+      });
+      
+      return response;
+    } catch (error) {
+      console.error('Error removing item from cart:', error);
+      throw error;
+    }
+  },
+
+  async updateCartItem(cartItemKey: string, quantity: number): Promise<any> {
+    try {
+      const response = await storeApiRequest('/cart/update-item', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          key: cartItemKey,
+          quantity: quantity 
+        })
+      });
+      
+      return response;
+    } catch (error) {
+      console.error('Error updating cart item:', error);
+      throw error;
+    }
+  },
+
+  async clearCart(): Promise<any> {
+    try {
+      const response = await storeApiRequest('/cart/empty-cart', {
+        method: 'POST'
+      });
+      
+      return response;
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+      throw error;
+    }
+  },
+
+  // Convert WooCommerce cart to our format
+  convertWooCommerceCartToAppCart(wooCart: any): CartItem[] {
+    if (!wooCart || !wooCart.items) {
+      return [];
+    }
+
+    return wooCart.items.map((item: any) => ({
+      id: item.key,
+      quantity: item.quantity,
+      attributes: item.variation || [],
+      product: {
+        id: item.id,
+        name: item.name,
+        price: item.prices.price,
+        images: item.images || [],
+        sku: item.sku,
+        stock_status: item.stock_status,
+        stock_quantity: item.stock_quantity
+      }
+    }));
+  },
+
+  // Convert our cart to WooCommerce format
+  convertAppCartToWooCommerceFormat(appCart: CartItem[]): any[] {
+    return appCart.map(item => ({
+      id: item.product.id,
+      quantity: item.quantity,
+      variation_id: item.attributes?.find(attr => attr.id === 'variation_id')?.option || undefined
+    }));
+  },
+
+  // ---------- Legacy Cart Synchronization (replaced by Store API) ----------
+  async getCustomerCart(customerId: number): Promise<CartItem[]> {
+    console.warn('getCustomerCart is deprecated, use getCartFromSession instead');
+    return [];
+  },
+
+  async saveCustomerCart(customerId: number, cartItems: CartItem[]): Promise<boolean> {
+    console.warn('saveCustomerCart is deprecated, use WooCommerce Store API instead');
+    return false;
+  },
+
+  async syncCart(customerId: number, localCart: CartItem[]): Promise<CartItem[]> {
+    console.warn('syncCart is deprecated, use WooCommerce Store API instead');
+    return localCart;
   },
 };

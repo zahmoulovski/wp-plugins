@@ -3,9 +3,14 @@ import { ChevronRight, Plus } from 'react-bootstrap-icons';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Category, Product } from '../../types';
 import { api } from '../../services/api';
-import { LoadingSpinner } from '../common/LoadingSpinner';
 import { ProductCard } from '../common/ProductCard';
 import { decodeHTMLEntities } from '../../utils/htmlUtils';
+import { 
+  CategoryListSkeleton, 
+  ProductGridSkeleton,
+  TextSkeleton,
+  ImageSkeleton 
+} from '../common/SkeletonLoader';
 
 interface CategoriesPageProps {
   onProductClick: (product: Product) => void;
@@ -134,7 +139,12 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
   };
 
   if (loading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="p-4 pb-20">
+        <TextSkeleton width="120px" height="32px" className="mb-6" />
+        <CategoryListSkeleton count={8} />
+      </div>
+    );
   }
 
   return (
@@ -191,7 +201,34 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
           </div>
 
           {productsLoading ? (
-            <LoadingSpinner />
+            <div>
+              {/* Subcategories skeleton */}
+              <div className="mb-6">
+                <TextSkeleton width="150px" height="24px" className="mb-4" />
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }, (_, i) => (
+                    <div key={i} className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <ImageSkeleton width="40px" height="40px" variant="rectangular" />
+                          <div>
+                            <TextSkeleton width="120px" height="20px" className="mb-1" />
+                            <TextSkeleton width="80px" height="16px" />
+                          </div>
+                        </div>
+                        <TextSkeleton width="20px" height="20px" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Products skeleton */}
+              <div>
+                <TextSkeleton width="100px" height="24px" className="mb-4" />
+                <ProductGridSkeleton count={10} />
+              </div>
+            </div>
           ) : (
             <>
               {/* Subcategories */}

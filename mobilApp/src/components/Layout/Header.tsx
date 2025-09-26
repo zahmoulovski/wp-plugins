@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Sun, Moon, Person } from 'react-bootstrap-icons';
+import { Sun, Moon, Person, Search } from 'react-bootstrap-icons';
 import { useApp } from '../../contexts/AppContext';
 
 interface HeaderProps {
@@ -90,6 +90,14 @@ export function Header({ currentPage, onPageChange, onMenuClick, isMenuOpen = fa
             ) : (
               <Person className="h-5 w-5 text-gray-600 dark:text-gray-400" />
             )}
+          </Link>
+            
+          <Link
+            to="/search"
+            className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Profil"
+          >
+          <Search className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </Link>
 
           {/* Dark Mode Toggle */}

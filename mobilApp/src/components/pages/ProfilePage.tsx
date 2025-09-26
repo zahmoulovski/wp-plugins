@@ -64,14 +64,9 @@ export function ProfilePage() {
     
     try {
       setLoading(true);
-      console.log('Loading orders for customer ID:', state.customer.id);
       const customerOrders = await api.getOrders(state.customer.id);
-      console.log('Orders loaded successfully:', customerOrders);
       setOrders(customerOrders);
     } catch (error) {
-      console.error('Error loading orders:', error);
-      console.error('Customer ID:', state.customer.id);
-      console.error('Customer data:', state.customer);
       
       // More specific error messages
       if (error.message?.includes('404')) {
@@ -242,10 +237,11 @@ export function ProfilePage() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     dispatch({ type: 'SET_CUSTOMER', payload: null });
     setOrders([]);
     toast.success('Déconnexion réussie');
+    navigate('/');
   };
 
   const handlePasswordReset = () => {
@@ -443,9 +439,33 @@ export function ProfilePage() {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const menuItems = [
-    // Menu items removed as requested
-  ];
+  const handlePayOrder = async () => {
+    if (!selectedOrder) return;
+
+    try {
+      const amount = Math.round(parseFloat(selectedOrder.total) * 1000);
+
+      const paymentData = {
+        amount,
+        first_name: selectedOrder.billing.first_name,
+        last_name: selectedOrder.billing.last_name,
+        phone: selectedOrder.billing.phone,
+        email: selectedOrder.billing.email,
+        success_link: `${window.location.origin}/payment-success?order_id=${selectedOrder.id}`,
+        fail_link: `${window.location.origin}/payment-failed?order_id=${selectedOrder.id}`,
+        session_id: `order_${selectedOrder.id}`,
+      };
+
+      const payment = await api.initFlouciPayment(paymentData);
+
+      await api.updateOrderMeta(selectedOrder.id, { flouci_payment_id: payment.paymentId });
+
+      window.location.href = payment.payUrl;
+    } catch (error) {
+      console.error('Payment initiation error:', error);
+      toast.error('Erreur lors de l\'initialisation du paiement. Veuillez reessayer.');
+    }
+  };
 
   return (
     <>
@@ -1025,22 +1045,6 @@ export function ProfilePage() {
                   </div>
                 )}
 
-                {/* Menu Items */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6">
-                  {menuItems.map((item, index) => (
-                    <button
-                      key={index}
-                      onClick={item.action}
-                      className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 first:rounded-t-xl last:rounded-b-xl transition-colors duration-200"
-                    >
-                      <div className="flex items-center">
-                        <item.icon className="h-5 w-5 text-gray-400 mr-3" />
-                        <span className="text-gray-900 dark:text-white">{item.label}</span>
-                      </div>
-                      <span className="text-gray-400">→</span>
-                    </button>
-                  ))}
-                </div>
 
                 {/* Recent Orders */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
@@ -1223,6 +1227,14 @@ export function ProfilePage() {
                   </span>
                 </div>
               </div>
+              {['pending', 'on-hold', 'processing'].includes(selectedOrder.status) && (
+                <button
+                  onClick={handlePayOrder}
+                  className="mt-4 w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200"
+                >
+                  Payer
+                </button>
+              )}
             </div>
           </div>
         </div>

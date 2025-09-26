@@ -1,10 +1,8 @@
 import React from 'react';
-import { PullToRefresh } from './PullToRefresh';
-import { useApp } from '../../contexts/AppContext';
 
 interface PageWrapperProps {
   children: React.ReactNode;
-  onRefresh?: () => Promise<void>;
+  onRefresh?: () => Promise<void>; // Kept for compatibility but not used
   className?: string;
 }
 
@@ -13,31 +11,11 @@ export const PageWrapper: React.FC<PageWrapperProps> = ({
   onRefresh,
   className = '' 
 }) => {
-  const { dispatch } = useApp();
-
-  const handleRefresh = async () => {
-    try {
-      // Reload current page data
-      if (onRefresh) {
-        await onRefresh();
-      } else {
-        // Default refresh - reload window
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error('Refresh failed:', error);
-    }
-  };
-
+  // Simple wrapper component - pull-to-refresh functionality removed
   return (
-    <PullToRefresh 
-      onRefresh={handleRefresh}
-      className={className}
-      threshold={80}
-      maxPull={120}
-    >
+    <div className={className}>
       {children}
-    </PullToRefresh>
+    </div>
   );
 };
 

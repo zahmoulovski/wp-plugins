@@ -19,6 +19,7 @@ import SplashScreen from './components/common/SplashScreen';
 import { PageWrapper } from './components/common/PageWrapper';
 import { Product, BlogPost } from './types';
 import { api } from './services/api';
+import PaymentCallback from './components/pages/PaymentCallback';
 
 function AppContent() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -48,7 +49,6 @@ function AppContent() {
   };
 
   const handleOrderSuccess = (order: any, subtotal: string) => {
-    console.log('Order success triggered:', { order, subtotal });
     // Store order details for thank you page with order ID in URL
     const orderDetails = { order, subtotal };
     (window as any).orderDetails = orderDetails;
@@ -111,10 +111,8 @@ function AppContent() {
           new Promise(resolve => setTimeout(resolve, 4000)) // Minimum 4 seconds
         ]);
         
-        console.log('Initial data loaded:', products.length, 'products');
         setIsLoading(false);
       } catch (error) {
-        console.error('Error loading initial data:', error);
         // Still hide splash screen after timeout even if there's an error
         setTimeout(() => setIsLoading(false), 4000);
       }
@@ -189,7 +187,7 @@ function AppContent() {
                 <BlogPage onPostClick={handleBlogPostClick} />
               </PageWrapper>
             } />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/payment-success" element={<PaymentCallback success={true} />} />\n            <Route path="/payment-failed" element={<PaymentCallback success={false} />} />\n            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
         {!isCheckoutPage && <BottomNav />}
