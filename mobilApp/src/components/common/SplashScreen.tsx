@@ -15,7 +15,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ isLoading, onComplete }) =>
         if (onComplete) {
           onComplete();
         }
-      }, 1000); // 500ms for fade animation
+      }, 1500); // 1500ms for fade animation
     }
   }, [isLoading, onComplete]);
 
@@ -26,8 +26,8 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ isLoading, onComplete }) =>
       }`}
       style={{
         background: 'linear-gradient(-45deg, #145c7d, #4db3d9, #145c7d, #4db3d9)',
-        backgroundSize: '400% 400%',
-        animation: 'gradient 15s ease infinite'
+        backgroundSize: '200% 200%',
+        animation: 'gradient 10s ease infinite'
       }}
     >
       <style>{`

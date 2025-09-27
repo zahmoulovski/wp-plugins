@@ -4,6 +4,7 @@ import { Product } from '../../types';
 import { api } from '../../services/api';
 import { ProductCard } from '../common/ProductCard';
 import { LoadingSpinner } from '../common/LoadingSpinner';
+import { useScrollToTop } from '../../hooks/useScrollToTop';
 
 interface SearchPageProps {
   onProductClick: (product: Product) => void;
@@ -20,6 +21,9 @@ export function SearchPage({ onProductClick }: SearchPageProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const [allProductNames, setAllProductNames] = useState<string[]>([]);
+
+  // Scroll to top when page loads
+  useScrollToTop();
 
   // Load product names from the text file
   useEffect(() => {
@@ -137,7 +141,7 @@ export function SearchPage({ onProductClick }: SearchPageProps) {
   };
 
   return (
-    <div className="p-4 pb-20">
+    <div className="p-4 pb-20 mb-8">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
         Rechercher des Produits
       </h1>

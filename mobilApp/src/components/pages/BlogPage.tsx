@@ -127,7 +127,7 @@ export function BlogPage({ onPostClick }: BlogPageProps) {
   }
 
   return (
-    <div className="p-4 pb-20">
+    <div className="p-4 pb-20 mb-8">
       {/* Header Section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Blog</h1>

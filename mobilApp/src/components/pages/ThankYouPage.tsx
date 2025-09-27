@@ -301,7 +301,7 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
   };
 
   return (
-    <div className="p-4 pb-20">
+    <div className="p-4 pb-20 mb-8">
       <div className="text-center mb-8">
         <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
@@ -331,6 +331,8 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
                   <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     Quantité: {item.quantity}
+                    <br />
+                    Réf : {item.sku}
                   </p>
                 </div>
                 <p className="font-semibold text-gray-900 dark:text-white">

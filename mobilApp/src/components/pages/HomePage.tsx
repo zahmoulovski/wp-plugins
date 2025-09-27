@@ -15,6 +15,7 @@ import {
   ImageSkeleton,
   TextSkeleton 
 } from '../common/SkeletonLoader';
+import { useScrollToTop } from '../../hooks/useScrollToTop';
 
 
 
@@ -43,6 +44,9 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
+
+  // Scroll to top when page loads
+  useScrollToTop();
 
   const CATEGORIES = [
     { id: 340, title: 'Coffres & Armoires fortes' },
@@ -252,7 +256,7 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
   }
 
   return (
-    <div className="p-4 pb-20">
+    <div className="p-4 pb-20 mb-8">
       {products.featured.length > 0 && (
         <section>
           <h2 className="text-xl font-bold mb-4 dark:text-white">Produits vedettes</h2>
@@ -299,10 +303,7 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
                     <Calendar size={14} />
                     <span>{formatDate(post.date)}</span>
                   </div>
-                  <div 
-                    className="text-gray-700 dark:text-gray-300 line-clamp-3 mb-4 text-sm leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: post.excerpt.rendered }}
-                  />
+                  
                   <button 
                     onClick={() => onBlogPostClick(post)}
                     className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium text-sm transition-colors"

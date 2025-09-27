@@ -11,6 +11,7 @@ import {
   TextSkeleton,
   ImageSkeleton 
 } from '../common/SkeletonLoader';
+import { useScrollToTop } from '../../hooks/useScrollToTop';
 
 interface CategoriesPageProps {
   onProductClick: (product: Product) => void;
@@ -28,6 +29,9 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+
+  // Scroll to top when page loads or category changes
+  useScrollToTop([categorySlug]);
 
   // Helper function to find category by slug or ID
   const findCategory = (categories: Category[], identifier: string): Category | undefined => {
@@ -148,7 +152,7 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
   }
 
   return (
-    <div className="p-4 pb-20">
+    <div className="p-4 pb-20 mb-8">
       {!selectedCategory ? (
         <>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">

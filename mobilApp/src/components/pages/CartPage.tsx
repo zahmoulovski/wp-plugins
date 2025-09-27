@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Plus, Dash, Trash, Bag } from 'react-bootstrap-icons';
 import { useApp } from '../../contexts/AppContext';
+import { useScrollToTop } from '../../hooks/useScrollToTop';
 
 interface CartPageProps {
   onCheckout: () => void;
@@ -8,6 +9,9 @@ interface CartPageProps {
 
 export function CartPage({ onCheckout }: CartPageProps) {
   const { state, dispatch } = useApp();
+
+  // Scroll to top when page loads
+  useScrollToTop();
 
   const updateQuantity = (id: number, quantity: number) => {
     dispatch({ type: 'UPDATE_CART_ITEM', payload: { id, quantity } });
@@ -62,7 +66,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
   }
 
   return (
-    <div className="p-4 pb-20">
+    <div className="p-4 pb-20 mb-8">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
         Panier d'Achat ({state.cart.length})
       </h1>

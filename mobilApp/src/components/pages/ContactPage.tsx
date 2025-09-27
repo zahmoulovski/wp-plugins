@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GeoAlt, Telephone, Envelope, Facebook, Twitter, Instagram, Tiktok,Pinterest, Youtube, Whatsapp, Send } from 'react-bootstrap-icons';
+import { useScrollToTop } from '../../hooks/useScrollToTop';
 
 interface ContactFormData {
   name: string;
@@ -19,6 +20,9 @@ export const ContactPage: React.FC = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formMessage, setFormMessage] = useState('');
+
+  // Scroll to top when page loads
+  useScrollToTop();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

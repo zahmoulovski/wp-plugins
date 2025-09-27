@@ -14,9 +14,17 @@ const PaymentCallback: React.FC<PaymentCallbackProps> = ({ success }) => {
     const handleCallback = async () => {
       const query = new URLSearchParams(location.search);
       const orderId = query.get('order_id');
+      const parentOrigin = query.get('parent_origin');
+
+      // Determine if running inside an iframe
+      const isInIframe = window.self !== window.top;
 
       if (!orderId) {
-        navigate('/thank-you', { state: { error: 'Invalid payment callback: No order ID' } });
+        if (isInIframe && parentOrigin) {
+          window.parent.postMessage({ type: 'konnectPaymentResult', success: false, error: 'Invalid payment callback: No order ID' }, parentOrigin);
+        } else {
+          navigate('/thank-you', { state: { error: 'Invalid payment callback: No order ID' } });
+        }
         return;
       }
 
@@ -24,27 +32,51 @@ const PaymentCallback: React.FC<PaymentCallbackProps> = ({ success }) => {
         const order = await api.getOrder(parseInt(orderId));
 
         if (success) {
-          const paymentId = order.meta_data?.find(meta => meta.key === 'flouci_payment_id')?.value;
+          const paymentId = order.meta_data?.find(meta => meta.key === 'konnect_payment_id')?.value;
 
           if (!paymentId) {
-            navigate('/thank-you', { state: { error: 'Payment ID not found for verification' } });
+            if (isInIframe && parentOrigin) {
+              window.parent.postMessage({ type: 'konnectPaymentResult', success: false, error: 'Payment ID not found for verification' }, parentOrigin);
+            } else {
+              navigate('/thank-you', { state: { error: 'Payment ID not found for verification' } });
+            }
             return;
           }
 
-          const verification = await api.verifyFlouciPayment(paymentId);
+          const verification = await api.verifyKonnectPayment(paymentId);
 
-          if (verification.status === 'success') {
-            await api.updateOrder(parseInt(orderId), { status: 'processing' });
-            navigate('/thank-you', { state: { order } });
+          if (verification.status === 'completed') {
+            await api.updateOrder(parseInt(orderId), { status: 'completed' });
+            if (isInIframe && parentOrigin) {
+              window.parent.postMessage({ type: 'konnectPaymentResult', success: true, orderId: parseInt(orderId) }, parentOrigin);
+            } else {
+              navigate('/thank-you', { state: { order } });
+            }
           } else {
-            navigate('/thank-you', { state: { error: 'Payment verification failed' } });
+            // Payment verification failed, set order status to on-hold
+            await api.updateOrder(parseInt(orderId), { status: 'on-hold' });
+            if (isInIframe && parentOrigin) {
+              window.parent.postMessage({ type: 'konnectPaymentResult', success: false, orderId: parseInt(orderId), error: 'Payment verification failed' }, parentOrigin);
+            } else {
+              navigate('/thank-you', { state: { error: 'Payment verification failed' } });
+            }
           }
         } else {
-          navigate('/thank-you', { state: { error: 'Payment failed, please try again' } });
+          // Payment failed, set order status to on-hold
+          await api.updateOrder(parseInt(orderId), { status: 'on-hold' });
+          if (isInIframe && parentOrigin) {
+            window.parent.postMessage({ type: 'konnectPaymentResult', success: false, orderId: parseInt(orderId), error: 'Payment failed, please try again' }, parentOrigin);
+          } else {
+            navigate('/thank-you', { state: { error: 'Payment failed, please try again' } });
+          }
         }
       } catch (error) {
         console.error('Error handling payment callback:', error);
-        navigate('/thank-you', { state: { error: 'Error processing payment callback' } });
+        if (isInIframe && parentOrigin) {
+          window.parent.postMessage({ type: 'konnectPaymentResult', success: false, error: 'Error processing payment callback' }, parentOrigin);
+        } else {
+          navigate('/thank-you', { state: { error: 'Error processing payment callback' } });
+        }
       }
     };
 
