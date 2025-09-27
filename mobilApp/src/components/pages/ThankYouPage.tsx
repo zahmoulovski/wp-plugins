@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { CheckCircle, House, Bag, XCircle } from 'react-bootstrap-icons';
 import { api } from '../../services/api';
 import { useLocation, useNavigate } from 'react-router-dom';
+import paymentLogo from '../../services/payment-logo.png';
+import { KonnectPaymentModal, useKonnectPayment } from '../../hooks/useKonnectPayment';
 
 interface OrderProduct {
   id: string;
@@ -74,8 +76,65 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [emailVerificationError, setEmailVerificationError] = useState<string>('');
   const [paymentError, setPaymentError] = useState<string>('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const konnectModal = useKonnectPayment();
+
+  /* -------  KONNECT MODAL LISTENER  ------- */
+  const handleKonnectClose = async () => {
+    // Handle payment cancellation/failure when close button is clicked
+    if (orderData) {
+      try {
+        // Update order status to on-hold
+        await api.updateOrder(orderData.id, { status: 'on-hold' });
+        
+        // Refresh order details
+        const updatedOrder = await api.getOrder(orderData.id);
+        setOrderData(updatedOrder);
+        
+        // Show message
+        setPaymentError('Paiement annulé. Votre commande est en attente.');
+      } catch (error) {
+        console.error('Error updating order status:', error);
+        setPaymentError('Erreur lors de la mise à jour du statut de la commande.');
+      }
+    }
+    
+    // Close the modal
+    konnectModal.closeKonnectPayment();
+  };
+
+  useEffect(() => {
+    if (!konnectModal.showKonnectIframe || !konnectModal.konnectPayUrl || !orderData) return;
+
+    const handleMessage = async (event: MessageEvent) => {
+      if (!event.origin.includes('konnect.network')) return;
+      if (event.data === 'payment_success') {
+        try {
+          await api.updateOrder(orderData.id, { status: 'completed' });
+          const updatedOrder = await api.getOrder(orderData.id);
+          setOrderData(updatedOrder);
+          konnectModal.closeKonnectPayment();
+          setPaymentError(''); // Clear any previous errors
+        } catch (error) {
+          console.error('Error updating order status:', error);
+        }
+      } else if (event.data === 'payment_failed') {
+        try {
+          await api.updateOrder(orderData.id, { status: 'on-hold' });
+          const updatedOrder = await api.getOrder(orderData.id);
+          setOrderData(updatedOrder);
+          konnectModal.closeKonnectPayment();
+          setPaymentError('Le paiement a échoué. Votre commande est en attente.');
+        } catch (error) {
+          console.error('Error updating order status:', error);
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [konnectModal.showKonnectIframe, konnectModal.konnectPayUrl, orderData]);
 
   const verifyOrderByEmail = async (email: string, orderId: string) => {
     setIsLoading(true);
@@ -300,6 +359,50 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
     return order.fee_lines.reduce((total, fee) => total + parseFloat(fee.total), 0);
   };
 
+  const handlePayOrder = async () => {
+    if (!orderData) return;
+
+    setIsProcessingPayment(true);
+    try {
+      const amount = Math.round(parseFloat(orderData.total) * 1000);
+
+      const paymentData = {
+        amount,
+        first_name: orderData.billing.first_name,
+        last_name: orderData.billing.last_name,
+        phone: orderData.billing.phone,
+        email: orderData.billing.email,
+        success_link: `${window.location.origin}/payment-success?order_id=${orderData.id}`,
+        fail_link: `${window.location.origin}/payment-failed?order_id=${orderData.id}`,
+        session_id: `order_${orderData.id}`,
+      };
+
+      console.log('Initiating Konnect payment with data:', paymentData);
+      const payment = await api.initKonnectPayment(paymentData);
+      console.log('Konnect payment response:', payment);
+      
+      await api.updateOrderMeta(orderData.id, { konnect_payment_id: payment.paymentRef });
+      
+      // Store order details for potential return
+      const orderDetails = { order: orderData, subtotal: orderData.line_items.reduce((sum, item) => sum + parseFloat(item.total), 0).toFixed(3) };
+      sessionStorage.setItem(`order_${orderData.id}`, JSON.stringify(orderDetails));
+      
+      // Open payment in modal instead of new tab
+      console.log('Opening Konnect modal with URL:', payment.payUrl);
+      konnectModal.openKonnectPayment(payment.payUrl);
+      console.log('Konnect modal state after opening:', {
+        showKonnectIframe: konnectModal.showKonnectIframe,
+        konnectPayUrl: konnectModal.konnectPayUrl
+      });
+
+    } catch (error) {
+      console.error('Payment initiation error:', error);
+      setPaymentError('Erreur lors de l\'initialisation du paiement. Veuillez reessayer.');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
   return (
     <div className="p-4 pb-20 mb-8">
       <div className="text-center mb-8">
@@ -308,8 +411,20 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
           Commande Confirmée !
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-400">
-          Votre commande #{order.id} a été placée avec succès
+          Votre commande #{orderData.id} a été placée avec succès
         </p>
+        <div className="mt-4">
+          <span className={`px-4 py-2 rounded-full text-sm font-medium ${
+            orderData.status === 'completed' ? 'bg-green-100 text-green-800' :
+            orderData.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+            orderData.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+            orderData.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+            orderData.status === 'on-hold' ? 'bg-orange-100 text-orange-800' :
+            'bg-gray-100 text-gray-800'
+          }`}>
+            Statut: {orderData.status}
+          </span>
+        </div>
       </div>
 
       <div className="space-y-6">
@@ -320,7 +435,7 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
           </h2>
           
           <div className="space-y-4">
-            {order.line_items.map((item) => (
+            {orderData.line_items.map((item) => (
               <div key={item.id} className="flex items-center gap-4 py-3 border-b border-gray-100 dark:border-gray-700">
                 <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
                   <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -347,13 +462,13 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
               <span className="text-gray-600 dark:text-gray-400">Sous-total</span>
               <span className="font-semibold">{subtotal} TND</span>
             </div>
-            {order.shipping_lines && order.shipping_lines.length > 0 && (
+            {orderData.shipping_lines && orderData.shipping_lines.length > 0 && (
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Livraison</span>
-                <span className="font-semibold">{parseFloat(order.shipping_lines[0].total).toFixed(3)} TND</span>
+                <span className="font-semibold">{parseFloat(orderData.shipping_lines[0].total).toFixed(3)} TND</span>
               </div>
             )}
-            {order.fee_lines && order.fee_lines.map((fee, index) => (
+            {orderData.fee_lines && orderData.fee_lines.map((fee, index) => (
               <div key={index} className="flex justify-between dark:text-white">
                 <span className="text-gray-600 dark:text-gray-400">{fee.name}</span>
                 <span className="font-semibold">{fee.total} TND</span>
@@ -362,7 +477,7 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
             <div className="flex justify-between text-lg font-bold border-t border-gray-200 dark:border-gray-600 pt-2">
               <span>Total</span>
               <span className="text-primary-600 dark:text-primary-400">
-                {order.total} TND
+                {orderData.total} TND
               </span>
             </div>
           </div>
@@ -375,44 +490,78 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
           </h2>
           
           <div className="space-y-2 text-gray-700 dark:text-white">
-            {order.billing && (
+            {orderData.billing && (
               <>
-                <p><strong>Nom:</strong> {order.billing.first_name} {order.billing.last_name}</p>
-                <p><strong>Email:</strong> {order.billing.email}</p>
-                <p><strong>Téléphone:</strong> {order.billing.phone}</p>
-                <p><strong>Adresse:</strong> {order.billing.address_1}</p>
-                <p><strong>Ville:</strong> {order.billing.city}, {order.billing.state}</p>
-                <p><strong>Code Postal:</strong> {order.billing.postcode}</p>
-                <p><strong>Pays:</strong> {order.billing.country}</p>
+                <p><strong>Nom:</strong> {orderData.billing.first_name} {orderData.billing.last_name}</p>
+                <p><strong>Email:</strong> {orderData.billing.email}</p>
+                <p><strong>Téléphone:</strong> {orderData.billing.phone}</p>
+                <p><strong>Adresse:</strong> {orderData.billing.address_1}</p>
+                <p><strong>Ville:</strong> {orderData.billing.city}, {orderData.billing.state}</p>
+                <p><strong>Code Postal:</strong> {orderData.billing.postcode}</p>
+                <p><strong>Pays:</strong> {orderData.billing.country}</p>
               </>
             )}
-            {order.shipping_lines && order.shipping_lines.length > 0 && (
-              <p><strong>Méthode de livraison:</strong> {order.shipping_lines[0].method_title}</p>
+            {orderData.shipping_lines && orderData.shipping_lines.length > 0 && (
+              <p><strong>Méthode de livraison:</strong> {orderData.shipping_lines[0].method_title}</p>
             )}
-            {order.payment_method_title && (
-              <p><strong>Méthode de paiement:</strong> {order.payment_method_title}</p>
+            {orderData.payment_method_title && (
+              <p><strong>Méthode de paiement:</strong> {orderData.payment_method_title}</p>
             )}
+
+            {/* Payment Button - Show only for pending, on-hold, or processing orders */}
+          {orderData.status === 'pending' || orderData.status === 'on-hold' || orderData.status === 'processing' ? (
+            <button
+              onClick={handlePayOrder}
+              disabled={isProcessingPayment}
+              className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white py-3 px-4 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+              {isProcessingPayment ? 'Traitement...' : 'Payer En ligne'}
+              <img src={paymentLogo} alt="Paiement" className="h-5" />
+            </button>
+          ) : null}
+
           </div>
         </div>
 
+        {/* Payment Error */}
+        {paymentError && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <XCircle className="h-5 w-5" />
+              <p className="text-sm font-medium">{paymentError}</p>
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
-        <div className="flex gap-4">
-          <button
-          onClick={onBackToHome}
-          className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-3 px-4 rounded-xl font-semibold transition-colors duration-200 flex items-center justify-center gap-2"
-        >
-          <House className="h-5 w-5" />
-          Retour à l'accueil
-        </button>
-        <button
-          onClick={onContinueShopping}
-          className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 px-4 rounded-xl font-semibold transition-colors duration-200 flex items-center justify-center gap-2"
-        >
-          <Bag className="h-5 w-5" />
-          Continuer vos achats
-        </button>
+        <div className="space-y-4">
+          
+
+          <div className="flex gap-4">
+            <button
+              onClick={onBackToHome}
+              className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-3 px-4 rounded-xl font-semibold transition-colors duration-200 flex items-center justify-center gap-2"
+            >
+              <House className="h-5 w-5" />
+              Retour à l'accueil
+            </button>
+            <button
+              onClick={onContinueShopping}
+              className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 px-4 rounded-xl font-semibold transition-colors duration-200 flex items-center justify-center gap-2"
+            >
+              <Bag className="h-5 w-5" />
+              Continuer vos achats
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* KONNECT MODAL */}
+      <KonnectPaymentModal
+        showKonnectIframe={konnectModal.showKonnectIframe}
+        konnectPayUrl={konnectModal.konnectPayUrl}
+        onClose={handleKonnectClose}
+      />
     </div>
   );
 }
