@@ -377,9 +377,7 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
         session_id: `order_${orderData.id}`,
       };
 
-      console.log('Initiating Konnect payment with data:', paymentData);
       const payment = await api.initKonnectPayment(paymentData);
-      console.log('Konnect payment response:', payment);
       
       await api.updateOrderMeta(orderData.id, { konnect_payment_id: payment.paymentRef });
       
@@ -388,7 +386,6 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
       sessionStorage.setItem(`order_${orderData.id}`, JSON.stringify(orderDetails));
       
       // Open payment in modal instead of new tab
-      console.log('Opening Konnect modal with URL:', payment.payUrl);
       konnectModal.openKonnectPayment(payment.payUrl);
       console.log('Konnect modal state after opening:', {
         showKonnectIframe: konnectModal.showKonnectIframe,

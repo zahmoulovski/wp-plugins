@@ -11,10 +11,8 @@ export const useKonnectPayment = () => {
   const [konnectPayUrl, setKonnectPayUrl] = useState<string | null>(null);
 
   const openKonnectPayment = (paymentUrl: string) => {
-    console.log('useKonnectPayment: Opening payment with URL:', paymentUrl);
     setKonnectPayUrl(paymentUrl);
     setShowKonnectIframe(true);
-    console.log('useKonnectPayment: State after opening - showKonnectIframe:', true, 'konnectPayUrl:', paymentUrl);
   };
 
   const closeKonnectPayment = () => {
@@ -35,7 +33,6 @@ export const KonnectPaymentModal = ({
   konnectPayUrl, 
   onClose 
 }: KonnectPaymentProps) => {
-  console.log('KonnectPaymentModal: Render called with showKonnectIframe:', showKonnectIframe, 'konnectPayUrl:', konnectPayUrl);
   if (!showKonnectIframe || !konnectPayUrl) return null;
 
   return (
