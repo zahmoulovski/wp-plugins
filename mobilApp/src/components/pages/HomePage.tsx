@@ -16,6 +16,7 @@ import {
   TextSkeleton 
 } from '../common/SkeletonLoader';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
+import { logViewItem, logAddToCart, logSearch } from '../../utils/analytics';
 
 
 

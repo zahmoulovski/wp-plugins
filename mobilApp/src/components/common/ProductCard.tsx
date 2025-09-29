@@ -3,6 +3,7 @@ import { Cart } from 'react-bootstrap-icons';
 import { Product } from '../../types';
 import { useApp } from '../../contexts/AppContext';
 import { ProductCardSkeleton } from './SkeletonLoader';
+import { logViewItem, logAddToCart } from '../../utils/analytics';
 
 interface ProductCardProps {
   product: Product;
@@ -44,6 +45,9 @@ export function ProductCard({ product, onProductClick, loading }: ProductCardPro
         product: product
       }
     });
+    
+    // Track add to cart event
+    logAddToCart(product.id.toString(), product.name, parseFloat(product.price));
   };
 
   const formatPrice = (price: string) => {
@@ -56,9 +60,15 @@ export function ProductCard({ product, onProductClick, loading }: ProductCardPro
 
   const mainImage = product.images?.[0]?.src || '/api/placeholder/600/600';
 
+  const handleProductClick = () => {
+    // Track product view
+    logViewItem(product.id.toString(), product.name, parseFloat(product.price));
+    onProductClick(product);
+  };
+
   return (
     <div 
-      onClick={() => onProductClick(product)}
+      onClick={handleProductClick}
       className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer group hover:shadow-md transition-all duration-200"
     >
       <div className="relative">

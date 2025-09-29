@@ -12,6 +12,7 @@ import { calculateDynamicShippingCosts } from '../../utils/zoneShippingCalculato
 import { useScrollToTop } from '../../hooks/useScrollToTop';
 import { useNavigate } from 'react-router-dom';
 import { KonnectPaymentModal, useKonnectPayment } from '../../hooks/useKonnectPayment';
+import { logBeginCheckout, logPaymentInfo, logPurchase } from '../../utils/analytics';
 
 interface CheckoutPageProps {
   onBack: () => void;
@@ -396,6 +397,10 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
       setCurrentStep(2);
       return;
     }
+    
+    // Track checkout begin
+    logBeginCheckout(parseFloat(calculateTotal()));
+    
     setLoading(true);
     try {
       const orderData: any = {
@@ -455,6 +460,10 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
       if (state.customer) orderData.customer_id = state.customer.id;
 
       const order = await api.createOrder(orderData);
+      
+      // Track payment method selection
+      logPaymentInfo(formData.paymentMethod);
+      
       const codMethods = ['cheque', 'cod', 'bacs'];
       if (codMethods.includes(formData.paymentMethod))
         await api.updateOrder(order.id, { status: 'processing' });
@@ -466,6 +475,9 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
         return;
       }
 
+      // Track successful purchase for non-Konnect payments
+      logPurchase(order.id, parseFloat(calculateTotal()));
+      
       dispatch({ type: 'CLEAR_CART' });
       onOrderSuccess(order, calculateSubtotal());
     } catch (err: any) {

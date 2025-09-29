@@ -4,6 +4,7 @@ import { api } from '../../services/api';
 import { useLocation, useNavigate } from 'react-router-dom';
 import paymentLogo from '../../services/payment-logo.png';
 import { KonnectPaymentModal, useKonnectPayment } from '../../hooks/useKonnectPayment';
+import { logPurchase } from '../../utils/analytics';
 
 interface OrderProduct {
   id: string;
@@ -115,6 +116,10 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
           await api.updateOrder(orderData.id, { status: 'completed' });
           const updatedOrder = await api.getOrder(orderData.id);
           setOrderData(updatedOrder);
+          
+          // Track successful purchase for Konnect payments
+          logPurchase(orderData.id, parseFloat(orderData.total));
+          
           konnectModal.closeKonnectPayment();
           setPaymentError(''); // Clear any previous errors
         } catch (error) {

@@ -20,6 +20,7 @@ import { PageWrapper } from './components/common/PageWrapper';
 import { Product, BlogPost } from './types';
 import { api } from './services/api';
 import PaymentCallback from './components/pages/PaymentCallback';
+import { initGA, logPageView } from './utils/analytics';
 
 function AppContent() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -97,6 +98,16 @@ function AppContent() {
       document.documentElement.classList.add('dark');
     }
   }, []);
+
+  // Initialize Google Analytics
+  useEffect(() => {
+    initGA();
+  }, []);
+
+  // Track page views on route changes
+  useEffect(() => {
+    logPageView();
+  }, [location]);
 
   // Simulate API data loading on app start
   useEffect(() => {
