@@ -107,9 +107,11 @@ export const ContactPage: React.FC = () => {
       // Prepare email data
       const emailData = {
         name: formData.name,
+        company: formData.company,
         email: formData.email,
-        subject: `Contact Form: ${formData.company || 'General Inquiry'}`,
-        message: `Phone: ${formData.phone}\n\n${formData.message}`,
+        phone: formData.phone,
+        subject: `Contact Form: ${formData.company || 'Enquête générale'}`,
+        message: formData.message,
         attachments: formData.attachments
       };
 
@@ -127,10 +129,8 @@ export const ContactPage: React.FC = () => {
           attachments: undefined
         });
         setSelectedFiles([]);
-        console.log('Email sent successfully:', response.data);
       } else {
         setFormMessage('Erreur lors de l\'envoi du message. Veuillez réessayer.');
-        console.error('Email sending failed:', response.message);
       }
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -140,8 +140,6 @@ export const ContactPage: React.FC = () => {
       setIsUploading(false);
     }
   };
-
-
 
   const socialLinks = [
     { name: 'Facebook', url: 'https://www.facebook.com/klarrionsarl', icon: Facebook, color: 'bg-blue-600' },

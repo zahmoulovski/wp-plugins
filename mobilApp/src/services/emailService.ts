@@ -1,20 +1,13 @@
 // Frontend email service for contact form
-// Note: This simulates email sending. For real email functionality, 
-// integrate with EmailJS or similar service
+// Now integrated with Formspree
 
-interface EmailConfig {
-  host: string;
-  port: number;
-  encryption: string;
-  username: string;
-  password: string;
-  autoTLS: boolean;
-  authentication: boolean;
-}
+import emailjs from '@emailjs/browser';
 
 interface ContactFormData {
   name: string;
+  company?: string; // Added for 'Entreprise / Organisation'
   email: string;
+  phone?: string; // Added for 'Téléphone'
   subject: string;
   message: string;
   attachments?: File[];
@@ -27,22 +20,20 @@ interface EmailResponse {
 }
 
 export class EmailService {
-  private config: EmailConfig;
   private formSubmissions: ContactFormData[] = [];
 
-  constructor() {
-    this.config = {
-      host: import.meta.env.VITE_SMTP_HOST || 'cp3.tn.oxa.host',
-      port: parseInt(import.meta.env.VITE_SMTP_PORT || '465'),
-      encryption: import.meta.env.VITE_SMTP_ENCRYPTION || 'ssl',
-      username: import.meta.env.VITE_SMTP_USERNAME || 'contact@klarrion.com',
-      password: import.meta.env.VITE_SMTP_PASSWORD || '',
-      autoTLS: import.meta.env.VITE_SMTP_AUTO_TLS === 'true',
-      authentication: import.meta.env.VITE_SMTP_AUTHENTICATION === 'true'
-    };
+  constructor() {}
+
+  private async toBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
   }
 
-  // Simulate email sending - stores locally and shows success
+  // Send email via EmailJS
   async sendContactEmail(formData: ContactFormData): Promise<EmailResponse> {
     try {
       // Validate form data
@@ -53,45 +44,66 @@ export class EmailService {
         };
       }
 
-      // Simulate email sending with SMTP configuration
-      console.log('Simulating email send with configuration:', {
-        host: this.config.host,
-        port: this.config.port,
-        encryption: this.config.encryption,
-        username: this.config.username,
-        // Password is hidden for security
-        hasPassword: !!this.config.password
+      const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+      const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+      const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+      const toEmail = import.meta.env.VITE_EMAILJS_TO_EMAIL;
+
+      if (!serviceId || !templateId || !publicKey || !toEmail) {
+        throw new Error('EmailJS service ID, template ID, public key, or recipient email not configured');
+      }
+
+      const attachmentPromises = (formData.attachments || []).map(async (file) => {
+        const base64 = await this.toBase64(file);
+        return {
+          name: file.name,
+          data: base64.split(',')[1], // Extract base64 content
+          type: file.type,
+          size: file.size
+        };
       });
 
-      // Store form submission locally (simulating email database)
-      const submission = {
-        ...formData,
-        timestamp: new Date().toISOString(),
-        id: Date.now().toString()
-      };
-      
-      this.formSubmissions.push(submission);
-      
-      // Simulate email sending delay
-      await this.simulateDelay(1500);
+      const processedAttachments = await Promise.all(attachmentPromises);
 
-      // Log the email content (for debugging)
-      console.log('Contact form submission:', {
-        to: this.config.username,
-        from: formData.email,
-        subject: `Contact Form: ${formData.subject}`,
+      const totalAttachmentsSize = processedAttachments.reduce((sum, attachment) => sum + attachment.size, 0);
+      if (totalAttachmentsSize > 40 * 1024) { // 40KB limit for attachments
+        return {
+          success: false,
+          message: 'Total attachment size exceeds the 40KB limit. Please send smaller files or use a file sharing service.'
+        };
+      }
+
+      const emailjsAttachments = processedAttachments.map(att => ({
+        name: att.name,
+        data: att.data,
+      }));
+
+      const attachmentList = processedAttachments.length > 0
+        ? processedAttachments.map(att => `<li>${att.name} (${(att.size / 1024).toFixed(2)} KB)</li>`).join('')
+        : 'Aucune pièce jointe';
+
+      const templateParams: Record<string, any> = {
+        from_name: formData.name,
+        from_email: formData.email,
+        to_name: 'Klarrion Support',
+        to_email: toEmail,
+        subject: formData.subject,
         message: formData.message,
-        attachments: formData.attachments?.length || 0,
-        timestamp: submission.timestamp
+        company: formData.company || 'N/A',
+        phone: formData.phone || 'N/A',
+        attachment_list: `<ul>${attachmentList}</ul>`,
+      };
+
+      console.log('EmailJS Attachments:', emailjsAttachments);
+
+      await emailjs.send(serviceId, templateId, templateParams, {
+        publicKey: publicKey,
+        attachments: emailjsAttachments,
       });
 
       return {
         success: true,
         message: 'Email sent successfully! We will get back to you soon.',
-        data: {
-          submissionId: submission.id,
-          timestamp: submission.timestamp
-        }
       };
 
     } catch (error) {
@@ -121,6 +133,14 @@ export class EmailService {
       return false;
     }
 
+    // Optional: Add validation for company and phone if they become mandatory
+    // if (formData.company && formData.company.trim().length < 2) {
+    //   return false;
+    // }
+    // if (formData.phone && formData.phone.trim().length < 7) { // Basic phone length check
+    //   return false;
+    // }
+
     return true;
   }
 
@@ -130,46 +150,6 @@ export class EmailService {
     return emailRegex.test(email);
   }
 
-  // Simulate network delay
-  private simulateDelay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  // Get form submissions (for debugging/admin)
-  getFormSubmissions(): ContactFormData[] {
-    return [...this.formSubmissions];
-  }
-
-  // Clear form submissions
-  clearFormSubmissions(): void {
-    this.formSubmissions = [];
-  }
-
-  // Get SMTP configuration (without password)
-  getSmtpConfig(): Partial<EmailConfig> {
-    const { password, ...configWithoutPassword } = this.config;
-    return configWithoutPassword;
-  }
-
-  // Method to integrate with EmailJS when ready
-  async sendWithEmailJS(formData: ContactFormData, emailjsConfig: {
-    serviceId: string;
-    templateId: string;
-    publicKey: string;
-  }): Promise<EmailResponse> {
-    try {
-      // This would integrate with EmailJS
-      // For now, it falls back to the local simulation
-      console.log('EmailJS integration ready. Service ID:', emailjsConfig.serviceId);
-      return await this.sendContactEmail(formData);
-    } catch (error) {
-      console.error('EmailJS integration error:', error);
-      return {
-        success: false,
-        message: 'Email service not configured. Please contact support.'
-      };
-    }
-  }
 }
 
 // Export singleton instance

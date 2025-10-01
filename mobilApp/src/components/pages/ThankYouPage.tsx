@@ -69,11 +69,9 @@ interface ThankYouPageProps {
   onContinueShopping: () => void;
 }
 
+export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }: ThankYouPageProps) {
   // Scroll to top when page loads
   useScrollToTop();
-
-
-export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }: ThankYouPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [orderData, setOrderData] = useState<OrderDetails | null>(null);
   const [subtotal, setSubtotal] = useState<string>('');
