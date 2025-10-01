@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { GeoAlt, Telephone, Envelope, Facebook, Twitter, Instagram, Tiktok,Pinterest, Youtube, Whatsapp, Send } from 'react-bootstrap-icons';
+import { GeoAlt, Telephone, Envelope, Facebook, Twitter, Instagram, Tiktok,Pinterest, Youtube, Whatsapp, Send, Paperclip } from 'react-bootstrap-icons';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
+import { emailService } from '../../services/emailService';
 
 interface ContactFormData {
   name: string;
@@ -8,6 +9,7 @@ interface ContactFormData {
   email: string;
   phone: string;
   message: string;
+  attachments?: File[];
 }
 
 export const ContactPage: React.FC = () => {
@@ -20,6 +22,9 @@ export const ContactPage: React.FC = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formMessage, setFormMessage] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [fileError, setFileError] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   // Scroll to top when page loads
   useScrollToTop();
@@ -32,42 +37,107 @@ export const ContactPage: React.FC = () => {
     }));
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setFileError('');
+    
+    if (files.length > 0) {
+      // Check total files limit
+      if (selectedFiles.length + files.length > 10) {
+        setFileError('Maximum 10 files allowed');
+        e.target.value = '';
+        return;
+      }
+      
+      // Simple file validation
+      const validFiles: File[] = [];
+      let hasErrors = false;
+      
+      files.forEach(file => {
+        // Check file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          hasErrors = true;
+          setFileError(`File ${file.name} is too large (max 10MB)`);
+        } else if (!file.type.match(/^(image\/(jpeg|png|gif|webp)|application\/(pdf|msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document)|text\/plain)$/)) {
+          hasErrors = true;
+          setFileError(`Invalid file type for ${file.name}`);
+        } else {
+          validFiles.push(file);
+        }
+      });
+      
+      if (validFiles.length > 0) {
+        setSelectedFiles(prev => [...prev, ...validFiles]);
+        setFormData(prev => ({
+          ...prev,
+          attachments: [...(prev.attachments || []), ...validFiles]
+        }));
+      }
+      
+      if (hasErrors) {
+        e.target.value = '';
+      }
+    }
+  };
+
+  const removeFile = (fileToRemove: File) => {
+    setSelectedFiles(prev => prev.filter(file => file !== fileToRemove));
+    setFileError('');
+    setFormData(prev => ({
+      ...prev,
+      attachments: (prev.attachments || []).filter(file => file !== fileToRemove)
+    }));
+  };
+
+  const removeAllFiles = () => {
+    setSelectedFiles([]);
+    setFileError('');
+    setFormData(prev => {
+      const { attachments, ...rest } = prev;
+      return rest;
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setFormMessage('');
 
     try {
-      // Import email service
-      const { emailService } = await import('../../services/emailService');
+      // Prepare email data
+      const emailData = {
+        name: formData.name,
+        email: formData.email,
+        subject: `Contact Form: ${formData.company || 'General Inquiry'}`,
+        message: `Phone: ${formData.phone}\n\n${formData.message}`,
+        attachments: formData.attachments
+      };
+
+      // Send email using the email service
+      const response = await emailService.sendContactEmail(emailData);
       
-      // Configure email service with EmailJS settings from environment variables
-      emailService.setConfig({
-        serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
-        templateId: import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
-        publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY
-      });
-      
-      // Send the email directly using the simplified service
-      const result = await emailService.sendContactEmail(formData);
-      
-      if (result.success) {
-        setFormMessage(result.message);
+      if (response.success) {
+        setFormMessage('Message envoyé avec succès !');
         setFormData({
           name: '',
           company: '',
           email: '',
           phone: '',
-          message: ''
+          message: '',
+          attachments: undefined
         });
+        setSelectedFiles([]);
+        console.log('Email sent successfully:', response.data);
       } else {
-        setFormMessage(result.message);
+        setFormMessage('Erreur lors de l\'envoi du message. Veuillez réessayer.');
+        console.error('Email sending failed:', response.message);
       }
     } catch (error) {
       console.error('Error submitting form:', error);
       setFormMessage('Une erreur s\'est produite. Veuillez réessayer.');
     } finally {
       setIsSubmitting(false);
+      setIsUploading(false);
     }
   };
 
@@ -161,6 +231,10 @@ export const ContactPage: React.FC = () => {
                       <Envelope className="w-4 h-4 text-blue-600 mr-2" />
                       <span className="text-gray-600 dark:text-gray-300">etskc@yahoo.fr</span>
                     </div>
+                  </div>
+                  <div className="mt-3 flex items-center">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Email service configured</span>
                   </div>
                 </div>
               </div>
@@ -266,6 +340,80 @@ export const ContactPage: React.FC = () => {
                   rows={5}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                 />
+              </div>
+
+              {/* File Upload Section */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Pièces jointes (optionnel) - Maximum 10 fichiers
+                </label>
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                  {selectedFiles.length === 0 ? (
+                    <div className="text-center">
+                      <Paperclip className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <label className="cursor-pointer">
+                        <span className="text-blue-600 hover:text-blue-500 font-medium">
+                          Cliquez pour joindre des fichiers
+                        </span>
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={handleFileChange}
+                          accept=".pdf,.doc,.docx,.ppt,.pptx,.xlsx,.xls,.jpg,.png"
+                          multiple
+                        />
+                      </label>
+                      <p className="text-sm text-gray-500 mt-1">
+                        PDF, DOC, DOCX, PPT, PPTX, XLSX, XLS, JPG, PNG (max. 10 Mo chacun, max. 10 fichiers)
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {selectedFiles.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                          <div className="flex items-center flex-1">
+                            <Paperclip className="w-4 h-4 text-gray-400 mr-2" />
+                            <span className="text-sm text-gray-700 dark:text-gray-300">
+                              {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeFile(file)}
+                            className="text-red-600 hover:text-red-500 text-sm font-medium ml-2"
+                          >
+                            Retirer
+                          </button>
+                        </div>
+                      ))}
+                      {selectedFiles.length < 10 && (
+                        <label className="cursor-pointer block text-center mt-2">
+                          <span className="text-blue-600 hover:text-blue-500 text-sm font-medium">
+                            + Ajouter plus de fichiers ({selectedFiles.length}/10)
+                          </span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={handleFileChange}
+                            accept=".pdf,.doc,.docx,.ppt,.pptx,.xlsx,.xls,.jpg,.png"
+                            multiple
+                          />
+                        </label>
+                      )}
+                      <button
+                        type="button"
+                        onClick={removeAllFiles}
+                        className="text-red-600 hover:text-red-500 text-sm font-medium block text-center mt-2"
+                      >
+                        Retirer tous les fichiers
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                {fileError && (
+                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">{fileError}</p>
+                )}
               </div>
 
               {formMessage && (

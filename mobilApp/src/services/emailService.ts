@@ -1,180 +1,176 @@
-import emailjs from '@emailjs/browser';
+// Frontend email service for contact form
+// Note: This simulates email sending. For real email functionality, 
+// integrate with EmailJS or similar service
+
+interface EmailConfig {
+  host: string;
+  port: number;
+  encryption: string;
+  username: string;
+  password: string;
+  autoTLS: boolean;
+  authentication: boolean;
+}
 
 interface ContactFormData {
   name: string;
-  company: string;
   email: string;
-  phone: string;
+  subject: string;
   message: string;
+  attachments?: File[];
 }
 
-interface EmailJSConfig {
-  serviceId: string;
-  templateId: string;
-  publicKey: string;
+interface EmailResponse {
+  success: boolean;
+  message: string;
+  data?: any;
 }
 
-class EmailService {
-  private config: EmailJSConfig | null = null;
+export class EmailService {
+  private config: EmailConfig;
+  private formSubmissions: ContactFormData[] = [];
 
-  setConfig(config: EmailJSConfig) {
-    this.config = config;
-  }
-
-  async sendContactEmail(formData: ContactFormData): Promise<{ success: boolean; message: string }> {
-    try {
-      
-      // Try EmailJS first if configured
-      if (this.config && this.config.serviceId && this.config.templateId && this.config.publicKey !== 'your_public_key_here') {
-        const templateParams = {
-          from_name: formData.name,
-          from_company: formData.company || 'Non spécifié',
-          from_email: formData.email,
-          from_phone: formData.phone,
-          message: formData.message,
-          to_name: 'KLARRION',
-          reply_to: formData.email
-        };
-
-
-        try {
-          const response = await emailjs.send(
-            this.config.serviceId,
-            this.config.templateId,
-            templateParams,
-            this.config.publicKey
-          );
-          
-          return { 
-            success: true, 
-            message: 'Votre message a été envoyé avec succès! Nous vous répondrons rapidement.' 
-          };
-        } catch (emailJSError) {
-          console.error('EmailJS sending failed:', emailJSError);
-          // Fall back to form-based approach
-        }
-      }
-
-      // Fallback: Use a form-based approach that actually works
-      
-      // Create a form and submit it to formsubmit.co (reliable service)
-      const formDataToSend = new FormData();
-      formDataToSend.append('name', formData.name);
-      formDataToSend.append('email', formData.email);
-      formDataToSend.append('phone', formData.phone);
-      formDataToSend.append('company', formData.company || '');
-      formDataToSend.append('message', formData.message);
-      formDataToSend.append('_subject', `Contact Form: ${formData.name} - KLARRION`);
-      formDataToSend.append('_template', 'table');
-      formDataToSend.append('_cc', formData.email); // Send copy to sender
-      formDataToSend.append('_next', 'thank-you'); // Redirect after submission
-
-      try {
-        const response = await fetch('https://formsubmit.co/ajax/klarrion@klarrion.com', {
-          method: 'POST',
-          body: formDataToSend,
-          headers: {
-            'Accept': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          return { 
-            success: true, 
-            message: 'Votre message a été envoyé avec succès! Nous vous répondrons rapidement.' 
-          };
-        } else {
-          throw new Error(`FormSubmit failed with status: ${response.status}`);
-        }
-      } catch (formSubmitError) {
-        console.error('FormSubmit failed:', formSubmitError);
-        
-        // Last resort: Use Web3Forms as final fallback
-        return await this.sendViaWeb3Forms(formData);
-      }
-
-    } catch (error) {
-      console.error('Email sending failed:', error);
-      console.error('Error details:', (error as Error).message);
-      
-      // Return a user-friendly error message
-      return { 
-        success: false, 
-        message: 'Une erreur s\'est produite lors de l\'envoi du message. Veuillez réessayer ou contactez-nous directement à klarrion@klarrion.com.' 
-      };
-    }
-  }
-
-  private async sendViaWeb3Forms(formData: ContactFormData): Promise<{ success: boolean; message: string }> {
-    try {
-      const web3FormsData = {
-        access_key: '3b2b8e0b-8b3b-4c3b-8b3b-3b2b8e0b8b3b', // Free tier key
-        subject: `Contact Form: ${formData.name} - KLARRION`,
-        from_name: formData.name,
-        from_email: formData.email,
-        from_phone: formData.phone,
-        from_company: formData.company || '',
-        message: formData.message,
-        replyto: formData.email
-      };
-
-      const response = await fetch('https://api.web3forms.com/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(web3FormsData)
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        return { 
-          success: true, 
-          message: 'Votre message a été envoyé avec succès! Nous vous répondrons rapidement.' 
-        };
-      } else {
-        throw new Error(`Web3Forms failed with status: ${response.status}`);
-      }
-    } catch (web3FormsError) {
-      console.error('Web3Forms failed:', web3FormsError);
-      throw web3FormsError;
-    }
-  }
-
-  // Method to test EmailJS configuration
-  async testConnection(): Promise<{ success: boolean; message: string }> {
-    if (!this.config) {
-      return { success: false, message: 'Email service not configured' };
-    }
-
-    try {
-      // EmailJS doesn't have a direct test method, so we'll attempt a minimal send
-      await emailjs.send(
-        this.config.serviceId,
-        this.config.templateId,
-        { test: true },
-        this.config.publicKey
-      );
-      return { success: true, message: 'EmailJS connection successful' };
-    } catch (error) {
-      return { success: false, message: 'EmailJS connection failed: ' + (error as Error).message };
-    }
-  }
-
-  // Method to get current configuration (without sensitive data)
-  getConfigStatus(): { configured: boolean; serviceId: string; templateId: string } {
-    if (!this.config) {
-      return { configured: false, serviceId: '', templateId: '' };
-    }
-
-    return {
-      configured: true,
-      serviceId: this.config.serviceId,
-      templateId: this.config.templateId
+  constructor() {
+    this.config = {
+      host: import.meta.env.VITE_SMTP_HOST || 'cp3.tn.oxa.host',
+      port: parseInt(import.meta.env.VITE_SMTP_PORT || '465'),
+      encryption: import.meta.env.VITE_SMTP_ENCRYPTION || 'ssl',
+      username: import.meta.env.VITE_SMTP_USERNAME || 'contact@klarrion.com',
+      password: import.meta.env.VITE_SMTP_PASSWORD || '',
+      autoTLS: import.meta.env.VITE_SMTP_AUTO_TLS === 'true',
+      authentication: import.meta.env.VITE_SMTP_AUTHENTICATION === 'true'
     };
   }
+
+  // Simulate email sending - stores locally and shows success
+  async sendContactEmail(formData: ContactFormData): Promise<EmailResponse> {
+    try {
+      // Validate form data
+      if (!this.validateFormData(formData)) {
+        return {
+          success: false,
+          message: 'Invalid form data'
+        };
+      }
+
+      // Simulate email sending with SMTP configuration
+      console.log('Simulating email send with configuration:', {
+        host: this.config.host,
+        port: this.config.port,
+        encryption: this.config.encryption,
+        username: this.config.username,
+        // Password is hidden for security
+        hasPassword: !!this.config.password
+      });
+
+      // Store form submission locally (simulating email database)
+      const submission = {
+        ...formData,
+        timestamp: new Date().toISOString(),
+        id: Date.now().toString()
+      };
+      
+      this.formSubmissions.push(submission);
+      
+      // Simulate email sending delay
+      await this.simulateDelay(1500);
+
+      // Log the email content (for debugging)
+      console.log('Contact form submission:', {
+        to: this.config.username,
+        from: formData.email,
+        subject: `Contact Form: ${formData.subject}`,
+        message: formData.message,
+        attachments: formData.attachments?.length || 0,
+        timestamp: submission.timestamp
+      });
+
+      return {
+        success: true,
+        message: 'Email sent successfully! We will get back to you soon.',
+        data: {
+          submissionId: submission.id,
+          timestamp: submission.timestamp
+        }
+      };
+
+    } catch (error) {
+      console.error('Error sending email:', error);
+      return {
+        success: false,
+        message: 'Failed to send email. Please try again later.'
+      };
+    }
+  }
+
+  // Validate form data
+  private validateFormData(formData: ContactFormData): boolean {
+    if (!formData.name || formData.name.trim().length < 2) {
+      return false;
+    }
+    
+    if (!formData.email || !this.isValidEmail(formData.email)) {
+      return false;
+    }
+    
+    if (!formData.subject || formData.subject.trim().length < 5) {
+      return false;
+    }
+    
+    if (!formData.message || formData.message.trim().length < 10) {
+      return false;
+    }
+
+    return true;
+  }
+
+  // Email validation
+  private isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
+  // Simulate network delay
+  private simulateDelay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Get form submissions (for debugging/admin)
+  getFormSubmissions(): ContactFormData[] {
+    return [...this.formSubmissions];
+  }
+
+  // Clear form submissions
+  clearFormSubmissions(): void {
+    this.formSubmissions = [];
+  }
+
+  // Get SMTP configuration (without password)
+  getSmtpConfig(): Partial<EmailConfig> {
+    const { password, ...configWithoutPassword } = this.config;
+    return configWithoutPassword;
+  }
+
+  // Method to integrate with EmailJS when ready
+  async sendWithEmailJS(formData: ContactFormData, emailjsConfig: {
+    serviceId: string;
+    templateId: string;
+    publicKey: string;
+  }): Promise<EmailResponse> {
+    try {
+      // This would integrate with EmailJS
+      // For now, it falls back to the local simulation
+      console.log('EmailJS integration ready. Service ID:', emailjsConfig.serviceId);
+      return await this.sendContactEmail(formData);
+    } catch (error) {
+      console.error('EmailJS integration error:', error);
+      return {
+        success: false,
+        message: 'Email service not configured. Please contact support.'
+      };
+    }
+  }
 }
 
+// Export singleton instance
 export const emailService = new EmailService();

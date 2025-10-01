@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import paymentLogo from '../../services/payment-logo.png';
 import { KonnectPaymentModal, useKonnectPayment } from '../../hooks/useKonnectPayment';
 import { logPurchase } from '../../utils/analytics';
+import { useScrollToTop } from '../../hooks/useScrollToTop';
 
 interface OrderProduct {
   id: string;
@@ -67,6 +68,10 @@ interface ThankYouPageProps {
   onBackToHome: () => void;
   onContinueShopping: () => void;
 }
+
+  // Scroll to top when page loads
+  useScrollToTop();
+
 
 export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }: ThankYouPageProps) {
   const [isLoading, setIsLoading] = useState(true);

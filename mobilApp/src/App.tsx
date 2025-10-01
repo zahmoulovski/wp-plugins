@@ -22,6 +22,8 @@ import { api } from './services/api';
 import PaymentCallback from './components/pages/PaymentCallback';
 import { initGA, logPageView } from './utils/analytics';
 
+// Removed Capacitor - web only application
+
 function AppContent() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
@@ -131,6 +133,8 @@ function AppContent() {
 
     loadInitialData();
   }, []);
+
+  // Removed Capacitor back button handling - web only application
 
   const handleSplashComplete = () => {
     setShowSplash(false);

@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import { ProductCard } from '../common/ProductCard';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
+import { products as productNames } from '../../contexts/products.js';
 
 interface SearchPageProps {
   onProductClick: (product: Product) => void;
@@ -25,22 +26,9 @@ export function SearchPage({ onProductClick }: SearchPageProps) {
   // Scroll to top when page loads
   useScrollToTop();
 
-  // Load product names from the text file
+  // Load product names from the JavaScript array
   useEffect(() => {
-    const loadProductNames = async () => {
-      try {
-        const response = await fetch('/src/contexts/product.txt');
-        const text = await response.text();
-        const names = text.split('\n')
-          .map(line => line.trim())
-          .filter(line => line.length > 0);
-        setAllProductNames(names);
-      } catch (error) {
-        console.error('Error loading product names:', error);
-      }
-    };
-    
-    loadProductNames();
+    setAllProductNames(productNames);
   }, []);
 
   // Generate suggestions based on query
