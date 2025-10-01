@@ -1,13 +1,15 @@
 // Frontend email service for contact form
-// Now integrated with Formspree
+// Enhanced with better attachment handling
 
 import emailjs from '@emailjs/browser';
+import { fileStorageService } from './fileStorage';
+import { ftpStorageService } from './ftpStorage';
 
 interface ContactFormData {
   name: string;
-  company?: string; // Added for 'Entreprise / Organisation'
+  company?: string;
   email: string;
-  phone?: string; // Added for 'Téléphone'
+  phone?: string;
   subject: string;
   message: string;
   attachments?: File[];
@@ -33,7 +35,83 @@ export class EmailService {
     });
   }
 
-  // Send email via EmailJS
+  // Enhanced file processing with FTP storage for better persistence
+  private async processAttachments(files: File[]): Promise<{
+    smallAttachments: Array<{name: string, data: string, type: string}>;
+    largeFiles: Array<{name: string, downloadUrl: string, size: number, type: string}>;
+    totalSize: number;
+  }> {
+    const smallAttachments: Array<{name: string, data: string, type: string}> = [];
+    const largeFiles: Array<{name: string, downloadUrl: string, size: number, type: string}> = [];
+    let totalSize = 0;
+
+    // Check if FTP storage is properly configured and connected
+    const ftpConfig = ftpStorageService.getConfigStatus();
+    const isFtpConnected = ftpStorageService.isFtpConnected();
+    const useFTP = ftpConfig.configured && isFtpConnected;
+
+    console.log(`FTP Configuration Check:`);
+    console.log(`- Configured: ${ftpConfig.configured}`);
+    console.log(`- Connected: ${isFtpConnected}`);
+    console.log(`- Use FTP: ${useFTP}`);
+
+    if (useFTP) {
+      console.log('Using FTP storage for file attachments');
+    } else {
+      console.log('FTP not configured or not connected, using temporary browser storage');
+    }
+
+    for (const file of files) {
+      totalSize += file.size;
+      
+      // Files under 10MB can be attached directly (EmailJS limit)
+      if (file.size < 10 * 1024 * 1024) {
+        try {
+          const base64 = await this.toBase64(file);
+          smallAttachments.push({
+            name: file.name,
+            data: base64.split(',')[1], // Extract base64 content
+            type: file.type
+          });
+        } catch (error) {
+          console.warn(`Failed to process small file ${file.name}:`, error);
+          // Store file in cloud storage (FTP if available, otherwise browser storage)
+          try {
+            const downloadUrl = useFTP 
+              ? await ftpStorageService.storeFile(file)
+              : await fileStorageService.storeFile(file);
+            largeFiles.push({
+              name: file.name,
+              downloadUrl,
+              size: file.size,
+              type: file.type
+            });
+          } catch (storageError) {
+            console.warn(`Failed to store file ${file.name} in cloud storage:`, storageError);
+          }
+        }
+      } else {
+        // Store large file in cloud storage (FTP if available, otherwise browser storage)
+        try {
+          const downloadUrl = useFTP 
+            ? await ftpStorageService.storeFile(file)
+            : await fileStorageService.storeFile(file);
+          largeFiles.push({
+            name: file.name,
+            downloadUrl,
+            size: file.size,
+            type: file.type
+          });
+        } catch (storageError) {
+          console.warn(`Failed to store file ${file.name} in cloud storage:`, storageError);
+        }
+      }
+    }
+
+    return { smallAttachments, largeFiles, totalSize };
+  }
+
+  // Send email via EmailJS with enhanced attachment handling
   async sendContactEmail(formData: ContactFormData): Promise<EmailResponse> {
     try {
       // Validate form data
@@ -53,34 +131,52 @@ export class EmailService {
         throw new Error('EmailJS service ID, template ID, public key, or recipient email not configured');
       }
 
-      const attachmentPromises = (formData.attachments || []).map(async (file) => {
-        const base64 = await this.toBase64(file);
-        return {
-          name: file.name,
-          data: base64.split(',')[1], // Extract base64 content
-          type: file.type,
-          size: file.size
-        };
-      });
+      // Process attachments
+      const { smallAttachments, largeFiles, totalSize } = await this.processAttachments(formData.attachments || []);
 
-      const processedAttachments = await Promise.all(attachmentPromises);
-
-      const totalAttachmentsSize = processedAttachments.reduce((sum, attachment) => sum + attachment.size, 0);
-      if (totalAttachmentsSize > 40 * 1024) { // 40KB limit for attachments
+      // Check total size (EmailJS has overall limits)
+      if (totalSize > 5 * 1024 * 1024) { // 5MB total limit
         return {
           success: false,
-          message: 'Total attachment size exceeds the 40KB limit. Please send smaller files or use a file sharing service.'
+          message: 'Total file size exceeds 5MB limit. Please use fewer or smaller files, or contact us directly.'
         };
       }
 
-      const emailjsAttachments = processedAttachments.map(att => ({
+      // Create attachment list for email
+      let attachmentList = '';
+      let attachmentInfo = '';
+
+      if (smallAttachments.length > 0) {
+        attachmentList += '<h4>📎 Pièces jointes (attachées):</h4><ul>';
+        smallAttachments.forEach(att => {
+          attachmentList += `<li>${att.name} (${this.formatFileSize(this.getBase64Size(att.data))})</li>`;
+        });
+        attachmentList += '</ul>';
+      }
+
+      if (largeFiles.length > 0) {
+        attachmentList += '<h4>📁 Fichiers volumineux (téléchargeables):</h4><ul>';
+        largeFiles.forEach(file => {
+          attachmentList += `<li><strong>${file.name}</strong> (${this.formatFileSize(file.size)}) - <a href="${file.downloadUrl}" target="_blank" style="color: #0066cc;">📥 Télécharger</a></li>`;
+        });
+        attachmentList += '</ul>';
+        
+        // Determine storage duration based on storage type
+        const storageDuration = ftpStorageService.getConfigStatus().configured ? '7 jours' : '24 heures';
+        
+        attachmentInfo = `
+          <div style="background-color: #e8f4fd; border: 1px solid #b8daff; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <strong>ℹ️ Note:</strong> Les fichiers volumineux (${largeFiles.length}) sont disponibles via téléchargement sécurisé.
+            Les liens sont valides pendant ${storageDuration}.
+          </div>
+        `;
+      }
+
+      // Prepare EmailJS attachments (only small files)
+      const emailjsAttachments = smallAttachments.map(att => ({
         name: att.name,
         data: att.data,
       }));
-
-      const attachmentList = processedAttachments.length > 0
-        ? processedAttachments.map(att => `<li>${att.name} (${(att.size / 1024).toFixed(2)} KB)</li>`).join('')
-        : 'Aucune pièce jointe';
 
       const templateParams: Record<string, any> = {
         from_name: formData.name,
@@ -91,33 +187,56 @@ export class EmailService {
         message: formData.message,
         company: formData.company || 'N/A',
         phone: formData.phone || 'N/A',
-        attachment_list: `<ul>${attachmentList}</ul>`,
+        attachment_list: attachmentList,
+        attachment_info: attachmentInfo,
       };
 
-      console.log('EmailJS Attachments:', emailjsAttachments);
+      console.log(`Envoi d'un e-mail avec ${smallAttachments.length} fichiers attachés et ${largeFiles.length} fichiers volumineux`);
 
-      await emailjs.send(serviceId, templateId, templateParams, {
+      // Send email with attachments
+      const emailConfig: any = {
         publicKey: publicKey,
-        attachments: emailjsAttachments,
-      });
+      };
+
+      // Add attachments if any
+      if (emailjsAttachments.length > 0) {
+        emailConfig.attachments = emailjsAttachments;
+      }
+
+      await emailjs.send(serviceId, templateId, templateParams, emailConfig);
 
       return {
         success: true,
-        message: 'Email sent successfully! We will get back to you soon.',
+        message: 'L\'e-mail a été envoyé avec succès ! Nous vous répondrons dans les plus brefs délais.',
       };
 
     } catch (error) {
       console.error('Error sending email:', error);
       return {
         success: false,
-        message: 'Failed to send email. Please try again later.'
+        message: 'L\'e-mail n\'a pas pu être envoyé. Veuillez réessayer.'
       };
     }
   }
 
+  // Helper method to format file size
+  private formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  // Helper method to get base64 size
+  private getBase64Size(base64String: string): number {
+    // Base64 string length * 0.75 gives approximate byte size
+    return Math.floor(base64String.length * 0.75);
+  }
+
   // Validate form data
   private validateFormData(formData: ContactFormData): boolean {
-    if (!formData.name || formData.name.trim().length < 2) {
+    if (!formData.name || formData.name.trim().length < 1) {
       return false;
     }
     
@@ -125,21 +244,13 @@ export class EmailService {
       return false;
     }
     
-    if (!formData.subject || formData.subject.trim().length < 5) {
+    if (!formData.subject || formData.subject.trim().length < 1) {
       return false;
     }
     
-    if (!formData.message || formData.message.trim().length < 10) {
+    if (!formData.message || formData.message.trim().length < 1) {
       return false;
     }
-
-    // Optional: Add validation for company and phone if they become mandatory
-    // if (formData.company && formData.company.trim().length < 2) {
-    //   return false;
-    // }
-    // if (formData.phone && formData.phone.trim().length < 7) { // Basic phone length check
-    //   return false;
-    // }
 
     return true;
   }

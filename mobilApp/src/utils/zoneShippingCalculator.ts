@@ -221,36 +221,7 @@ function calculateTotalCostForMethod(
   return totalCost;
 }
 
-export function getBestShippingMethod(
-  cartItems: CartItem[],
-  destination: Record<string, any>
-): { method: string; cost: number } | null {
-  
-  const availableMethods = getAvailableShippingMethods(cartItems);
-  
-  
-  if (availableMethods.length === 0) {
-    
-    return null;
-  }
-  
-  const methodCosts = availableMethods.map(methodName => {
-    const totalCost = calculateTotalCostForMethod(cartItems, methodName);
-    return {
-      method: methodName,
-      cost: totalCost
-    };
-  });
-  
-  // Sort by cost (ascending)
-  methodCosts.sort((a, b) => a.cost - b.cost);
-  
-  
-  return {
-    method: methodCosts[0].method,
-    cost: methodCosts[0].cost
-  };
-}
+
 
 export async function calculateDynamicShippingCosts(
   cartItems: CartItem[]

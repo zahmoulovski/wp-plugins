@@ -21,6 +21,7 @@ import { Product, BlogPost } from './types';
 import { api } from './services/api';
 import PaymentCallback from './components/pages/PaymentCallback';
 import { initGA, logPageView } from './utils/analytics';
+import { DownloadHandler } from './contexts/DownloadHandler';
 
 // Removed Capacitor - web only application
 
@@ -115,10 +116,7 @@ function AppContent() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        // Simulate API calls that would normally happen
-        // This gives the splash screen time to show while data loads
-        
-        // Load initial products data (minimum 4 seconds for splash screen visibility)
+
         const [products, timeout] = await Promise.all([
           api.getProducts({ per_page: 20 }),
           new Promise(resolve => setTimeout(resolve, 4000)) // Minimum 4 seconds
@@ -202,7 +200,10 @@ function AppContent() {
                 <BlogPage onPostClick={handleBlogPostClick} />
               </PageWrapper>
             } />
-            <Route path="/payment-success" element={<PaymentCallback success={true} />} />\n            <Route path="/payment-failed" element={<PaymentCallback success={false} />} />\n            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/payment-success" element={<PaymentCallback success={true} />} />
+            <Route path="/payment-failed" element={<PaymentCallback success={false} />} />
+            <Route path="/download/:fileId" element={<DownloadHandler />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
         {!isCheckoutPage && <BottomNav />}

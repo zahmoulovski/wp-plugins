@@ -7,11 +7,10 @@ export default defineConfig({
     host: true,  // 👈 allows network access
     port: 2403,
     proxy: {
-      '/flouci': {
-        target: 'https://developers.flouci.com/api/v2',
+      '/send-email': {
+        target: 'http://localhost:3001',
         changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/flouci/, '')
+        secure: false
       }
     }
   },

@@ -10,15 +10,6 @@ export const logPageView = () => {
   ReactGA.send({ hitType: 'pageview', page: window.location.pathname });
 };
 
-export const logEvent = (category: string, action: string, label?: string, value?: number) => {
-  ReactGA.event({
-    category,
-    action,
-    label,
-    value
-  });
-};
-
 export const logPurchase = (orderId: string, value: number, currency: string = 'TND') => {
   ReactGA.event('purchase', {
     transaction_id: orderId,
@@ -29,17 +20,6 @@ export const logPurchase = (orderId: string, value: number, currency: string = '
 
 export const logAddToCart = (productId: string, productName: string, price: number, quantity: number = 1) => {
   ReactGA.event('add_to_cart', {
-    items: [{
-      item_id: productId,
-      item_name: productName,
-      price: price,
-      quantity: quantity
-    }]
-  });
-};
-
-export const logRemoveFromCart = (productId: string, productName: string, price: number, quantity: number = 1) => {
-  ReactGA.event('remove_from_cart', {
     items: [{
       item_id: productId,
       item_name: productName,
