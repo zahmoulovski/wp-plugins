@@ -96,9 +96,13 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
       const randomFeatured = shuffleArray(featured).slice(0, 20);
       const randomNonFeatured = shuffleArray(nonFeatured).slice(0, 6);
 
+      // Filter out out-of-stock products for homepage
+      const filteredFeatured = api.filterAndSortProductsByStock(randomFeatured, { hideOutOfStock: true });
+      const filteredNonFeatured = api.filterAndSortProductsByStock(randomNonFeatured, { hideOutOfStock: true });
+
       setProducts({
-        featured: randomFeatured,
-        nonFeatured: randomNonFeatured,
+        featured: filteredFeatured,
+        nonFeatured: filteredNonFeatured,
       });
     } catch (err) {
       console.error('Error loading products:', err);
@@ -159,7 +163,14 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
         // 🔀 Shuffle and select random subset for display (8 products)
         results[cat.title] = shuffleArray(cachedProducts).slice(0, 8);
       }
-      setCategoryProducts(results);
+      
+      // Filter out out-of-stock products for category sections on homepage
+      const filteredResults: Record<string, Product[]> = {};
+      for (const [categoryTitle, categoryProducts] of Object.entries(results)) {
+        filteredResults[categoryTitle] = api.filterAndSortProductsByStock(categoryProducts, { hideOutOfStock: true });
+      }
+      
+      setCategoryProducts(filteredResults);
     } catch (err) {
       console.error('Error loading category products:', err);
       // Don't set error for category products - show empty state instead

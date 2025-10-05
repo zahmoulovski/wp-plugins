@@ -11,6 +11,12 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
         secure: false
+      },
+      '/wp-json': {
+        target: 'https://klarrion.com',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path
       }
     }
   },

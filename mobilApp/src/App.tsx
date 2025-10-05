@@ -21,7 +21,7 @@ import { Product, BlogPost } from './types';
 import { api } from './services/api';
 import PaymentCallback from './components/pages/PaymentCallback';
 import { initGA, logPageView } from './utils/analytics';
-import { DownloadHandler } from './contexts/DownloadHandler';
+
 
 // Removed Capacitor - web only application
 
@@ -202,7 +202,7 @@ function AppContent() {
             } />
             <Route path="/payment-success" element={<PaymentCallback success={true} />} />
             <Route path="/payment-failed" element={<PaymentCallback success={false} />} />
-            <Route path="/download/:fileId" element={<DownloadHandler />} />
+  
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

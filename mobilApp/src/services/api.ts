@@ -2,8 +2,10 @@ import { Product, Category, Customer, Order, BlogPost } from '../types'
 import { cacheService } from './cache';
 import { initKonnectPayment, verifyKonnectPayment } from './konnectGateway';
 
-const BASE_URL = 'https://klarrion.com/wp-json/wc/v3';
-const STORE_API_URL = 'https://klarrion.com/wp-json/wc/store';
+// Use relative paths for development (proxy) and full URLs for production
+const isDevelopment = import.meta.env.DEV;
+const BASE_URL = isDevelopment ? '/wp-json/wc/v3' : `${import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com'}/wp-json/wc/v3`;
+const STORE_API_URL = isDevelopment ? '/wp-json/wc/store' : `${import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com'}/wp-json/wc/store`;
 const auth = btoa(`${import.meta.env.VITE_WOOCOMMERCE_CONSUMER_KEY}:${import.meta.env.VITE_WOOCOMMERCE_CONSUMER_SECRET}`);
 
 // Define a constant for the global shipping zone ID
@@ -167,19 +169,88 @@ export const api = {
     return [];
   },
 
-  async authenticateUser(usernameOrEmail: string, password: string): Promise<Customer> {
+  async authenticateUser(email: string, password: string): Promise<Customer> {
     try {
-      // Search for customer by email or username
-      const customers = await this.searchCustomers(usernameOrEmail);
-      
-      if (customers.length === 0) {
-        throw new Error('User not found');
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new Error('Invalid email format');
       }
-      
-      const customer = customers[0];
-      
-      return customer;
-      
+
+      // Try to use the custom WordPress authentication endpoint first
+      try {
+        console.log('Attempting authentication with email:', email);
+        const wpBaseUrl = isDevelopment ? '' : (import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com');
+        const response = await fetch(`${wpBaseUrl}/wp-json/mobile-app/v1/authenticate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: email,
+            password: password
+          })
+        });
+
+        console.log('Authentication response status:', response.status);
+        const data = await response.json();
+        console.log('Authentication response data:', data);
+
+        if (!response.ok || !data.success) {
+          if (response.status === 401) {
+            throw new Error('Invalid password');
+          } else if (response.status === 404) {
+            throw new Error('User not found');
+          } else {
+            throw new Error(data.message || 'Authentication failed');
+          }
+        }
+
+        // Ensure avatar_url is included in the customer data
+        if (data.customer && !data.customer.avatar_url) {
+          console.log('No avatar_url in authentication response, trying to fetch from WordPress API');
+          try {
+            const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
+            const avatarResponse = await fetch(`${wpBaseUrl}/wp-json/wp/v2/users/${data.customer.id}?_fields=avatar_urls`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
+            
+            if (avatarResponse.ok) {
+              const avatarData = await avatarResponse.json();
+              console.log('Avatar data from WordPress API:', avatarData);
+              if (avatarData.avatar_urls && avatarData.avatar_urls['96']) {
+                data.customer.avatar_url = avatarData.avatar_urls['96'];
+              }
+            }
+          } catch (avatarError) {
+            console.log('Failed to fetch avatar from WordPress API:', avatarError);
+          }
+        }
+
+        // Convert the WordPress customer data to WooCommerce format
+        const customer: Customer = {
+          id: data.customer.id,
+          email: data.customer.email,
+          first_name: data.customer.first_name,
+          last_name: data.customer.last_name,
+          username: data.customer.username,
+          billing: data.customer.billing,
+          shipping: data.customer.shipping,
+          is_paying_customer: data.customer.is_paying_customer,
+          avatar_url: data.customer.avatar_url || '',
+          date_created: '', // Will be populated by WooCommerce if needed
+          date_modified: '', // Will be populated by WooCommerce if needed
+        };
+
+        return customer;
+      } catch (endpointError) {
+        // If the WordPress endpoint is not available, provide a helpful error message
+        console.error('WordPress authentication endpoint not available:', endpointError);
+        throw new Error('Authentication service unavailable. Please contact support to enable secure login.');
+      }
     } catch (error) {
       console.error('Authentication error:', error);
       throw error;
@@ -236,7 +307,61 @@ export const api = {
   },
 
   async getCustomer(id: number): Promise<Customer> {
-    return apiRequest(`/customers/${id}`);
+    try {
+      // Try our custom endpoint first that includes avatar data
+      const wpBaseUrl = isDevelopment ? '' : (import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com');
+      const response = await fetch(`${wpBaseUrl}/wp-json/mobile-app/v1/customer/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.customer) {
+        return data.customer;
+      } else {
+        // Fallback to standard WooCommerce API if custom endpoint fails
+        console.log('Custom endpoint failed, falling back to WooCommerce API');
+      }
+    } catch (error) {
+      console.log('Custom endpoint error, falling back to WooCommerce API:', error);
+    }
+
+    // Fallback to standard WooCommerce API and try to enhance with avatar data
+    try {
+      const customer = await apiRequest(`/customers/${id}`);
+      
+      // Try to get avatar from WordPress API
+      try {
+        const avatarResponse = await fetch(`${BASE_URL}/wp-json/wp/v2/users/${id}?_fields=avatar_urls`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (avatarResponse.ok) {
+          const avatarData = await avatarResponse.json();
+          console.log('Avatar data from WordPress API for customer', id, ':', avatarData);
+          if (avatarData.avatar_urls && avatarData.avatar_urls['96']) {
+            customer.avatar_url = avatarData.avatar_urls['96'];
+          }
+        }
+      } catch (avatarError) {
+        console.log('Failed to fetch avatar from WordPress API:', avatarError);
+      }
+      
+      return customer;
+    } catch (error) {
+      console.error('Failed to fetch customer:', error);
+      throw error;
+    }
   },
 
   async createCustomer(customerData: Partial<Customer>): Promise<Customer> {
@@ -277,10 +402,72 @@ export const api = {
     throw new Error('Profile picture upload is not supported. Please use the website to update your profile picture.');
   },
 
-  async updateCustomerPassword(customerId: number, currentPassword: string, newPassword: string): Promise<boolean> {
-    // Password updates are now handled through the website redirect
-    // This function is kept for compatibility but returns success
-    return true;
+  async updatePassword(passwordData: { current_password: string; new_password: string; user_email?: string }): Promise<void> {
+    try {
+      // Get user email from localStorage if not provided
+      let userEmail = passwordData.user_email;
+      if (!userEmail) {
+        const userData = localStorage.getItem('user');
+        if (userData) {
+          const parsed = JSON.parse(userData);
+          userEmail = parsed?.customer?.email || parsed?.email;
+        }
+      }
+      
+      if (!userEmail) {
+        throw new Error('User email is required for password update');
+      }
+      
+      // Validate password strength
+      if (passwordData.new_password.length < 8) {
+        throw new Error('New password must be at least 8 characters long');
+      }
+      
+      // Check for password complexity
+      if (!/[A-Za-z]/.test(passwordData.new_password) || !/[0-9]/.test(passwordData.new_password)) {
+        throw new Error('New password must contain both letters and numbers');
+      }
+      
+      // Use the custom WordPress password update endpoint
+      const wpBaseUrl = isDevelopment ? '' : (import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com');
+      const response = await fetch(`${wpBaseUrl}/wp-json/mobile-app/v1/update-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          current_password: passwordData.current_password,
+          new_password: passwordData.new_password,
+          user_email: userEmail
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Password update failed');
+      }
+
+      if (!data.success) {
+        throw new Error(data.message || data.error || 'Password update failed');
+      }
+
+      console.log('Password updated successfully');
+      
+    } catch (error: any) {
+      console.error('Password update error:', error);
+      
+      // Provide more detailed error messages
+      if (error.message.includes('Failed to fetch')) {
+        throw new Error('Network error: Unable to connect to the server. Please check your internet connection.');
+      } else if (error.message.includes('404')) {
+        throw new Error('The password update endpoint is not available. Please contact support.');
+      } else if (error.message.includes('403')) {
+        throw new Error('Access denied. Please verify your current password.');
+      } else {
+        throw new Error(`Password update failed: ${error.message}`);
+      }
+    }
   },
 
   async createOrder(orderData: any): Promise<Order> {
@@ -455,6 +642,21 @@ export const api = {
     });
   },
 
+  // Test endpoint to verify WordPress plugin is working
+  async testWordPressEndpoint(): Promise<boolean> {
+    try {
+      const wpBaseUrl = isDevelopment ? '' : (import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com');
+      const response = await fetch(`${wpBaseUrl}/wp-json/mobile-app/v1/test`);
+      const data = await response.json();
+      
+      console.log('WordPress endpoint test result:', data);
+      return data.success === true;
+    } catch (error) {
+      console.error('WordPress endpoint test failed:', error);
+      return false;
+    }
+  },
+
   // ---------- Konnect ----------
   initKonnectPayment,
   verifyKonnectPayment,
@@ -481,7 +683,8 @@ export const api = {
       const queryParams = new URLSearchParams(defaultParams as Record<string, string>).toString();
       
       // Use WordPress REST API instead of WooCommerce API for blog posts
-      const wpApiUrl = `https://klarrion.com/wp-json/wp/v2/posts?${queryParams}&_embed`;
+      const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
+      const wpApiUrl = `${wpBaseUrl}/wp-json/wp/v2/posts?${queryParams}&_embed`;
       
       // Try to fetch posts with better error handling
       let posts;
@@ -532,5 +735,35 @@ export const api = {
     // Cache the result
     cacheService.setProduct(post as any);
     return post;
+  },
+
+  // Helper function to filter and sort products by stock status
+  filterAndSortProductsByStock(products: Product[], options: {
+    hideOutOfStock?: boolean;
+    sortByStock?: boolean;
+  } = {}): Product[] {
+    let filteredProducts = [...products];
+
+    // Hide out of stock products if requested
+    if (options.hideOutOfStock) {
+      filteredProducts = filteredProducts.filter(product => product.stock_status !== 'outofstock');
+    }
+
+    // Sort by stock status if requested (instock/backorder first, then outofstock)
+    if (options.sortByStock) {
+      filteredProducts.sort((a, b) => {
+        // Priority: instock and onbackorder come first, then outofstock
+        const aInStock = a.stock_status === 'instock' || a.stock_status === 'onbackorder';
+        const bInStock = b.stock_status === 'instock' || b.stock_status === 'onbackorder';
+        
+        if (aInStock && !bInStock) return -1; // a comes first
+        if (!aInStock && bInStock) return 1;  // b comes first
+        
+        // If both are in the same stock category, sort alphabetically by name
+        return a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' });
+      });
+    }
+
+    return filteredProducts;
   },
 };

@@ -87,11 +87,14 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
         page === 1 ? api.getCategories().then(cats => cats.filter(cat => cat.parent === categoryId)) : Promise.resolve([])
       ]);
       
+      // Sort products: in-stock and backorder first (alphabetically), then out-of-stock
+      const sortedProducts = api.filterAndSortProductsByStock(products, { sortByStock: true });
+      
       if (page === 1) {
-        setCategoryProducts(products);
+        setCategoryProducts(sortedProducts);
         setSubcategories(subcats);
       } else {
-        setCategoryProducts(prev => [...prev, ...products]);
+        setCategoryProducts(prev => [...prev, ...sortedProducts]);
       }
       
       setHasMoreProducts(products.length === 10);

@@ -6,6 +6,8 @@ import { Order } from '../../types';
 import { Toaster, toast } from 'react-hot-toast';
 import paymentLogo from '../../services/payment-logo.png';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
+import logoKLARRION from '../../services/klarrionLogo.png';
+
 
 export function ProfilePage() {
   const { state, dispatch } = useApp();
@@ -48,7 +50,7 @@ export function ProfilePage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [loginData, setLoginData] = useState({
-    emailOrUsername: '',
+    email: '',
     password: '',
   });
   const [signUpData, setSignUpData] = useState({
@@ -60,6 +62,12 @@ export function ProfilePage() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
 
   // Scroll to top when page loads or when switching between views
   useScrollToTop([showLoginForm, showSignUpForm, showOrderDetails], 'smooth');
@@ -98,7 +106,7 @@ export function ProfilePage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!loginData.emailOrUsername || !loginData.password) {
+    if (!loginData.email || !loginData.password) {
       toast.error('Veuillez remplir tous les champs');
       return;
     }
@@ -112,7 +120,7 @@ export function ProfilePage() {
       setLoading(true);
 
       // Use proper authentication that verifies password
-      const authenticatedCustomer = await api.authenticateUser(loginData.emailOrUsername, loginData.password);
+      const authenticatedCustomer = await api.authenticateUser(loginData.email, loginData.password);
 
       if (authenticatedCustomer) {
         // For WordPress users, we need to handle them differently
@@ -147,7 +155,7 @@ export function ProfilePage() {
         // Set the customer in state
         dispatch({ type: 'SET_CUSTOMER', payload: authenticatedCustomer });
         setShowLoginForm(false);
-        setLoginData({ emailOrUsername: '', password: '' });
+        setLoginData({ email: '', password: '' });
 
         toast.success('Connexion réussie !');
       } else {
@@ -159,9 +167,15 @@ export function ProfilePage() {
       if (error.message === 'Invalid password') {
         toast.error('Mot de passe incorrect. Veuillez réessayer.');
       } else if (error.message === 'User not found') {
-        toast.error('Aucun compte trouvé avec cet email ou nom d\'utilisateur');
+        toast.error('Aucun compte trouvé avec cet email');
+      } else if (error.message === 'Not a customer account') {
+        toast.error('Ce compte n\'est pas un compte client. Veuillez utiliser un compte client.');
+      } else if (error.message === 'Authentication service unavailable') {
+        toast.error('Service d\'authentification temporairement indisponible');
+      } else if (error.message === 'Invalid email format') {
+        toast.error('Format d\'email invalide');
       } else {
-        toast.error('Erreur lors de la connexion. Veuillez réessayer.');
+        toast.error(`Erreur: ${error.message || 'Erreur lors de la connexion. Veuillez réessayer.'}`);
       }
     } finally {
       setLoading(false);
@@ -349,6 +363,92 @@ export function ProfilePage() {
     toast.success('Redirecting to password change page...');
   };
 
+  const testWordPressEndpoint = async () => {
+    try {
+      setLoading(true);
+      const isWorking = await api.testWordPressEndpoint();
+      
+      if (isWorking) {
+        toast.success('WordPress endpoint is working correctly!');
+      } else {
+        toast.error('WordPress endpoint test failed. The plugin may not be active.');
+      }
+    } catch (error) {
+      console.error('Endpoint test error:', error);
+      toast.error('Failed to test WordPress endpoint');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordUpdate = async () => {
+    // Validate password fields
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      toast.error('Please fill in all password fields');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      toast.error('New password must be at least 8 characters long');
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error('New password and confirmation do not match');
+      return;
+    }
+
+    if (passwordData.currentPassword === passwordData.newPassword) {
+      toast.error('New password must be different from current password');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Test the endpoint first
+      const endpointWorking = await api.testWordPressEndpoint();
+      if (!endpointWorking) {
+        toast.error('Password service is temporarily unavailable. Please contact support.');
+        return;
+      }
+
+      // Call the password update API
+      await api.updatePassword({
+        current_password: passwordData.currentPassword,
+        new_password: passwordData.newPassword,
+        user_email: state.customer?.email || ''
+      });
+
+      // Success - reset form and close it
+      setShowPasswordForm(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      toast.success('Password updated successfully!');
+
+    } catch (error: any) {
+      console.error('Password update error:', error);
+      
+      // Handle specific error messages from the API
+      if (error.message?.includes('current_password')) {
+        toast.error('Current password is incorrect');
+      } else if (error.message?.includes('weak')) {
+        toast.error('New password is too weak. Please use a stronger password');
+      } else if (error.message?.includes('NetworkError') || error.message?.includes('Failed to fetch')) {
+        toast.error('Network error. Please check your connection and try again.');
+      } else if (error.message?.includes('404')) {
+        toast.error('Password update service is temporarily unavailable. Please contact support.');
+      } else if (error.message?.includes('User not found')) {
+        toast.error('User account not found. Please log out and log in again.');
+      } else if (error.message?.includes('Not a customer account')) {
+        toast.error('This account type cannot update password through the app.');
+      } else {
+        toast.error(error.message || 'Failed to update password. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCancelEdit = () => {
     setIsEditingProfile(false);
     setEditProfileData({
@@ -475,6 +575,8 @@ export function ProfilePage() {
     }
   };
 
+
+
   return (
     <>
       <Toaster position="top-center" />
@@ -499,9 +601,9 @@ export function ProfilePage() {
 
           {!state.customer ? (
             <div className="text-center py-12">
-              <Person className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Bienvenue chez Klarrion
+              <img src={logoKLARRION} alt="KLARRION Logo" className="w-40 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-primary-600 dark:text-white mb-2">
+                Bienvenue chez  KLARRION
               </h2>
               <p className="text-gray-500 dark:text-gray-400 mb-6">
                 Connectez-vous pour accéder à votre compte et à l'historique de vos commandes
@@ -527,10 +629,10 @@ export function ProfilePage() {
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 max-w-sm mx-auto">
                   <form onSubmit={handleLogin} className="space-y-4">
                     <input
-                      type="text"
-                      placeholder="E-mail ou nom d'utilisateur"
-                      value={loginData.emailOrUsername}
-                      onChange={(e) => setLoginData({ ...loginData, emailOrUsername: e.target.value })}
+                      type="email"
+                      placeholder="E-mail"
+                      value={loginData.email}
+                      onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
                       required
                       className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     />
@@ -786,21 +888,64 @@ export function ProfilePage() {
                       className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     />
 
-                    {/* Password Change Section - Redirect to WordPress */}
+                    {/* Password Change Section - Inline Form */}
                     <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
                       <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Change Password</h4>
-                      <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-4">
-                        <p className="text-sm text-primary-800 dark:text-primary-200 mb-3">
-                          Pour votre sécurité, la modification du mot de passe se fait directement sur notre site web.
-                        </p>
+                      
+                      {!showPasswordForm ? (
                         <button
                           type="button"
-                          onClick={() => handlePasswordRedirect()}
+                          onClick={() => setShowPasswordForm(true)}
                           className="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 px-4 rounded-lg transition-colors duration-200 text-sm font-medium"
                         >
                           Changer le mot de passe
                         </button>
-                      </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <input
+                            type="password"
+                            placeholder="Current Password"
+                            value={passwordData.currentPassword}
+                            onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          />
+                          <input
+                            type="password"
+                            placeholder="New Password (min. 8 characters)"
+                            value={passwordData.newPassword}
+                            onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          />
+                          <input
+                            type="password"
+                            placeholder="Confirm New Password"
+                            value={passwordData.confirmPassword}
+                            onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          />
+                          <div className="flex space-x-2">
+                            <button
+                              type="button"
+                              onClick={handlePasswordUpdate}
+                              disabled={loading || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                              className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white py-2 px-4 rounded-lg transition-colors duration-200 text-sm font-medium"
+                            >
+                              {loading ? 'Updating...' : 'Update Password'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowPasswordForm(false);
+                                setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                              }}
+                              disabled={loading}
+                              className="flex-1 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg transition-colors duration-200 text-sm font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     {/* Action Buttons */}
                     <div className="flex space-x-3 pt-4">

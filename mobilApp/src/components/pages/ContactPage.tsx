@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { GeoAlt, Telephone, Envelope, Facebook, Twitter, Instagram, Tiktok, Pinterest, Youtube, Whatsapp, Send, Paperclip } from 'react-bootstrap-icons';
+import { GeoAlt, Telephone, Envelope, Facebook, Twitter, Instagram, Tiktok, Pinterest, Youtube, Whatsapp, Send } from 'react-bootstrap-icons';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
 import { emailService } from '../../services/emailService';
-import { ftpStorageService } from '../../services/ftpStorage';
 
 interface ContactFormData {
   name: string;
@@ -11,7 +10,6 @@ interface ContactFormData {
   phone: string;
   message: string;
   subject: string;
-  attachments?: File[];
 }
 
 export const ContactPage: React.FC = () => {
@@ -26,48 +24,9 @@ export const ContactPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [fileError, setFileError] = useState('');
-  const [fileInputKey, setFileInputKey] = useState('');
-  const [ftpConnectionStatus, setFtpConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
 
   // Scroll to top when page loads
   useScrollToTop();
-
-  // Cleanup FTP connection on unmount
-  useEffect(() => {
-    return () => {
-      disconnectFTP();
-    };
-  }, []);
-
-  // FTP Connection Management
-  const connectFTP = async () => {
-    if (ftpConnectionStatus !== 'disconnected') return;
-    
-    console.log('Starting FTP connection...');
-    setFtpConnectionStatus('connecting');
-    try {
-      const connected = await ftpStorageService.connect();
-      if (connected) {
-        setFtpConnectionStatus('connected');
-        console.log('FTP connection established successfully');
-      } else {
-        setFtpConnectionStatus('disconnected');
-        console.log('FTP connection failed');
-      }
-    } catch (error) {
-      console.error('FTP connection failed:', error);
-      setFtpConnectionStatus('disconnected');
-    }
-  };
-
-  const disconnectFTP = async () => {
-    if (ftpConnectionStatus === 'connected') {
-      await ftpStorageService.disconnect();
-      setFtpConnectionStatus('disconnected');
-    }
-  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -75,55 +34,6 @@ export const ContactPage: React.FC = () => {
       ...prev,
       [name]: value
     }));
-
-    // Connect to FTP when user starts filling the form
-    if (value.trim() && ftpConnectionStatus === 'disconnected') {
-      connectFTP();
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    const newFiles: File[] = [];
-    const errors: string[] = [];
-
-    files.forEach(file => {
-      // Check individual file size (10MB limit per file)
-      if (file.size > 10 * 1024 * 1024) {
-        errors.push(`Le fichier "${file.name}" est trop volumineux (${(file.size / (1024 * 1024)).toFixed(1)} MB). La limite par fichier est de 10MB.`);
-        return;
-      }
-
-      // Check total size (EmailJS has overall limits)
-      const totalSize = [...selectedFiles, ...newFiles, file].reduce((sum, f) => sum + f.size, 0);
-      if (totalSize > 2 * 1024 * 1024) { // 2MB total limit
-        errors.push(`La taille totale des fichiers dépasse la limite de 2MB. Veuillez réduire le nombre ou la taille des fichiers.`);
-        return;
-      }
-
-      newFiles.push(file);
-    });
-
-    if (errors.length > 0) {
-      setFileError(errors.join(' '));
-    }
-
-    if (newFiles.length > 0) {
-      setSelectedFiles(prev => [...prev, ...newFiles]);
-    }
-
-    // Reset file input
-    e.target.value = '';
-  };
-
-  const removeFile = (fileToRemove: File) => {
-    setSelectedFiles(prev => prev.filter(file => file !== fileToRemove));
-    setFileError('');
-  };
-
-  const removeAllFiles = () => {
-    setSelectedFiles([]);
-    setFileError('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -133,23 +43,6 @@ export const ContactPage: React.FC = () => {
     setSuccessMessage('');
 
     try {
-      console.log('Form submission started...');
-      console.log(`Selected files: ${selectedFiles.length}`);
-      console.log(`FTP connection status: ${ftpConnectionStatus}`);
-
-      // Ensure FTP is connected if configured and we have large files
-      if (selectedFiles.length > 0 && ftpConnectionStatus === 'disconnected') {
-        console.log('Attempting to connect to FTP for file upload...');
-        // Try to connect to FTP if we have files to upload
-        await connectFTP();
-        
-        // Wait a bit for connection to establish
-        if (ftpConnectionStatus === 'connecting') {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      }
-
-      // Prepare email data
       const emailData = {
         name: formData.name,
         company: formData.company,
@@ -157,7 +50,6 @@ export const ContactPage: React.FC = () => {
         phone: formData.phone,
         subject: formData.subject,
         message: formData.message,
-        attachments: selectedFiles,
       };
 
       // Send email via EmailJS
@@ -173,8 +65,6 @@ export const ContactPage: React.FC = () => {
           subject: '',
           message: ''
         });
-        setSelectedFiles([]);
-        setFileInputKey(Date.now().toString());
       } else {
         setErrorMessage(result.message);
       }
@@ -184,8 +74,6 @@ export const ContactPage: React.FC = () => {
       setErrorMessage('An unexpected error occurred. Please try again later.');
     } finally {
       setIsSubmitting(false);
-      // Disconnect FTP after form submission
-      disconnectFTP();
     }
   };
 
@@ -414,109 +302,7 @@ export const ContactPage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   />
                 </div>
-
-                {/* File Attachments */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Pièces jointes
-                    </label>
-                    {/* FTP Connection Status */}
-                    <div className="flex items-center text-xs">
-                      {ftpConnectionStatus === 'connecting' && (
-                        <div className="flex items-center text-yellow-600 dark:text-yellow-400">
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current mr-1"></div>
-                          Connexion FTP...
-                        </div>
-                      )}
-                      {ftpConnectionStatus === 'connected' && (
-                        <div className="flex items-center text-green-600 dark:text-green-400">
-                          <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-                          FTP Connecté
-                        </div>
-                      )}
-                      {ftpConnectionStatus === 'disconnected' && (
-                        <div className="flex items-center text-gray-500 dark:text-gray-400">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full mr-1"></div>
-                          FTP Déconnecté
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
-                    <div className="flex items-center justify-center">
-                      <input
-                        type="file"
-                        multiple
-                        onChange={handleFileChange}
-                        className="hidden"
-                        id="file-upload"
-                        key={fileInputKey}
-                      />
-                      <label
-                        htmlFor="file-upload"
-                        className="cursor-pointer flex items-center text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-                      >
-                        <Paperclip className="w-5 h-5 mr-2" />
-                        <span>Joindre des fichiers</span>
-                      </label>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
-                      Les fichiers de moins de 10MB seront attachés à l'email. Les fichiers plus volumineux seront stockés temporairement.
-                      {ftpConnectionStatus === 'connected' ? ' Stockage FTP activé (7 jours).' : ' Stockage temporaire (24h).'}
-                      Limite totale: 2MB
-                    </p>
-                  </div>
-
-                  {/* File List */}
-                  {selectedFiles.length > 0 && (
-                    <div className="mt-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Fichiers sélectionnés ({selectedFiles.length})
-                        </h4>
-                        <button
-                          type="button"
-                          onClick={removeAllFiles}
-                          className="text-sm text-red-600 hover:text-red-800 dark:text-red-400"
-                        >
-                          Tout supprimer
-                        </button>
-                      </div>
-                      <div className="space-y-2">
-                        {selectedFiles.map((file, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                            <div className="flex items-center">
-                              <Paperclip className="w-4 h-4 text-gray-500 mr-2" />
-                              <span className="text-sm text-gray-700 dark:text-gray-300">
-                                {file.name} ({(file.size / 1024).toFixed(1)} KB)
-                              </span>
-                              {file.size > 10 * 1024 * 1024 && (
-                                <span className="ml-2 text-xs text-orange-600 dark:text-orange-400">
-                                  (Trop volumineux pour être attaché)
-                                </span>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeFile(file)}
-                              className="text-red-600 hover:text-red-800 dark:text-red-400"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* File Error */}
-                  {fileError && (
-                    <div className="mt-2 text-sm text-red-600 dark:text-red-400">
-                      {fileError}
-                    </div>
-                  )}
-                </div>
+                
 
                 {/* Submit Button */}
                 <button
