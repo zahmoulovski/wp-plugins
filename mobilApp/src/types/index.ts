@@ -262,3 +262,32 @@ export interface PortfolioItem {
     }>;
   };
 }
+
+// API Interface definition
+export interface APIInterface {
+  // WooCommerce functions
+  getProducts(params?: Record<string, string | number>): Promise<Product[]>;
+  getProduct(id: number): Promise<Product | null>;
+  searchProducts(query: string): Promise<Product[]>;
+  searchCustomers(query: string): Promise<Customer[]>;
+  authenticateUser(username: string, password: string): Promise<{ user: Customer; token: string } | null>;
+  getCategories(): Promise<Category[]>;
+  getShippingMethods(): Promise<ShippingMethod[]>;
+  getShippingZones(): Promise<ShippingZone[]>;
+  getShippingMethodInstances(zoneId: number): Promise<ShippingMethodInstance[]>;
+  calculateShipping(products: { product_id: number; quantity: number }[], postalCode: string): Promise<any>;
+  createOrder(orderData: any): Promise<Order | null>;
+  getOrders(customerId: number): Promise<Order[]>;
+  getOrder(id: number): Promise<Order | null>;
+  getBlogPosts(params?: Record<string, string | number>): Promise<BlogPost[]>;
+  getBlogPost(id: number): Promise<BlogPost | null>;
+  searchBlogPosts(query: string): Promise<BlogPost[]>;
+  getBlogCategories(): Promise<Category[]>;
+  filterAndSortProductsByStock(products: Product[]): Product[];
+  
+  // Portfolio functions
+  getPortfolioItems(params?: Record<string, string | number>): Promise<PortfolioItem[]>;
+  getProjectCategories(): Promise<PortfolioCategory[]>;
+  getPortfolioCategories(): Promise<PortfolioCategory[]>;
+  getPortfolioItem(id: number): Promise<PortfolioItem | null>;
+}

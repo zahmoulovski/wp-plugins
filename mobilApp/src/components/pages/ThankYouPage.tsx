@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CheckCircle, House, Bag, XCircle } from 'react-bootstrap-icons';
 import { api } from '../../services/api';
 import { useLocation, useNavigate } from 'react-router-dom';
-import paymentLogo from '../../services/payment-logo.png';
+import paymentLogo from '../../components/assets/payment-logo.png';
 import { KonnectPaymentModal, useKonnectPayment } from '../../hooks/useKonnectPayment';
 import { logPurchase } from '../../utils/analytics';
 import { useScrollToTop } from '../../hooks/useScrollToTop';

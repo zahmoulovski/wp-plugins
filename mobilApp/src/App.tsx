@@ -133,9 +133,6 @@ function AppContent() {
 
     loadInitialData();
   }, []);
-
-  // Removed Capacitor back button handling - web only application
-
   const handleSplashComplete = () => {
     setShowSplash(false);
   };
@@ -203,6 +200,11 @@ function AppContent() {
               </PageWrapper>
             } />
             <Route path="/portfolio" element={
+              <PageWrapper>
+                <PortfolioPage />
+              </PageWrapper>
+            } />
+            <Route path="/galerie" element={
               <PageWrapper>
                 <PortfolioPage />
               </PageWrapper>

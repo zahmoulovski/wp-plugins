@@ -1,4 +1,4 @@
-import { Product, Category, Customer, Order, BlogPost, PortfolioItem, PortfolioCategory } from '../types'
+import { Product, Category, Customer, Order, BlogPost, PortfolioItem, PortfolioCategory, APIInterface } from '../types'
 import { cacheService } from './cache';
 import { initKonnectPayment, verifyKonnectPayment } from './konnectGateway';
 
@@ -71,7 +71,7 @@ async function storeApiRequest(endpoint: string, options: RequestInit = {}, cart
   return response.json();
 }
 
-export const api = {
+export const api: APIInterface = {
   // ---------- WooCommerce ----------
   async getProducts(params: Record<string, string | number> = {}): Promise<Product[]> {
     // Check cache first
@@ -768,7 +768,7 @@ export const api = {
   },
 
   // ---------- Portfolio ----------
-  async getPortfolioItems(params: Record<string, string | number> = {}): Promise<PortfolioItem[]> {
+  getPortfolioItems: async (params: Record<string, string | number> = {}): Promise<PortfolioItem[]> => {
     try {
       const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
       const queryParams = new URLSearchParams({
@@ -780,8 +780,10 @@ export const api = {
         ...params
       }).toString();
       
+      // Add _embed parameter to get embedded categories
       const wpApiUrl = `${wpBaseUrl}/wp-json/wp/v2/portfolio?${queryParams}&_embed`;
       
+      console.log('API: Fetching portfolio items from:', wpApiUrl);
       const response = await fetch(wpApiUrl, {
         headers: {
           'Content-Type': 'application/json',
@@ -793,39 +795,50 @@ export const api = {
       }
       
       const items = await response.json();
+      console.log('API: Raw portfolio items response:', items.length, 'items');
       
       // Transform the data to match our interface
-      return items.map((item: any) => ({
-        id: item.id,
-        title: item.title,
-        content: item.content,
-        excerpt: item.excerpt,
-        date: item.date,
-        modified: item.modified,
-        slug: item.slug,
-        status: item.status,
-        type: item.type,
-        link: item.link,
-        permalink: item.permalink,
-        featured_media: item.featured_media,
-        author: item.author,
-        portfolio_categories: item.portfolio_categories || [],
-        project_categories: item['project-cat'] || [], // Add project categories
-        featured_image_url: item.featured_image_url,
-        custom_fields: item.custom_fields,
-        _embedded: item._embedded
-      }));
+      return items.map((item: any) => {
+        // Extract categories from embedded data or fallback to direct fields
+        const portfolioCategories = item._embedded?.['wp:term']?.[0] || item.portfolio_categories || [];
+        const projectCategories = item._embedded?.['wp:term']?.[1] || item['project-cat'] || [];
+        
+        console.log(`API: Item ${item.id} - portfolio_categories:`, portfolioCategories);
+        console.log(`API: Item ${item.id} - project_categories:`, projectCategories);
+        
+        return {
+          id: item.id,
+          title: item.title,
+          content: item.content,
+          excerpt: item.excerpt,
+          date: item.date,
+          modified: item.modified,
+          slug: item.slug,
+          status: item.status,
+          type: item.type,
+          link: item.link,
+          permalink: item.permalink,
+          featured_media: item.featured_media,
+          author: item.author,
+          portfolio_categories: portfolioCategories,
+          project_categories: projectCategories,
+          featured_image_url: item.featured_image_url,
+          custom_fields: item.custom_fields,
+          _embedded: item._embedded
+        };
+      });
     } catch (error) {
       console.error('Error fetching portfolio items:', error);
       return [];
     }
   },
 
-  async getProjectCategories(): Promise<PortfolioCategory[]> {
+  getProjectCategories: async (): Promise<PortfolioCategory[]> => {
     try {
       const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
       const wpApiUrl = `${wpBaseUrl}/wp-json/wp/v2/project-cat?per_page=100`;
       
+      console.log('API: Fetching project categories from:', wpApiUrl);
       const response = await fetch(wpApiUrl, {
         headers: {
           'Content-Type': 'application/json',
@@ -837,6 +850,7 @@ export const api = {
       }
       
       const categories = await response.json();
+      console.log('API: Raw project categories response:', categories);
       
       // Transform the data to match our interface
       return categories.map((cat: any) => ({
@@ -855,11 +869,12 @@ export const api = {
     }
   },
 
-  async getPortfolioCategories(): Promise<PortfolioCategory[]> {
+  getPortfolioCategories: async (): Promise<PortfolioCategory[]> => {
     try {
       const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
       const wpApiUrl = `${wpBaseUrl}/wp-json/wp/v2/portfolio_category?per_page=100`;
       
+      console.log('API: Fetching portfolio categories from:', wpApiUrl);
       const response = await fetch(wpApiUrl, {
         headers: {
           'Content-Type': 'application/json',
@@ -871,6 +886,7 @@ export const api = {
       }
       
       const categories = await response.json();
+      console.log('API: Raw portfolio categories response:', categories);
       
       // Transform the data to match our interface
       return categories.map((cat: any) => ({
@@ -889,11 +905,12 @@ export const api = {
     }
   },
 
-  async getPortfolioItem(id: number): Promise<PortfolioItem | null> {
+  getPortfolioItem: async (id: number): Promise<PortfolioItem | null> => {
     try {
       const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
       const wpApiUrl = `${wpBaseUrl}/wp-json/wp/v2/portfolio/${id}?_embed`;
       
+      console.log('API: Fetching portfolio item from:', wpApiUrl);
       const response = await fetch(wpApiUrl, {
         headers: {
           'Content-Type': 'application/json',
@@ -905,6 +922,11 @@ export const api = {
       }
       
       const item = await response.json();
+      console.log('API: Raw portfolio item response:', item);
+      
+      // Transform the data to match our interface
+      const portfolioCategories = item._embedded?.['wp:term']?.[0] || item.portfolio_categories || [];
+      const projectCategories = item._embedded?.['wp:term']?.[1] || item['project-cat'] || [];
       
       return {
         id: item.id,
@@ -920,8 +942,8 @@ export const api = {
         permalink: item.permalink,
         featured_media: item.featured_media,
         author: item.author,
-        portfolio_categories: item.portfolio_categories || [],
-        project_categories: item['project-cat'] || [], // Add project categories
+        portfolio_categories: portfolioCategories,
+        project_categories: projectCategories,
         featured_image_url: item.featured_image_url,
         custom_fields: item.custom_fields,
         _embedded: item._embedded

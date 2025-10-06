@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowClockwise, BoxArrowUpRight, Calendar3, Person, Link45deg } from 'react-bootstrap-icons';
+import { ArrowClockwise, BoxArrowUpRight, Calendar3, Person, Link45deg, ArrowLeft } from 'react-bootstrap-icons';
 import { api } from '../../services/api';
 import { PortfolioItem } from '../../types';
+import Lightbox from './Lightbox';
 
 interface PortfolioDetailProps {
   className?: string;
@@ -15,6 +16,7 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ className = '' }) => 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
+  const [lightboxOpen, setLightboxOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (slug) {
@@ -50,18 +52,28 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ className = '' }) => 
 
   const getProjectImages = () => {
     const images = [];
+    const imageSet = new Set();
     
     // Add featured image if available
     if (item?.featured_image) {
       images.push(item.featured_image);
+      imageSet.add(item.featured_image);
     }
     
     // Add images from custom fields if available
     if (item?.custom_fields?.project_images) {
-      if (Array.isArray(item.custom_fields.project_images)) {
-        images.push(...item.custom_fields.project_images);
+      if (Array.isArray(item?.custom_fields?.project_images)) {
+        item.custom_fields.project_images.forEach(img => {
+          if (!imageSet.has(img)) {
+            images.push(img);
+            imageSet.add(img);
+          }
+        });
       } else if (typeof item.custom_fields.project_images === 'string') {
-        images.push(item.custom_fields.project_images);
+        if (!imageSet.has(item.custom_fields.project_images)) {
+          images.push(item.custom_fields.project_images);
+          imageSet.add(item.custom_fields.project_images);
+        }
       }
     }
     
@@ -69,8 +81,9 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ className = '' }) => 
     if (item?._embedded?.['wp:featuredmedia']?.[0]?.media_details?.sizes) {
       const mediaSizes = item._embedded['wp:featuredmedia'][0].media_details.sizes;
       Object.values(mediaSizes).forEach((size: any) => {
-        if (size.source_url && !images.includes(size.source_url)) {
+        if (size.source_url && !imageSet.has(size.source_url)) {
           images.push(size.source_url);
+          imageSet.add(size.source_url);
         }
       });
     }
@@ -86,6 +99,83 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ className = '' }) => 
   const prevImage = () => {
     const images = getProjectImages();
     setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
+  };
+
+  const getContentImages = () => {
+    if (!item?.content?.rendered) return [];
+    
+    const imgRegex = /<img[^>]+src="([^">]+)"[^>]*>/g;
+    const images = [];
+    let match;
+    
+    while ((match = imgRegex.exec(item.content.rendered)) !== null) {
+      images.push(match[1]);
+    }
+    
+    return images;
+  };
+
+  const renderContentWithGallery = () => {
+    if (!item?.content?.rendered) return null;
+    
+    const contentImages = getContentImages();
+    
+    if (contentImages.length === 0) {
+      return (
+        <div 
+          dangerouslySetInnerHTML={{ 
+            __html: item.content.rendered || item.excerpt.rendered 
+          }} 
+        />
+      );
+    }
+    
+    // Remove images from content to show them in gallery
+    const contentWithoutImages = item.content.rendered.replace(/<img[^>]+>/g, '');
+    
+    return (
+      <div className="space-y-8">
+        {/* Pinterest-style gallery for content images */}
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Galerie d'images</h2>
+          
+          {/* Pinterest-style masonry grid */}
+          <div className="columns-2 md:columns-3 gap-3 space-y-3">
+            {contentImages.map((image, index) => (
+              <div key={index} className="break-inside-avoid">
+                <div 
+                  className="relative group cursor-pointer overflow-hidden rounded-lg"
+                  style={{ borderRadius: '5px' }}
+                  onClick={() => {
+                    setCurrentImageIndex(index);
+                    setLightboxOpen(true);
+                  }}
+                >
+                  <img
+                    src={image}
+                    alt={`${item.title.rendered} - Image ${index + 1}`}
+                    className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
+                    style={{ gap: '10px' }}
+                  />
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <BoxArrowUpRight className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Content without images */}
+        <div 
+          dangerouslySetInnerHTML={{ 
+            __html: contentWithoutImages || item.excerpt.rendered 
+          }} 
+        />
+      </div>
+    );
   };
 
   if (loading) {
@@ -122,7 +212,7 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ className = '' }) => 
   const currentImage = projectImages[currentImageIndex];
 
   return (
-    <div className={`max-w-6xl mx-auto px-4 py-8 ${className}`}>
+    <div className={`max-w-6xl mx-auto px-4 py-8 mb-20 ${className}`}>
       {/* Back Button */}
       <button
         onClick={() => navigate('/portfolio')}
@@ -132,162 +222,58 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ className = '' }) => 
         Retour au portfolio
       </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Image Gallery */}
-        <div className="space-y-4">
-          {currentImage && (
-            <div className="relative aspect-video bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
-              <img
-                src={currentImage}
-                alt={item.title.rendered}
-                className="w-full h-full object-cover"
-              />
-              
-              {projectImages.length > 1 && (
-                <>
-                  <button
-                    onClick={prevImage}
-                    className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
-                  >
-                    <ArrowLeft className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={nextImage}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
-                  >
-                    <BoxArrowUpRight className="w-5 h-5 rotate-45" />
-                  </button>
-                  
-                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
-                    {projectImages.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setCurrentImageIndex(index)}
-                        className={`w-2 h-2 rounded-full transition-colors ${
-                          index === currentImageIndex ? 'bg-white' : 'bg-white/50'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-          
-          {/* Thumbnail Gallery */}
-          {projectImages.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {projectImages.map((image, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentImageIndex(index)}
-                  className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
-                    index === currentImageIndex 
-                      ? 'border-primary' 
-                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                  }`}
-                >
-                  <img
-                    src={image}
-                    alt={`${item.title.rendered} ${index + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+         {/* Project Details */}
+         <div className="space-y-6 lg:col-span-2">
+           <div>
+             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+               {item.title.rendered}
+             </h1>
+             
+             <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400 mb-6">
+               <span className="flex items-center gap-1">
+                 <Calendar3 className="w-4 h-4" />
+                 {new Date(item.date).toLocaleDateString('fr-FR', {
+                   year: 'numeric',
+                   month: 'long',
+                   day: 'numeric'
+                 })}
+               </span>
+               <span className="flex items-center gap-1">
+                 <Person className="w-4 h-4" />
+                 {item._embedded?.author?.[0]?.name || 'Unknown'}
+               </span>
+             </div>
 
-        {/* Project Details */}
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-              {item.title.rendered}
-            </h1>
-            
-            <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400 mb-6">
-              <span className="flex items-center gap-1">
-                <Calendar3 className="w-4 h-4" />
-                {new Date(item.date).toLocaleDateString('fr-FR', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </span>
-              <span className="flex items-center gap-1">
-                <Person className="w-4 h-4" />
-                {item._embedded?.author?.[0]?.name || 'Unknown'}
-              </span>
-            </div>
-
-            {item.portfolio_categories && item.portfolio_categories.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-6">
-                {item.portfolio_categories.map((category) => (
-                  <span
-                    key={category.id}
-                    className="px-3 py-1 bg-primary/10 text-primary text-sm rounded-full dark:bg-primary/20"
-                  >
-                    {category.name}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="prose prose-lg dark:prose-invert max-w-none">
-            <div 
-              dangerouslySetInnerHTML={{ 
-                __html: item.content.rendered || item.excerpt.rendered 
-              }} 
-            />
-          </div>
-
-          {/* Custom Fields */}
-          {item.custom_fields && (
-            <div className="space-y-4">
-              {item.custom_fields.client_name && (
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Client</h3>
-                  <p className="text-gray-700 dark:text-gray-300">{item.custom_fields.client_name}</p>
+              {item.project_categories && item.project_categories.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {item.project_categories.map((category) => (
+                    <span
+                      key={category.id}
+                      className="px-3 py-1 bg-primary/10 text-primary text-sm rounded-full dark:bg-primary/20"
+                    >
+                      {category.name}
+                    </span>
+                  ))}
                 </div>
               )}
-              
-              {item.custom_fields.project_date && (
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Date du projet</h3>
-                  <p className="text-gray-700 dark:text-gray-300">
-                    {new Date(item.custom_fields.project_date).toLocaleDateString('fr-FR')}
-                  </p>
-                </div>
-              )}
-              
-              {item.custom_fields.skills && (
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Compétences</h3>
-                  <p className="text-gray-700 dark:text-gray-300">{item.custom_fields.skills}</p>
-                </div>
-              )}
-              
-              {item.custom_fields.project_url && (
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Lien du projet</h3>
-                  <a
-                    href={item.custom_fields.project_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
-                  >
-                    <Link45deg className="w-4 h-4" />
-                    Visiter le site
-                  </a>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
+           </div>
+
+           <div className="prose prose-lg dark:prose-invert max-w-none">
+              {renderContentWithGallery()}
+            </div>           
+         </div>
+       </div>
+
+       {/* Lightbox */}
+       <Lightbox
+         images={getContentImages()}
+         currentIndex={currentImageIndex}
+         isOpen={lightboxOpen}
+         onClose={() => setLightboxOpen(false)}
+       />
+     </div>
+   );
+ };
 
 export default PortfolioDetail;

@@ -4,9 +4,9 @@ import { useApp } from '../../contexts/AppContext';
 import { api } from '../../services/api';
 import { Order } from '../../types';
 import { Toaster, toast } from 'react-hot-toast';
-import paymentLogo from '../../services/payment-logo.png';
+import paymentLogo from '../../components/assets/payment-logo.png';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
-import logoKLARRION from '../../services/klarrionLogo.png';
+import logoKLARRION from'../../components/assets/klarrionLogo.png';
 import { useNavigate } from 'react-router-dom';
 
 
