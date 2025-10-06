@@ -198,7 +198,7 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ className = '' }) => 
           <div className="text-red-500 text-xl mb-4">⚠️</div>
           <p className="text-red-600 dark:text-red-400">{error || 'Projet non trouvé'}</p>
           <button 
-            onClick={() => navigate('/portfolio')}
+            onClick={() => navigate('/galerie')}
             className="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
           >
             Retour au portfolio
@@ -215,7 +215,7 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ className = '' }) => 
     <div className={`max-w-6xl mx-auto px-4 py-8 mb-20 ${className}`}>
       {/* Back Button */}
       <button
-        onClick={() => navigate('/portfolio')}
+        onClick={() => navigate('/galerie')}
         className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors mb-6"
       >
         <ArrowLeft className="w-5 h-5" />

@@ -11,12 +11,11 @@ interface PortfolioProps {
   onCategoryChange?: (category: string) => void;
 }
 
-// Simple cache implementation
 const portfolioCache = {
   items: null as PortfolioItem[] | null,
   categories: null as ProjectCategory[] | null,
   timestamp: 0,
-  CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+  CACHE_DURATION: 5 * 60 * 1000,
   
   isValid() {
     return this.items && this.categories && (Date.now() - this.timestamp) < this.CACHE_DURATION;
@@ -47,7 +46,6 @@ const Portfolio: React.FC<PortfolioProps> = ({
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   
-  // Use internal state if no external control
   const [internalSelectedCategory, setInternalSelectedCategory] = useState('all');
   const selectedCategory = externalSelectedCategory ?? internalSelectedCategory;
   const setSelectedCategory = (category: string) => {
@@ -60,7 +58,6 @@ const Portfolio: React.FC<PortfolioProps> = ({
 
   const fetchPortfolioData = useCallback(async (loadMore = false) => {
     try {
-      console.log('=== FETCH PORTFOLIO DATA ===');
       if (loadMore) {
         setLoadingMore(true);
       } else {
@@ -68,9 +65,7 @@ const Portfolio: React.FC<PortfolioProps> = ({
       }
       setError(null);
 
-      // Check cache first
       if (!loadMore && portfolioCache.isValid()) {
-        console.log('Using cached data');
         setItems(portfolioCache.items!);
         setCategories(portfolioCache.categories!);
         setTotalItems(portfolioCache.items!.length);
@@ -79,82 +74,52 @@ const Portfolio: React.FC<PortfolioProps> = ({
         return;
       }
 
-      // Fetch categories first
-      console.log('Fetching categories...');
       let fetchedCategories: ProjectCategory[] = [];
       try {
         fetchedCategories = await api.getProjectCategories();
-        console.log('Categories fetched:', fetchedCategories.length);
       } catch (catError) {
-        console.warn('Could not fetch categories:', catError);
         fetchedCategories = [];
       }
       
-      // Set categories with initial 0 counts
       const categoriesWithCounts = fetchedCategories.map(cat => ({ ...cat, count: 0 }));
       
-      // Fetch all items to calculate category counts
-      console.log('Fetching all items for category counts...');
       const allItems = await api.getPortfolioItems({ per_page: 100, status: 'publish' });
-      console.log('All items fetched:', allItems.length);
-      
-      if (allItems.length > 0) {
-        console.log('Sample item structure:', allItems[0]);
-        console.log('Sample item project_categories:', allItems[0].project_categories);
-        console.log('Sample item portfolio_categories:', allItems[0].portfolio_categories);
-      }
       
       const categoryCounts = new Map<string, number>();
-      allItems.forEach((item, index) => {
-        // Use project_categories first (galerie-cat taxonomy), fallback to portfolio_categories
-        const categories = item.project_categories || item.portfolio_categories || [];
-        console.log(`Item ${index} categories:`, categories);
+      allItems.forEach((item) => {
+        const projectCategories = item.project_categories || [];
+        const portfolioCategories = item.portfolio_categories || [];
+        const allCategories = [...projectCategories, ...portfolioCategories];
         
-        categories.forEach(cat => {
-          const currentCount = categoryCounts.get(cat.slug) || 0;
-          categoryCounts.set(cat.slug, currentCount + 1);
-          console.log(`Category ${cat.slug} count: ${currentCount + 1}`);
+        const processedSlugs = new Set<string>();
+        allCategories.forEach(cat => {
+          if (!processedSlugs.has(cat.slug)) {
+            processedSlugs.add(cat.slug);
+            const currentCount = categoryCounts.get(cat.slug) || 0;
+            categoryCounts.set(cat.slug, currentCount + 1);
+          }
         });
       });
       
-      console.log('Final category counts:', Object.fromEntries(categoryCounts));
-      
-      // Update categories with proper counts
       const updatedCategories = categoriesWithCounts.map(cat => {
         const count = categoryCounts.get(cat.slug) || 0;
-        console.log(`Category ${cat.name} (${cat.slug}): ${count}`);
         return {
           ...cat,
           count: count
         };
       });
       
-      console.log('Updated categories with counts:', updatedCategories);
       setCategories(updatedCategories);
       
-      // Cache the data
       portfolioCache.items = allItems;
       portfolioCache.categories = updatedCategories;
       portfolioCache.timestamp = Date.now();
       
-      // Filter items based on selected category
-      let filteredItems = allItems;
-      if (selectedCategory !== 'all') {
-        filteredItems = allItems.filter(item => {
-          // Use project_categories first (galerie-cat taxonomy), fallback to portfolio_categories
-          const categories = item.project_categories || item.portfolio_categories || [];
-          return categories.some(cat => cat.slug === selectedCategory);
-        });
-      }
-      
-      // Update state
-      setItems(filteredItems);
+      setItems(allItems);
       setPage(1);
-      setHasMore(filteredItems.length >= 12);
-      setTotalItems(filteredItems.length);
-      console.log('=== FETCH COMPLETE ===');
+      setHasMore(allItems.length >= 12);
+      setTotalItems(allItems.length);
     } catch (err) {
-      console.error('Error fetching portfolio data:', err);
       setError('Erreur lors du chargement du portfolio');
     } finally {
       setLoading(false);
@@ -162,15 +127,12 @@ const Portfolio: React.FC<PortfolioProps> = ({
     }
   }, [selectedCategory, onCategoryChange]);
 
-  // Clear cache function
   const clearCache = () => {
     portfolioCache.clear();
     localStorage.removeItem('portfolio_cache');
   };
 
-  // Add cache persistence
   useEffect(() => {
-    // Load from localStorage on mount
     const cachedData = localStorage.getItem('portfolio_cache');
     if (cachedData) {
       try {
@@ -181,12 +143,10 @@ const Portfolio: React.FC<PortfolioProps> = ({
           portfolioCache.timestamp = timestamp;
         }
       } catch (e) {
-        console.warn('Failed to load cache from localStorage:', e);
       }
     }
   }, []);
 
-  // Save to localStorage when data changes
   useEffect(() => {
     if (portfolioCache.items && portfolioCache.categories) {
       try {
@@ -196,7 +156,6 @@ const Portfolio: React.FC<PortfolioProps> = ({
           timestamp: portfolioCache.timestamp
         }));
       } catch (e) {
-        console.warn('Failed to save cache to localStorage:', e);
       }
     }
   }, [portfolioCache.items, portfolioCache.categories, portfolioCache.timestamp]);
@@ -205,8 +164,93 @@ const Portfolio: React.FC<PortfolioProps> = ({
     fetchPortfolioData();
   }, [selectedCategory]);
 
-  // Items are already filtered in the fetch function
-  const filteredItems = items;
+  const filteredItems = React.useMemo(() => {
+    if (selectedCategory === 'all') {
+      return items;
+    }
+    
+    const categoryMap = new Map();
+    categories.forEach(cat => {
+      categoryMap.set(cat.slug.toLowerCase(), cat);
+      categoryMap.set(cat.name.toLowerCase(), cat);
+    });
+    
+    const filtered = items.filter(item => {
+      const projectCategories = item.project_categories || [];
+      const portfolioCategories = item.portfolio_categories || [];
+      const allCategories = [...projectCategories, ...portfolioCategories];
+      
+      const normalizedSelectedCategory = selectedCategory.toLowerCase().trim();
+      
+      const hasMatch = allCategories.some(cat => {
+        const normalizedCatSlug = cat.slug.toLowerCase().trim();
+        const normalizedCatName = cat.name.toLowerCase().trim();
+        
+        if (normalizedCatSlug === normalizedSelectedCategory) {
+          return true;
+        }
+        
+        if (normalizedCatName === normalizedSelectedCategory) {
+          return true;
+        }
+        
+        if (normalizedCatName.includes(normalizedSelectedCategory) || normalizedSelectedCategory.includes(normalizedCatName)) {
+          return true;
+        }
+        
+        return false;
+      });
+      
+      return hasMatch;
+    });
+    
+    if (filtered.length === 0 && items.length > 0) {
+      const fallbackFiltered = items.filter(item => {
+        const title = item.title.rendered.toLowerCase();
+        const excerpt = (item.excerpt?.rendered || '').toLowerCase();
+        const content = (item.content?.rendered || '').toLowerCase();
+        const searchTerm = selectedCategory.toLowerCase();
+        
+        const titleMatch = title.includes(searchTerm);
+        const excerptMatch = excerpt.includes(searchTerm);
+        const contentMatch = content.includes(searchTerm);
+        
+        if (titleMatch || excerptMatch || contentMatch) {
+          return true;
+        }
+        return false;
+      });
+      
+      return fallbackFiltered;
+    }
+    
+    return filtered;
+  }, [items, selectedCategory, categories]);
+
+  const categoryCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    
+    categories.forEach(cat => {
+      counts[cat.slug] = 0;
+    });
+    
+    items.forEach(item => {
+      const projectCategories = item.project_categories || [];
+      const portfolioCategories = item.portfolio_categories || [];
+      const allCategories = [...projectCategories, ...portfolioCategories];
+      
+      const processedCategories = new Set<string>();
+      
+      allCategories.forEach(cat => {
+        if (!processedCategories.has(cat.slug)) {
+          processedCategories.add(cat.slug);
+          counts[cat.slug] = (counts[cat.slug] || 0) + 1;
+        }
+      });
+    });
+    
+    return counts;
+  }, [items, categories]);
 
   const getFeaturedImage = (item: PortfolioItem) => {
     if (item._embedded?.['wp:featuredmedia']?.[0]?.source_url) {
@@ -268,7 +312,6 @@ const Portfolio: React.FC<PortfolioProps> = ({
 
   return (
     <div className={`portfolio-container ${className}`}>
-      {/* Header */}
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-gray-900 mb-4">Notre Portfolio</h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
@@ -276,7 +319,6 @@ const Portfolio: React.FC<PortfolioProps> = ({
         </p>
       </div>
 
-      {/* Category Filter */}
       <div className="flex flex-wrap gap-2 justify-center mb-8">
         <button
           onClick={() => setSelectedCategory('all')}
@@ -292,8 +334,6 @@ const Portfolio: React.FC<PortfolioProps> = ({
           </span>
         </button>
         {categories.map((category) => {
-          console.log(`Rendering category: ${category.name} (${category.slug}) - count: ${category.count}`);
-          
           return (
             <button
               key={category.id}
@@ -313,28 +353,6 @@ const Portfolio: React.FC<PortfolioProps> = ({
         })}
       </div>
 
-      {/* Debug Info */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="bg-yellow-100 border border-yellow-400 rounded-lg p-4 mb-8">
-          <h3 className="font-bold text-yellow-800 mb-2">Debug Info:</h3>
-          <div className="text-sm text-yellow-700 space-y-1">
-            <div>Categories loaded: {categories.length}</div>
-            <div>Items loaded: {items.length}</div>
-            <div>Filtered items: {filteredItems.length}</div>
-            <div>Selected category: {selectedCategory}</div>
-            <div>Total items: {totalItems}</div>
-            <div>Has more: {hasMore ? 'Yes' : 'No'}</div>
-            <div>Loading: {loading ? 'Yes' : 'No'}</div>
-            <div>Loading more: {loadingMore ? 'Yes' : 'No'}</div>
-            <div>Categories data:</div>
-            <pre className="text-xs bg-yellow-50 p-2 rounded overflow-auto max-h-32">
-              {JSON.stringify(categories.map(cat => ({ name: cat.name, slug: cat.slug, count: cat.count })), null, 2)}
-            </pre>
-          </div>
-        </div>
-      )}
-
-      {/* Portfolio Grid - Pinterest Style Masonry */}
       <div className="columns-1 md:columns-2 lg:columns-3 xl:columns-4 gap-6 space-y-6">
         {filteredItems.map((item) => {
           const featuredImage = getFeaturedImage(item);
@@ -345,7 +363,6 @@ const Portfolio: React.FC<PortfolioProps> = ({
               key={item.id}
               className="portfolio-item bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 break-inside-avoid mb-6"
             >
-              {/* Featured Image */}
               {featuredImage && (
                 <div className="relative overflow-hidden group">
                   <img
@@ -367,21 +384,17 @@ const Portfolio: React.FC<PortfolioProps> = ({
                 </div>
               )}
 
-              {/* Content */}
               <div className="p-6">
-                {/* Title */}
                 <h3 
                   className="text-xl font-bold text-gray-900 dark:text-white mb-3 line-clamp-2"
                   dangerouslySetInnerHTML={{ __html: item.title.rendered }}
                 />
 
-                {/* Excerpt */}
                 <div 
                   className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-3"
                   dangerouslySetInnerHTML={{ __html: item.excerpt.rendered }}
                 />
 
-                {/* Meta Information */}
                 <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1">
@@ -397,7 +410,6 @@ const Portfolio: React.FC<PortfolioProps> = ({
                   </div>
                 </div>
 
-                {/* Categories */}
                 {(item.project_categories || item.portfolio_categories) && (item.project_categories?.length > 0 || item.portfolio_categories?.length > 0) && (
                   <div className="flex flex-wrap gap-2 mb-4">
                     {(item.project_categories || item.portfolio_categories || []).slice(0, 3).map((category) => (
@@ -416,7 +428,6 @@ const Portfolio: React.FC<PortfolioProps> = ({
                   </div>
                 )}
 
-                {/* Action Buttons */}
               <div className="flex gap-3">
                 <button
                   onClick={() => navigate(`/galerie/${item.slug}/`)}
@@ -442,14 +453,12 @@ const Portfolio: React.FC<PortfolioProps> = ({
         })}
       </div>
 
-      {/* No Results */}
       {filteredItems.length === 0 && (
         <div className="col-span-full text-center py-12">
           <p className="text-gray-500 dark:text-gray-400 text-lg">Aucun projet trouvé</p>
         </div>
       )}
       
-      {/* Load More Button */}
       {hasMore && (
         <div className="col-span-full text-center mt-8">
           <button
@@ -469,7 +478,6 @@ const Portfolio: React.FC<PortfolioProps> = ({
         </div>
       )}
       
-      {/* Lightbox */}
       <Lightbox
         images={lightboxImages}
         currentIndex={lightboxIndex}
@@ -480,40 +488,4 @@ const Portfolio: React.FC<PortfolioProps> = ({
   );
 };
 
-  // Render category filter
-  const renderCategoryFilter = () => {
-    console.log('RENDER CATEGORY FILTER - Categories:', categories);
-    
-    return (
-      <div className="flex flex-wrap gap-2 justify-center mb-8">
-        <button
-          onClick={() => setSelectedCategory('all')}
-          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-            selectedCategory === 'all'
-              ? 'bg-primary text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          Tous ({totalItems})
-        </button>
-        {categories.map((category) => {
-          console.log(`Rendering category: ${category.name} (${category.slug}) - count: ${category.count}`);
-          
-          return (
-            <button
-              key={category.id}
-              onClick={() => setSelectedCategory(category.slug)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                selectedCategory === category.slug
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {category.name} ({category.count})
-            </button>
-          );
-        })}
-      </div>
-    );
-  };
 export default Portfolio;
