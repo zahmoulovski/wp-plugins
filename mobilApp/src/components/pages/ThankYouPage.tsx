@@ -6,6 +6,8 @@ import paymentLogo from '../../services/payment-logo.png';
 import { KonnectPaymentModal, useKonnectPayment } from '../../hooks/useKonnectPayment';
 import { logPurchase } from '../../utils/analytics';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
+import { useApp } from '../../contexts/AppContext';
+import { toast } from 'react-hot-toast';
 
 interface OrderProduct {
   id: string;
@@ -72,6 +74,7 @@ interface ThankYouPageProps {
 export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }: ThankYouPageProps) {
   // Scroll to top when page loads
   useScrollToTop();
+  const { state, dispatch } = useApp();
   const [isLoading, setIsLoading] = useState(true);
   const [orderData, setOrderData] = useState<OrderDetails | null>(null);
   const [subtotal, setSubtotal] = useState<string>('');
@@ -222,7 +225,7 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300">Loading order details...</p>
+          <p className="text-gray-600 dark:text-gray-300">Chargement des détails de la commande...</p>
         </div>
       </div>
     );
@@ -277,7 +280,7 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
               Vérification de Commande
             </h2>
             <p className="text-gray-600 dark:text-gray-300 mb-6">
-              Pour accéder à votre commande #{orderId}, veuillez entrer l'adresse email utilisée lors de la commande.
+              Pour accéder à la commande #{orderId}, veuillez entrer l'adresse email utilisée lors de la commande.
             </p>
           </div>
 
@@ -307,7 +310,7 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
               <button
                 type="submit"
                 disabled={isLoading}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
+                className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-400 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200"
               >
                 {isLoading ? 'Vérification...' : 'Vérifier'}
               </button>
@@ -405,6 +408,105 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
       setPaymentError('Erreur lors de l\'initialisation du paiement. Veuillez reessayer.');
     } finally {
       setIsProcessingPayment(false);
+    }
+  };
+
+  const handleOrderAgain = async () => {
+    if (!orderData) return;
+
+    try {
+      // Clear current cart first
+      dispatch({ type: 'CLEAR_CART' });
+
+      // Track items that couldn't be added due to stock issues
+      const unavailableItems = [];
+      let addedItems = 0;
+
+      // Add all items from the order to cart with stock validation
+      for (const item of orderData.line_items) {
+        try {
+          // Fetch current product data to check stock status
+          const product = await api.getProduct(item.product_id);
+          
+          if (!product) {
+            unavailableItems.push({ name: item.name, reason: 'Produit introuvable' });
+            continue;
+          }
+
+          // Check if product is in stock or allows backorders
+          const isInStock = product.stock_status === 'instock' || product.stock_status === 'onbackorder';
+          const hasStock = product.stock_quantity === null || product.stock_quantity >= item.quantity;
+          
+          if (!isInStock && product.stock_status !== 'onbackorder') {
+            unavailableItems.push({ name: item.name, reason: 'Rupture de stock' });
+            continue;
+          }
+
+          if (!hasStock && product.stock_status !== 'onbackorder') {
+            const availableQty = product.stock_quantity || 0;
+            unavailableItems.push({ 
+              name: item.name, 
+              reason: `Stock insuffisant (${availableQty} disponible${availableQty > 1 ? 's' : ''})`
+            });
+            continue;
+          }
+
+          // Add to cart with current product data
+          const productData = {
+            id: item.product_id,
+            name: item.name,
+            price: parseFloat(item.price),
+            images: product.images || [],
+            sku: item.sku,
+            stock_quantity: product.stock_quantity,
+            type: product.type || 'simple',
+            status: product.status || 'publish',
+            stock_status: product.stock_status
+          };
+
+          dispatch({
+            type: 'ADD_TO_CART',
+            payload: {
+              product: productData,
+              quantity: item.quantity,
+              variationId: item.variation_id || null
+            }
+          });
+          
+          addedItems++;
+          
+        } catch (error) {
+          console.error(`Error adding item ${item.name}:`, error);
+          unavailableItems.push({ name: item.name, reason: 'Erreur lors de l\'ajout' });
+        }
+      }
+
+      // Show appropriate messages
+      if (addedItems === 0) {
+        // No items were added
+        toast.error('Aucun article n\'a pu être ajouté au panier.');
+        if (unavailableItems.length > 0) {
+          unavailableItems.forEach(item => {
+            toast.error(`${item.name}: ${item.reason}`);
+          });
+        }
+      } else if (unavailableItems.length > 0) {
+        // Some items were added, some were not
+        toast.success(`${addedItems} article${addedItems > 1 ? 's' : ''} ajouté${addedItems > 1 ? 's' : ''} au panier !`);
+        unavailableItems.forEach(item => {
+          toast.error(`${item.name}: ${item.reason}`);
+        });
+        // Still redirect to cart for the items that were added
+        navigate('/cart');
+      } else {
+        // All items were added successfully
+        toast.success('Tous les articles ont été ajoutés au panier ! Redirection vers le paiement...');
+        navigate('/cart');
+      }
+      
+    } catch (error) {
+      console.error('Error reordering items:', error);
+      toast.error('Erreur lors de l\'ajout des articles au panier.');
     }
   };
 
@@ -524,6 +626,13 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
               <img src={paymentLogo} alt="Paiement" className="h-5" />
             </button>
           ) : null}
+
+          <button
+            onClick={handleOrderAgain}
+            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-xl font-semibold transition-colors duration-200"
+          >
+            Commander à nouveau !
+          </button>
 
           </div>
         </div>

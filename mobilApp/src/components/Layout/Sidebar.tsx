@@ -199,13 +199,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     <>
       {/* Overlay */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300" />
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-20 transition-opacity duration-300" />
       )}
 
       {/* Sidebar */}
       <div
         ref={sidebarRef}
-        className={`fixed top-0 left-0 h-full w-80 bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 z-50 flex flex-col ${
+        className={`fixed top-0 left-0 h-full w-80 bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 z-30 flex flex-col ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -222,7 +222,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto pb-20">
           {/* Main Menu */}
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             {mainMenuItems.map((item) => {
@@ -252,7 +252,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             {renderCategoryTree()}
           </div>
 
-          {/* Secondary Menu */}
+          {/* Secondary Menu 
           <div className="p-4">
             {secondaryMenuItems.map((item) => {
               const Icon = item.icon;
@@ -268,7 +268,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </Link>
               );
             })}
-          </div>
+          </div>*/}
         </div>
       </div>
     </>

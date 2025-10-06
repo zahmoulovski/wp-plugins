@@ -7,10 +7,12 @@ import { Toaster, toast } from 'react-hot-toast';
 import paymentLogo from '../../services/payment-logo.png';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
 import logoKLARRION from '../../services/klarrionLogo.png';
+import { useNavigate } from 'react-router-dom';
 
 
 export function ProfilePage() {
   const { state, dispatch } = useApp();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [showLoginForm, setShowLoginForm] = useState(false);
@@ -423,26 +425,26 @@ export function ProfilePage() {
       // Success - reset form and close it
       setShowPasswordForm(false);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      toast.success('Password updated successfully!');
+      toast.success('Mot de passe mis à jour avec succès !');
 
     } catch (error: any) {
-      console.error('Password update error:', error);
+      console.error('Erreur de mise à jour du mot de passe :', error);
       
       // Handle specific error messages from the API
       if (error.message?.includes('current_password')) {
-        toast.error('Current password is incorrect');
+        toast.error('Mot de passe actuel incorrect');
       } else if (error.message?.includes('weak')) {
-        toast.error('New password is too weak. Please use a stronger password');
+        toast.error('Nouveau mot de passe trop faible. Veuillez utiliser un mot de passe plus fort');
       } else if (error.message?.includes('NetworkError') || error.message?.includes('Failed to fetch')) {
-        toast.error('Network error. Please check your connection and try again.');
+        toast.error('Erreur de réseau. Veuillez vérifier votre connexion et réessayer.');
       } else if (error.message?.includes('404')) {
-        toast.error('Password update service is temporarily unavailable. Please contact support.');
+        toast.error('Service de mise à jour de mot de passe temporairement indisponible. Veuillez contacter le support.');
       } else if (error.message?.includes('User not found')) {
-        toast.error('User account not found. Please log out and log in again.');
+        toast.error('Compte utilisateur non trouvé. Veuillez vous déconnecter et reconnecter.');
       } else if (error.message?.includes('Not a customer account')) {
-        toast.error('This account type cannot update password through the app.');
+        toast.error('Ce type d\'compte ne peut pas mettre à jour le mot de passe via l\'application.');
       } else {
-        toast.error(error.message || 'Failed to update password. Please try again.');
+        toast.error(error.message || 'Échec de la mise à jour du mot de passe. Veuillez réessayer.');
       }
     } finally {
       setLoading(false);
@@ -463,19 +465,19 @@ export function ProfilePage() {
 
     // Validate required fields
     if (!editBillingData.first_name || !editBillingData.last_name || !editBillingData.email) {
-      toast.error('Please fill in all required billing fields (first name, last name, email)');
+      toast.error('Veuillez remplir tous les champs requis de facturation (prénom, nom, email)');
       return;
     }
 
     if (!editBillingData.address_1 || !editBillingData.city || !editBillingData.postcode) {
-      toast.error('Please fill in all required address fields (address, city, postcode)');
+      toast.error('Veuillez remplir tous les champs requis d\'adresse (adresse, ville, code postal)');
       return;
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(editBillingData.email)) {
-      toast.error('Please enter a valid email address');
+      toast.error('Veuillez entrer une adresse email valide');
       return;
     }
 
@@ -490,11 +492,11 @@ export function ProfilePage() {
 
       dispatch({ type: 'SET_CUSTOMER', payload: updatedCustomer });
       setIsEditingAddresses(false);
-      toast.success('Addresses updated successfully!');
+      toast.success('Adresses mises à jour avec succès !');
 
     } catch (error: any) {
-      console.error('Address update error:', error);
-      toast.error('Failed to update addresses');
+      console.error('Erreur de mise à jour des adresses :', error);
+      toast.error('Échec de la mise à jour des adresses');
     } finally {
       setLoading(false);
     }
@@ -562,7 +564,6 @@ export function ProfilePage() {
         session_id: `order_${selectedOrder.id}`,
       };
 
-
       const payment = await api.initKonnectPayment(paymentData);
 
       await api.updateOrderMeta(selectedOrder.id, { konnect_payment_id: payment.paymentRef });
@@ -570,8 +571,110 @@ export function ProfilePage() {
       window.open(payment.payUrl, '_blank');
 
     } catch (error) {
-      console.error('Payment initiation error:', error);
+      console.error('Erreur lors de l\'initialisation du paiement :', error);
       toast.error('Erreur lors de l\'initialisation du paiement. Veuillez reessayer.');
+    }
+  };
+
+  const handleOrderAgain = async () => {
+    if (!selectedOrder) return;
+
+    try {
+      // Clear current cart first
+      dispatch({ type: 'CLEAR_CART' });
+
+      // Track items that couldn't be added due to stock issues
+      const unavailableItems = [];
+      let addedItems = 0;
+
+      // Add all items from the order to cart with stock validation
+      for (const item of selectedOrder.line_items) {
+        try {
+          // Fetch current product data to check stock status
+          const product = await api.getProduct(item.product_id);
+          
+          if (!product) {
+            unavailableItems.push({ name: item.name, reason: 'Produit introuvable' });
+            continue;
+          }
+
+          // Check if product is in stock or allows backorders
+          const isInStock = product.stock_status === 'instock' || product.stock_status === 'onbackorder';
+          const hasStock = product.stock_quantity === null || product.stock_quantity >= item.quantity;
+          
+          if (!isInStock && product.stock_status !== 'onbackorder') {
+            unavailableItems.push({ name: item.name, reason: 'Rupture de stock' });
+            continue;
+          }
+
+          if (!hasStock && product.stock_status !== 'onbackorder') {
+            const availableQty = product.stock_quantity || 0;
+            unavailableItems.push({ 
+              name: item.name, 
+              reason: `Stock insuffisant (${availableQty} disponible${availableQty > 1 ? 's' : ''})`
+            });
+            continue;
+          }
+
+          // Add to cart with current product data
+          const productData = {
+            id: item.product_id,
+            name: item.name,
+            price: parseFloat(item.price),
+            images: product.images || [],
+            sku: item.sku,
+            stock_quantity: product.stock_quantity,
+            type: product.type || 'simple',
+            status: product.status || 'publish',
+            stock_status: product.stock_status
+          };
+
+          dispatch({
+            type: 'ADD_TO_CART',
+            payload: {
+              product: productData,
+              quantity: item.quantity,
+              variationId: item.variation_id || null
+            }
+          });
+          
+          addedItems++;
+          
+        } catch (error) {
+          console.error(`Error adding item ${item.name}:`, error);
+          unavailableItems.push({ name: item.name, reason: 'Erreur lors de l\'ajout' });
+        }
+      }
+
+      // Close modal
+      setShowOrderDetails(false);
+
+      // Show appropriate messages
+      if (addedItems === 0) {
+        // No items were added
+        toast.error('Aucun article n\'a pu être ajouté au panier.');
+        if (unavailableItems.length > 0) {
+          unavailableItems.forEach(item => {
+            toast.error(`${item.name}: ${item.reason}`);
+          });
+        }
+      } else if (unavailableItems.length > 0) {
+        // Some items were added, some were not
+        toast.success(`${addedItems} article${addedItems > 1 ? 's' : ''} ajouté${addedItems > 1 ? 's' : ''} au panier !`);
+        unavailableItems.forEach(item => {
+          toast.error(`${item.name}: ${item.reason}`);
+        });
+        // Still redirect to cart for the items that were added
+        navigate('/cart');
+      } else {
+        // All items were added successfully
+        toast.success('Tous les articles ont été ajoutés au panier ! Redirection vers le paiement...');
+        navigate('/cart');
+      }
+      
+    } catch (error) {
+      console.error('Error reordering items:', error);
+      toast.error('Erreur lors de l\'ajout des articles au panier.');
     }
   };
 
@@ -954,14 +1057,14 @@ export function ProfilePage() {
                         disabled={loading}
                         className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-2 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {loading ? 'Saving...' : 'Save Changes'}
+                        {loading ? 'Enregistrement...' : 'Enregistrer'}
                       </button>
                       <button
                         onClick={handleCancelEdit}
                         disabled={loading}
                         className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Cancel
+                        Annuler
                       </button>
                     </div>
                   </div>
@@ -1185,7 +1288,7 @@ export function ProfilePage() {
                       disabled={loading}
                       className="flex-1 bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {loading ? 'Saving...' : 'Save Addresses'}
+                      {loading ? 'Enregistrement...' : 'Enregistrer Adresses'}
                     </button>
                     <button
                       onClick={handleCancelAddressEdit}
@@ -1378,15 +1481,26 @@ export function ProfilePage() {
                   </span>
                 </div>
               </div>
-              {['pending', 'on-hold', 'processing'].includes(selectedOrder.status) && (
+              
+              {/* Action Buttons */}
+              <div className="space-y-3 mt-4">
                 <button
-                  onClick={handlePayOrder}
-                  className="mt-4 w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200 flex flex-col items-center justify-center"
+                  onClick={handleOrderAgain}
+                  className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors duration-200"
                 >
-                  Payer En ligne
-                  <img src={paymentLogo} alt="Payment methods" className="h-6 mt-2" />
+                  Commander à nouveau !
                 </button>
-              )}
+                
+                {['pending', 'on-hold', 'processing'].includes(selectedOrder.status) && (
+                  <button
+                    onClick={handlePayOrder}
+                    className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200 flex flex-col items-center justify-center"
+                  >
+                    Payer En ligne
+                    <img src={paymentLogo} alt="Payment methods" className="h-6 mt-2" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
