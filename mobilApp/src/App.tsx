@@ -15,6 +15,7 @@ import { ContactPage } from './components/pages/ContactPage';
 import { ProductModal } from './components/common/ProductModal';
 import { BlogPage } from './components/pages/BlogPage';
 import { BlogModal } from './components/common/BlogModal';
+import NotFoundPage from './components/pages/NotFoundPage';
 import PortfolioPage from './components/pages/PortfolioPage';
 import PortfolioDetail from './components/common/PortfolioDetail';
 import SplashScreen from './components/common/SplashScreen';
@@ -199,11 +200,6 @@ function AppContent() {
                 <BlogPage onPostClick={handleBlogPostClick} />
               </PageWrapper>
             } />
-            <Route path="/portfolio" element={
-              <PageWrapper>
-                <PortfolioPage />
-              </PageWrapper>
-            } />
             <Route path="/galerie" element={
               <PageWrapper>
                 <PortfolioPage />
@@ -217,7 +213,7 @@ function AppContent() {
             <Route path="/payment-success" element={<PaymentCallback success={true} />} />
             <Route path="/payment-failed" element={<PaymentCallback success={false} />} />
   
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>
         {!isCheckoutPage && <BottomNav />}

@@ -184,7 +184,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const mainMenuItems = [
     { path: '/', icon: House, label: 'Accueil' },
     { path: '/categories', icon: Grid3x3, label: 'Catégories' },
-    { path: '/portfolio', icon: Briefcase, label: 'Portfolio' },
+    { path: '/galerie', icon: Briefcase, label: 'Portfolio' },
     { path: '/search', icon: Search, label: 'Recherche' },
     { path: '/blog', icon: JournalText, label: 'Blog' },
     { path: '/cart', icon: Cart, label: 'Panier', badge: cartItemsCount },
