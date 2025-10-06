@@ -1,4 +1,4 @@
-import { Product, Category, Customer, Order, BlogPost } from '../types'
+import { Product, Category, Customer, Order, BlogPost, PortfolioItem, PortfolioCategory } from '../types'
 import { cacheService } from './cache';
 import { initKonnectPayment, verifyKonnectPayment } from './konnectGateway';
 
@@ -765,5 +765,170 @@ export const api = {
     }
 
     return filteredProducts;
+  },
+
+  // ---------- Portfolio ----------
+  async getPortfolioItems(params: Record<string, string | number> = {}): Promise<PortfolioItem[]> {
+    try {
+      const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
+      const queryParams = new URLSearchParams({
+        per_page: params.per_page ? String(params.per_page) : '12',
+        page: params.page ? String(params.page) : '1',
+        orderby: params.orderby ? String(params.orderby) : 'date',
+        order: params.order ? String(params.order) : 'desc',
+        status: params.status ? String(params.status) : 'publish',
+        ...params
+      }).toString();
+      
+      const wpApiUrl = `${wpBaseUrl}/wp-json/wp/v2/portfolio?${queryParams}&_embed`;
+      
+      const response = await fetch(wpApiUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Portfolio API request failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const items = await response.json();
+      
+      // Transform the data to match our interface
+      return items.map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        content: item.content,
+        excerpt: item.excerpt,
+        date: item.date,
+        modified: item.modified,
+        slug: item.slug,
+        status: item.status,
+        type: item.type,
+        link: item.link,
+        permalink: item.permalink,
+        featured_media: item.featured_media,
+        author: item.author,
+        portfolio_categories: item.portfolio_categories || [],
+        project_categories: item['project-cat'] || [], // Add project categories
+        featured_image_url: item.featured_image_url,
+        custom_fields: item.custom_fields,
+        _embedded: item._embedded
+      }));
+    } catch (error) {
+      console.error('Error fetching portfolio items:', error);
+      return [];
+    }
+  },
+
+  async getProjectCategories(): Promise<PortfolioCategory[]> {
+    try {
+      const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
+      const wpApiUrl = `${wpBaseUrl}/wp-json/wp/v2/project-cat?per_page=100`;
+      
+      const response = await fetch(wpApiUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Project categories API request failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const categories = await response.json();
+      
+      // Transform the data to match our interface
+      return categories.map((cat: any) => ({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        description: cat.description,
+        count: cat.count,
+        link: cat.link,
+        image: cat.image,
+        category_data: cat.category_data
+      }));
+    } catch (error) {
+      console.error('Error fetching project categories:', error);
+      return [];
+    }
+  },
+
+  async getPortfolioCategories(): Promise<PortfolioCategory[]> {
+    try {
+      const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
+      const wpApiUrl = `${wpBaseUrl}/wp-json/wp/v2/portfolio_category?per_page=100`;
+      
+      const response = await fetch(wpApiUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Portfolio categories API request failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const categories = await response.json();
+      
+      // Transform the data to match our interface
+      return categories.map((cat: any) => ({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        description: cat.description,
+        count: cat.count,
+        link: cat.link,
+        image: cat.image,
+        category_data: cat.category_data
+      }));
+    } catch (error) {
+      console.error('Error fetching portfolio categories:', error);
+      return [];
+    }
+  },
+
+  async getPortfolioItem(id: number): Promise<PortfolioItem | null> {
+    try {
+      const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
+      const wpApiUrl = `${wpBaseUrl}/wp-json/wp/v2/portfolio/${id}?_embed`;
+      
+      const response = await fetch(wpApiUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Portfolio item API request failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const item = await response.json();
+      
+      return {
+        id: item.id,
+        title: item.title,
+        content: item.content,
+        excerpt: item.excerpt,
+        date: item.date,
+        modified: item.modified,
+        slug: item.slug,
+        status: item.status,
+        type: item.type,
+        link: item.link,
+        permalink: item.permalink,
+        featured_media: item.featured_media,
+        author: item.author,
+        portfolio_categories: item.portfolio_categories || [],
+        project_categories: item['project-cat'] || [], // Add project categories
+        featured_image_url: item.featured_image_url,
+        custom_fields: item.custom_fields,
+        _embedded: item._embedded
+      };
+    } catch (error) {
+      console.error('Error fetching portfolio item:', error);
+      return null;
+    }
   },
 };

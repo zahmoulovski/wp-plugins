@@ -195,3 +195,70 @@ export interface ProductShippingInfo {
   shipping_method_title: string;
   shipping_class_slug?: string;
 }
+
+export interface PortfolioCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  count: number;
+  link: string;
+  image?: string;
+  category_data?: {
+    id: number;
+    name: string;
+    slug: string;
+    description: string;
+    count: number;
+    link: string;
+    image?: string;
+  };
+}
+
+export interface PortfolioItem {
+  id: number;
+  title: {
+    rendered: string;
+  };
+  content: {
+    rendered: string;
+  };
+  excerpt: {
+    rendered: string;
+  };
+  date: string;
+  modified: string;
+  slug: string;
+  status: string;
+  type: string;
+  link: string;
+  permalink?: string;
+  featured_media: number;
+  author: number;
+  portfolio_categories?: PortfolioCategory[];
+  project_categories?: PortfolioCategory[]; // Add project categories
+  featured_image_url?: {
+    full?: string;
+    large?: string;
+    medium?: string;
+    thumbnail?: string;
+  };
+  custom_fields?: {
+    project_url?: string;
+    client_name?: string;
+    project_date?: string;
+    skills?: string;
+  };
+  _embedded?: {
+    'wp:featuredmedia'?: Array<{
+      source_url: string;
+      alt_text: string;
+    }>;
+    author?: Array<{
+      name: string;
+      avatar_urls?: {
+        '48': string;
+      };
+    }>;
+  };
+}
