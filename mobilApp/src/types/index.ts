@@ -268,6 +268,7 @@ export interface APIInterface {
   // WooCommerce functions
   getProducts(params?: Record<string, string | number>): Promise<Product[]>;
   getProduct(id: number): Promise<Product | null>;
+  getBestSellers(params?: Record<string, string | number>): Promise<Product[]>;
   searchProducts(query: string): Promise<Product[]>;
   searchCustomers(query: string): Promise<Customer[]>;
   authenticateUser(username: string, password: string): Promise<{ user: Customer; token: string } | null>;

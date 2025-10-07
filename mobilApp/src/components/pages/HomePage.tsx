@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import { cacheService } from '../../services/cache';
 import { ProductCard } from '../common/ProductCard';
 import { FeaturedProductsCarousel } from '../common/FeaturedProductsCarousel';
+import { BannerSlider } from '../common/BannerSlider';
 import { Calendar, JournalText, ArrowUp, ArrowRight } from 'react-bootstrap-icons';
 import { Link } from 'react-router-dom';
 import { decodeHTMLEntities } from '../../utils/htmlUtils';
@@ -17,6 +18,7 @@ import {
 } from '../common/SkeletonLoader';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
 import { logViewItem, logAddToCart, logSearch } from '../../utils/analytics';
+import coffresPoster from '../assets/poster/coffres-banner.webp';
 
 
 
@@ -36,9 +38,9 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
-  const [products, setProducts] = useState<{ featured: Product[]; nonFeatured: Product[] }>({
+  const [products, setProducts] = useState<{ featured: Product[]; bestSellers: Product[] }>({
     featured: [],
-    nonFeatured: [],
+    bestSellers: [],
   });
   const [categoryProducts, setCategoryProducts] = useState<Record<string, Product[]>>({});
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
@@ -63,116 +65,85 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
     });
   };
 
-  const loadProducts = async () => {
+  const loadHomepageData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Generate unique cache keys for each session to allow refresh on page reload
-      const sessionId = Date.now().toString().slice(-6); // 6-digit session identifier
-      const featuredCacheKey = { per_page: 100, featured: true, session: sessionId };
-      const nonFeaturedCacheKey = { per_page: 100, featured: false, session: sessionId };
-
-      // Check cache first with session-specific keys
-      const cachedFeatured = cacheService.getProducts(featuredCacheKey);
-      const cachedNonFeatured = cacheService.getProducts(nonFeaturedCacheKey);
-
-      let featured = cachedFeatured;
-      let nonFeatured = cachedNonFeatured;
-
-      // If not in cache, fetch from API with larger pool (WooCommerce doesn't support orderby=rand)
-      if (!featured || !nonFeatured) {
-        [nonFeatured, featured] = await Promise.all([
-          api.getProducts({ per_page: 100, featured: false }),
-          api.getProducts({ per_page: 100, featured: true })
-        ]);
-
-        // Cache with session-specific keys (shorter cache time for more frequent updates)
-        cacheService.setProducts(nonFeatured, nonFeaturedCacheKey, 2 * 60 * 1000); // 2 minutes
-        cacheService.setProducts(featured, featuredCacheKey, 2 * 60 * 1000); // 2 minutes
+      // Generate unique session ID for this load
+      const sessionId = Date.now().toString().slice(-6);
+      const homepageCacheKey = `homepage_data_${sessionId}`;
+      
+      // Check if we have cached homepage data
+      const cachedData = cacheService.getProducts(homepageCacheKey);
+      if (cachedData) {
+        // Use cached data if available
+        setProducts(cachedData.products);
+        setCategoryProducts(cachedData.categoryProducts);
+        setBlogPosts(cachedData.blogPosts);
+        setLoading(false);
+        return;
       }
 
-      // 🔀 Shuffle and select random subset for display
-      const randomFeatured = shuffleArray(featured).slice(0, 20);
-      const randomNonFeatured = shuffleArray(nonFeatured).slice(0, 6);
+      // Load ALL homepage data in parallel
+      const [featuredProducts, bestSellersData, allCategoryProducts, blogPostsData] = await Promise.all([
+        // Featured products
+        api.getProducts({ per_page: 100, featured: true }),
+        // Best sellers with randomization
+        api.getBestSellers({ per_page: 20 }), // Get more for better randomization
+        // All categories at once
+        Promise.all(CATEGORIES.map(cat => api.getProducts({ per_page: 100, category: cat.id }))),
+        // Blog posts
+        api.getBlogPosts({ per_page: 12, orderby: 'date', order: 'desc' })
+      ]);
 
-      // Filter out out-of-stock products for homepage
+      // Process featured products
+      const randomFeatured = shuffleArray(featuredProducts).slice(0, 20);
       const filteredFeatured = api.filterAndSortProductsByStock(randomFeatured, { hideOutOfStock: true });
-      const filteredNonFeatured = api.filterAndSortProductsByStock(randomNonFeatured, { hideOutOfStock: true });
 
-      setProducts({
-        featured: filteredFeatured,
-        nonFeatured: filteredNonFeatured,
+      // Process best sellers with randomization
+      const shuffledBestSellers = shuffleArray(bestSellersData).slice(0, 8);
+      const filteredBestSellers = api.filterAndSortProductsByStock(shuffledBestSellers, { hideOutOfStock: true });
+
+      // Process category products
+      const categoryResults: Record<string, Product[]> = {};
+      CATEGORIES.forEach((cat, index) => {
+        const shuffledCategory = shuffleArray(allCategoryProducts[index]).slice(0, 8);
+        categoryResults[cat.title] = api.filterAndSortProductsByStock(shuffledCategory, { hideOutOfStock: true });
       });
+
+      // Process blog posts
+      const shuffledBlogPosts = blogPostsData.length > 0 ? shuffleArray(blogPostsData).slice(0, 3) : [];
+
+      // Set all data at once
+      const finalData = {
+        products: {
+          featured: filteredFeatured,
+          bestSellers: filteredBestSellers,
+        },
+        categoryProducts: categoryResults,
+        blogPosts: shuffledBlogPosts
+      };
+
+      setProducts(finalData.products);
+      setCategoryProducts(finalData.categoryProducts);
+      setBlogPosts(finalData.blogPosts);
+
+      // Cache the complete homepage data for 5 minutes
+      cacheService.setProducts(finalData, homepageCacheKey, 5 * 60 * 1000);
+
     } catch (err) {
-      // If we have cached products from previous sessions, show them as fallback
-      if (products.featured.length === 0 && products.nonFeatured.length === 0) {
-        setError('Failed to load products');
-      }
-      // Otherwise, keep showing existing products
+      setError('Failed to load homepage data');
+      console.error('Homepage data loading error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadBlogPosts = async () => {
-    try {
-      // Fetch more posts for better randomization
-      const posts = await api.getBlogPosts({ 
-        per_page: 12, // Fetch more posts to randomize from
-        orderby: 'date',
-        order: 'desc'
-      });
-      // Only show actual blog posts from WordPress
-      if (posts.length > 0) {
-        // Shuffle and take only 3 posts for random display on homepage
-        const shuffledPosts = shuffleArray(posts).slice(0, 3);
-        setBlogPosts(shuffledPosts);
-      } else {
-        // If no posts, show empty state
-        setBlogPosts([]);
-      }
-    } catch (error) {
-      setBlogPosts([]);
-    }
-  };
-
-  const loadCategories = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const results: Record<string, Product[]> = {};
-      const sessionId = Date.now().toString().slice(-6); // Same session ID as loadProducts
-      
-      for (const cat of CATEGORIES) {
-        // Generate session-specific cache key for each category
-        const cacheKey = { per_page: 100, category: cat.id, session: sessionId };
-        let cachedProducts = cacheService.getProducts(cacheKey);
-        
-        if (!cachedProducts) {
-          // Fetch more products (100 instead of 20) for better randomization
-          cachedProducts = await api.getProducts({ per_page: 100, category: cat.id });
-          // Cache with shorter expiry for more frequent updates
-          cacheService.setProducts(cachedProducts, cacheKey, 2 * 60 * 1000); // 2 minutes
-        }
-        
-        // 🔀 Shuffle and select random subset for display (8 products)
-        results[cat.title] = shuffleArray(cachedProducts).slice(0, 8);
-      }
-      
-      // Filter out out-of-stock products for category sections on homepage
-      const filteredResults: Record<string, Product[]> = {};
-      for (const [categoryTitle, categoryProducts] of Object.entries(results)) {
-        filteredResults[categoryTitle] = api.filterAndSortProductsByStock(categoryProducts, { hideOutOfStock: true });
-      }
-      
-      setCategoryProducts(filteredResults);
-    } catch (err) {
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Load all homepage data in one go
+  useEffect(() => {
+    loadHomepageData();
+  }, []);
 
   // Helper function to get category slug for navigation
   const getCategorySlug = (categoryTitle: string): string => {
@@ -199,16 +170,14 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
   };
 
   useEffect(() => {
-    loadProducts();
-    loadCategories();
-    loadBlogPosts();
+    loadHomepageData();
   }, []);
 
   if (loading) {
     return (
       <div className="p-4 pb-20">
         {/* Featured products skeleton */}
-        <section>
+        <section className="mb-8">
           <TextSkeleton width="120px" height="24px" className="mb-4" />
           <div className="mb-8">
             <div className="flex overflow-x-auto space-x-4 pb-4">
@@ -221,28 +190,59 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
           </div>
         </section>
 
+        {/* Coffres & Armoires fortes skeleton */}
+        <section className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <TextSkeleton width="200px" height="24px" />
+            <TextSkeleton width="100px" height="16px" />
+          </div>
+          <div className="relative mb-6 overflow-hidden rounded-lg">
+            <ImageSkeleton width="100%" height="200px" />
+            <div className="absolute bottom-4 left-4">
+              <TextSkeleton width="200px" height="20px" className="mb-2" />
+              <TextSkeleton width="60px" height="16px" />
+            </div>
+          </div>
+          <ProductGridSkeleton count={6} />
+        </section>
+
+        {/* Équipement Laboratoire skeleton with banner slider */}
+        <section className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <TextSkeleton width="180px" height="24px" />
+            <TextSkeleton width="100px" height="16px" />
+          </div>
+          <div className="mb-6">
+            <div className="h-48 md:h-64 lg:h-80 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+            <div className="flex justify-center mt-4 space-x-2">
+              {Array.from({ length: 4 }, (_, i) => (
+                <div key={i} className="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse" />
+              ))}
+            </div>
+          </div>
+          <ProductGridSkeleton count={6} />
+        </section>
+
+        {/* Best Sellers skeleton */}
+        <section className="mb-8">
+          <TextSkeleton width="120px" height="24px" className="mb-4" />
+          <ProductGridSkeleton count={8} />
+        </section>
+
+        {/* Meubles Métalliques skeleton */}
+        <section className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <TextSkeleton width="150px" height="24px" />
+            <TextSkeleton width="80px" height="16px" />
+          </div>
+          <ProductGridSkeleton count={6} />
+        </section>
+
         {/* Blog posts skeleton */}
         <section className="mb-8">
           <TextSkeleton width="150px" height="24px" className="mb-4" />
           <BlogPostGridSkeleton count={2} />
         </section>
-
-        {/* New products skeleton */}
-        <section className="mb-8">
-          <TextSkeleton width="120px" height="24px" className="mb-4" />
-          <ProductGridSkeleton count={6} />
-        </section>
-
-        {/* Category products skeleton */}
-        {CATEGORIES.map((_, index) => (
-          <section key={index} className="mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <TextSkeleton width="150px" height="24px" />
-              <TextSkeleton width="80px" height="16px" />
-            </div>
-            <ProductGridSkeleton count={6} />
-          </section>
-        ))}
       </div>
     );
   }
@@ -252,7 +252,7 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
       <div className="p-4 pb-20 text-center">
         <p className="text-red-500 dark:text-red-400 mb-4">{error}</p>
         <button
-          onClick={() => { loadProducts(); loadCategories(); }}
+          onClick={loadHomepageData}
           className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg"
         >
           Retry
@@ -273,6 +273,108 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
         </section>
       )}
 
+      {/* Coffres & Armoires fortes section - moved to 2nd position */}
+      {categoryProducts['Coffres & Armoires fortes'] && categoryProducts['Coffres & Armoires fortes'].length > 0 && (
+        <section className="mt-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold dark:text-white">Coffres & Armoires fortes</h2>
+            <Link
+              to="/categories/340"
+              className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium text-sm flex items-center gap-1 transition-colors duration-200"
+            >
+              Voir tous les produits
+              <ArrowRight size={14} />
+            </Link>
+          </div>
+          <Link to="/categories/340" className="block mb-6">
+            <div className="relative overflow-hidden rounded-lg hover:opacity-90 transition-opacity duration-200">
+              <img
+                src={coffresPoster}
+                alt="Coffres & Armoires fortes"
+                className="w-full h-auto object-cover"
+                loading="lazy"
+              />
+              <div className="absolute bottom-4 left-4 text-white">
+                <h3 className="text-lg font-bold mb-2">Sécurisez vos biens avec confiance.</h3>
+                <span className="inline-flex items-center text-white hover:text-gray-200 font-medium text-sm transition-colors duration-200">
+                  Voir plus
+                  <ArrowRight size={14} className="ml-1" />
+                </span>
+              </div>
+            </div>
+          </Link>
+          <div className="grid grid-cols-2 gap-4">
+            {categoryProducts['Coffres & Armoires fortes'].slice(0, 6).map(product => (
+              <ProductCard key={product.id} product={product} onProductClick={onProductClick} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Équipement Laboratoire section - moved to 4th position with banner slider */}
+      {categoryProducts['Équipement Laboratoire'] && categoryProducts['Équipement Laboratoire'].length > 0 && (
+        <section className="mt-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold dark:text-white">Équipement Laboratoire</h2>
+            <Link
+              to="/categories/1139"
+              className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium text-sm flex items-center gap-1 transition-colors duration-200"
+            >
+              Voir tous les produits
+              <ArrowRight size={14} />
+            </Link>
+          </div>
+          
+          {/* Banner Slider inside Équipement Laboratoire section */}
+          <div className="mb-6">
+            <BannerSlider />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            {categoryProducts['Équipement Laboratoire'].slice(0, 6).map(product => (
+              <ProductCard key={product.id} product={product} onProductClick={onProductClick} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      
+
+      {products.bestSellers.length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-xl font-bold mb-4 dark:text-white">Meilleures ventes</h2>
+          <div className="grid grid-cols-2 gap-4">
+            {products.bestSellers.map(product => (
+              <ProductCard key={product.id} product={product} onProductClick={onProductClick} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Other category sections */}
+      {Object.entries(categoryProducts).map(([title, prods]) =>
+        title !== 'Coffres & Armoires fortes' && title !== 'Équipement Laboratoire' && prods.length > 0 && (
+          <section key={title} className="mt-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold dark:text-white">{title}</h2>
+              <Link
+                to={getCategorySlug(title)}
+                className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium text-sm flex items-center gap-1 transition-colors duration-200"
+              >
+                Voir tous les produits
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {prods.map(product => (
+                <ProductCard key={product.id} product={product} onProductClick={onProductClick} />
+              ))}
+            </div>
+          </section>
+        )
+      )}
+
+      {/* Blog Section - moved to end */}
       {blogPosts.length > 0 && (
         <section className="mt-8">
           <h2 className="text-xl font-bold mb-4 dark:text-white flex items-center gap-2">
@@ -331,39 +433,6 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
             </a>
           </div>
         </section>
-      )}
-
-      {products.nonFeatured.length > 0 && (
-        <section className="mt-8">
-          <h2 className="text-xl font-bold mb-4 dark:text-white">Nouveaux produits</h2>
-          <div className="grid grid-cols-2 gap-4">
-            {products.nonFeatured.map(product => (
-              <ProductCard key={product.id} product={product} onProductClick={onProductClick} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {Object.entries(categoryProducts).map(([title, prods]) =>
-        prods.length > 0 && (
-          <section key={title} className="mt-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold dark:text-white">{title}</h2>
-              <Link
-                to={getCategorySlug(title)}
-                className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium text-sm flex items-center gap-1 transition-colors duration-200"
-              >
-                Voir tous les produits
-                <ArrowRight size={14} />
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {prods.map(product => (
-                <ProductCard key={product.id} product={product} onProductClick={onProductClick} />
-              ))}
-            </div>
-          </section>
-        )
       )}
 
       {/* Back to Top Button */}

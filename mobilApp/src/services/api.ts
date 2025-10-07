@@ -95,6 +95,31 @@ export const api: APIInterface = {
     return products;
   },
 
+  async getBestSellers(params: Record<string, string | number> = {}): Promise<Product[]> {
+    // Check cache first
+    const cacheKey = { ...params, best_sellers: true };
+    const cachedProducts = cacheService.getProducts(cacheKey);
+    if (cachedProducts) {
+      return cachedProducts;
+    }
+
+    // Set up parameters for best sellers (ordered by popularity/sales)
+    const enhancedParams = {
+      ...params,
+      orderby: 'popularity',
+      order: 'desc',
+      per_page: params.per_page || 8,
+      status: 'publish'
+    };
+
+    const queryParams = new URLSearchParams(enhancedParams as Record<string, string>).toString();
+    const products = await apiRequest(`/products?${queryParams}`);
+    
+    // Cache the results
+    cacheService.setProducts(products, cacheKey);
+    return products;
+  },
+
   async getProduct(id: number): Promise<Product> {
     // Check cache first
     const cachedProduct = cacheService.getProduct(id);
