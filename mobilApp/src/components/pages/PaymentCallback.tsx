@@ -71,7 +71,6 @@ const PaymentCallback: React.FC<PaymentCallbackProps> = ({ success }) => {
           }
         }
       } catch (error) {
-        console.error('Error handling payment callback:', error);
         if (isInIframe && parentOrigin) {
           window.parent.postMessage({ type: 'konnectPaymentResult', success: false, error: 'Error processing payment callback' }, parentOrigin);
         } else {

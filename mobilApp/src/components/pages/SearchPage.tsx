@@ -6,6 +6,7 @@ import { ProductCard } from '../common/ProductCard';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
 import { products as productNames } from '../../contexts/products.js';
+import toast from 'react-hot-toast';
 
 interface SearchPageProps {
   onProductClick: (product: Product) => void;
@@ -74,7 +75,7 @@ export function SearchPage({ onProductClick }: SearchPageProps) {
       const results = await api.searchProducts(searchQuery);
       setProducts(results);
     } catch (error) {
-      console.error('Error searching products:', error);
+      toast.error('Erreur lors de la recherche des produits.');
     } finally {
       setLoading(false);
     }

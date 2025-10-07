@@ -33,7 +33,12 @@ class MobileAppAuthEndpoint {
                 'http://localhost:3000',
                 'http://localhost:5173',
                 'https://klarrion.com',
-                'https://www.klarrion.com'
+                'https://www.klarrion.com',
+                'http://192.168.0.199:2403',
+                'http://192.168.0.199:2404',
+                'http://192.168.0.199:2405',
+                'http://192.168.0.199:2406',
+                'http://192.168.0.199:2407'
             );
             
             if (in_array($origin, $allowed_origins)) {

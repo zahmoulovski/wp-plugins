@@ -43,7 +43,6 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ className = '' }) => 
         setError('Projet non trouvé');
       }
     } catch (err) {
-      console.error('Error fetching portfolio item:', err);
       setError('Erreur lors du chargement du projet');
     } finally {
       setLoading(false);
@@ -180,12 +179,54 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ className = '' }) => 
 
   if (loading) {
     return (
-      <div className={`flex items-center justify-center min-h-[600px] ${className}`}>
-        <div className="text-center">
-          <div className="w-12 h-12 animate-spin text-primary mx-auto mb-4">
-            <ArrowClockwise className="w-12 h-12" />
+      <div className={`max-w-6xl mx-auto px-4 py-8 mb-20 ${className}`}>
+        {/* Back Button Skeleton */}
+        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 mb-6">
+          <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+          <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Project Details Skeleton */}
+          <div className="space-y-6 lg:col-span-2">
+            <div>
+              {/* Title Skeleton */}
+              <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded mb-4 animate-pulse"></div>
+              
+              {/* Meta Info Skeleton */}
+              <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400 mb-6">
+                <div className="flex items-center gap-1">
+                  <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+              </div>
+
+              {/* Categories Skeleton */}
+              <div className="flex flex-wrap gap-2 mb-6">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                ))}
+              </div>
+            </div>
+
+            {/* Content Skeleton */}
+            <div className="space-y-4">
+              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
+              
+              {/* Image Gallery Skeleton */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-8">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="aspect-square bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+                ))}
+              </div>
+            </div>
           </div>
-          <p className="text-gray-600 dark:text-gray-400">Chargement du projet...</p>
         </div>
       </div>
     );
@@ -239,24 +280,19 @@ const PortfolioDetail: React.FC<PortfolioDetailProps> = ({ className = '' }) => 
                    day: 'numeric'
                  })}
                </span>
-               <span className="flex items-center gap-1">
-                 <Person className="w-4 h-4" />
-                 {item._embedded?.author?.[0]?.name || 'Unknown'}
-               </span>
+               {(item.project_categories || item.portfolio_categories) && (item.project_categories?.length > 0 || item.portfolio_categories?.length > 0) && (
+                 <div className="flex items-center gap-1">
+                   <span className="text-primary font-medium">
+                     {(item.project_categories?.[0]?.name || item.portfolio_categories?.[0]?.name || '')}
+                   </span>
+                   {((item.project_categories?.length || 0) + (item.portfolio_categories?.length || 0)) > 1 && (
+                     <span className="text-xs text-gray-400">
+                       +{((item.project_categories?.length || 0) + (item.portfolio_categories?.length || 0)) - 1}
+                     </span>
+                   )}
+                 </div>
+               )}
              </div>
-
-              {item.project_categories && item.project_categories.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {item.project_categories.map((category) => (
-                    <span
-                      key={category.id}
-                      className="px-3 py-1 bg-primary/10 text-primary text-sm rounded-full dark:bg-primary/20"
-                    >
-                      {category.name}
-                    </span>
-                  ))}
-                </div>
-              )}
            </div>
 
            <div className="prose prose-lg dark:prose-invert max-w-none">

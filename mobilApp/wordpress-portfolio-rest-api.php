@@ -213,10 +213,41 @@ add_filter('rest_prepare_portfolio', 'klarrion_modify_portfolio_rest_response', 
  * Enable CORS for REST API requests
  */
 function klarrion_enable_portfolio_cors() {
-    header("Access-Control-Allow-Origin: *");
-    header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
-    header("Access-Control-Allow-Credentials: true");
-    header("Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce");
+    // Handle CORS for the portfolio endpoints
+    if (isset($_SERVER['HTTP_ORIGIN'])) {
+        $origin = $_SERVER['HTTP_ORIGIN'];
+        
+        // Allow requests from your mobile app domain
+        $allowed_origins = array(
+            'http://localhost:2403',
+            'http://localhost:2404',
+            'http://localhost:2405',
+            'http://localhost:2406',
+            'http://localhost:2407',
+            'http://localhost:3000',
+            'http://localhost:5173',
+            'https://klarrion.com',
+            'https://www.klarrion.com',
+            'http://192.168.0.199:2403',
+            'http://192.168.0.199:2404',
+            'http://192.168.0.199:2405',
+            'http://192.168.0.199:2406',
+            'http://192.168.0.199:2407'
+        );
+        
+        if (in_array($origin, $allowed_origins)) {
+            header("Access-Control-Allow-Origin: $origin");
+            header('Access-Control-Allow-Credentials: true');
+            header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+            header('Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce');
+        }
+    } else {
+        // Fallback to wildcard for non-browser requests
+        header("Access-Control-Allow-Origin: *");
+        header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
+        header("Access-Control-Allow-Credentials: true");
+        header("Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce");
+    }
     
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
         status_header(200);

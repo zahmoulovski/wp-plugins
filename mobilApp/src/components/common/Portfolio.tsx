@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { PortfolioItem, ProjectCategory } from '../../types';
-import { BoxArrowUpRight, Calendar, Person, ArrowClockwise } from 'react-bootstrap-icons';
+import { BoxArrowUpRight, Calendar3, Person, ArrowClockwise } from 'react-bootstrap-icons';
 import Lightbox from "./Lightbox";
 
 interface PortfolioProps {
   className?: string;
   selectedCategory?: string;
   onCategoryChange?: (category: string) => void;
+  onLoad?: () => void;
 }
 
 const portfolioCache = {
@@ -31,7 +32,8 @@ const portfolioCache = {
 const Portfolio: React.FC<PortfolioProps> = ({ 
   className = '', 
   selectedCategory: externalSelectedCategory,
-  onCategoryChange 
+  onCategoryChange,
+  onLoad
 }) => {
   const navigate = useNavigate();
   const [items, setItems] = useState<PortfolioItem[]>([]);
@@ -71,6 +73,10 @@ const Portfolio: React.FC<PortfolioProps> = ({
         setTotalItems(portfolioCache.items!.length);
         setHasMore(portfolioCache.items!.length >= 12);
         setLoading(false);
+        // Call onLoad callback when cached data is used
+        if (onLoad) {
+          onLoad();
+        }
         return;
       }
 
@@ -119,8 +125,18 @@ const Portfolio: React.FC<PortfolioProps> = ({
       setPage(1);
       setHasMore(allItems.length >= 12);
       setTotalItems(allItems.length);
+      
+      // Call onLoad callback when data is loaded
+      if (onLoad) {
+        onLoad();
+      }
     } catch (err) {
+      console.error('Portfolio loading error:', err);
       setError('Erreur lors du chargement du portfolio');
+      // Still call onLoad on error to hide skeleton
+      if (onLoad) {
+        onLoad();
+      }
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -282,12 +298,29 @@ const Portfolio: React.FC<PortfolioProps> = ({
 
   if (loading) {
     return (
-      <div className={`flex items-center justify-center min-h-[400px] ${className}`}>
-        <div className="text-center">
-          <div className="w-12 h-12 animate-spin text-primary mx-auto mb-4">
-            <ArrowClockwise className="w-12 h-12" />
-          </div>
-          <p className="text-gray-600 dark:text-gray-400">Chargement du portfolio...</p>
+      <div className={`portfolio-container ${className}`}>
+        <div className="flex flex-wrap gap-2 justify-center mb-8">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-12 w-32 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+          ))}
+        </div>
+        
+        <div className="columns-1 md:columns-2 lg:columns-3 xl:columns-4 gap-6 space-y-6">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden break-inside-avoid mb-6 animate-pulse">
+              <div className="h-48 bg-gray-200 dark:bg-gray-700"></div>
+              <div className="p-6">
+                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded mb-3"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-4 w-3/4"></div>
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                </div>
+                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -312,20 +345,13 @@ const Portfolio: React.FC<PortfolioProps> = ({
 
   return (
     <div className={`portfolio-container ${className}`}>
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Notre Portfolio</h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Découvrez nos projets récents et notre expertise en action
-        </p>
-      </div>
-
       <div className="flex flex-wrap gap-2 justify-center mb-8">
         <button
           onClick={() => setSelectedCategory('all')}
-          className={`px-6 py-3 rounded-full font-medium transition-all duration-300 ${
+          className={`px-6 py-3 rounded-full font-300 transition-all duration-300 ${
             selectedCategory === 'all'
-              ? 'bg-primary text-white shadow-lg transform scale-105'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-md dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+              ? 'bg-primary-500 text-white dark:text-white shadow-lg transform scale-105'
+              : 'bg-gray-100 text-primary hover:bg-gray-200 hover:shadow-md dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
           }`}
         >
           Tous les projets
@@ -338,10 +364,10 @@ const Portfolio: React.FC<PortfolioProps> = ({
             <button
               key={category.id}
               onClick={() => setSelectedCategory(category.slug)}
-              className={`px-6 py-3 rounded-full font-medium transition-all duration-300 ${
+              className={`px-6 py-3 rounded-full font-300 transition-all duration-300 ${
                 selectedCategory === category.slug
-                  ? 'bg-primary text-white shadow-lg transform scale-105'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-md dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                  ? 'bg-primary-500 text-white dark:text-white shadow-lg transform scale-105'
+                  : 'bg-gray-100 text-primary hover:bg-gray-200 hover:shadow-md dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
               }`}
             >
               {category.name}
@@ -356,8 +382,7 @@ const Portfolio: React.FC<PortfolioProps> = ({
       <div className="columns-1 md:columns-2 lg:columns-3 xl:columns-4 gap-6 space-y-6">
         {filteredItems.map((item) => {
           const featuredImage = getFeaturedImage(item);
-          const author = item._embedded?.author?.[0];
-
+          
           return (
             <article
               key={item.id}
@@ -390,43 +415,28 @@ const Portfolio: React.FC<PortfolioProps> = ({
                   dangerouslySetInnerHTML={{ __html: item.title.rendered }}
                 />
 
-                <div 
-                  className="text-gray-600 dark:text-gray-300 mb-4 line-clamp-3"
-                  dangerouslySetInnerHTML={{ __html: item.excerpt.rendered }}
-                />
-
                 <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
+                      <Calendar3 className="w-4 h-4" />
                       <span>{formatDate(item.date)}</span>
                     </div>
-                    {author && (
+                    {(item.project_categories || item.portfolio_categories) && (item.project_categories?.length > 0 || item.portfolio_categories?.length > 0) && (
                       <div className="flex items-center gap-1">
-                        <Person className="w-4 h-4" />
-                        <span>{author.name}</span>
+                        <span className="text-primary font-medium">
+                          {(item.project_categories?.[0]?.name || item.portfolio_categories?.[0]?.name || '')}
+                        </span>
+                        {((item.project_categories?.length || 0) + (item.portfolio_categories?.length || 0)) > 1 && (
+                          <span className="text-xs text-gray-400">
+                            +{((item.project_categories?.length || 0) + (item.portfolio_categories?.length || 0)) - 1}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
                 </div>
 
-                {(item.project_categories || item.portfolio_categories) && (item.project_categories?.length > 0 || item.portfolio_categories?.length > 0) && (
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {(item.project_categories || item.portfolio_categories || []).slice(0, 3).map((category) => (
-                      <span
-                        key={category.id}
-                        className="px-3 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full"
-                      >
-                        {category.name}
-                      </span>
-                    ))}
-                    {((item.project_categories?.length || 0) + (item.portfolio_categories?.length || 0)) > 3 && (
-                      <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs font-medium rounded-full">
-                        +{((item.project_categories?.length || 0) + (item.portfolio_categories?.length || 0)) - 3}
-                      </span>
-                    )}
-                  </div>
-                )}
+
 
               <div className="flex gap-3">
                 <button

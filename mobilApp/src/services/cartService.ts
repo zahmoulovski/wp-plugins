@@ -8,7 +8,6 @@ export const cartService = {
       const wooCart = await api.getCartFromSession();
       return api.convertWooCommerceCartToAppCart(wooCart);
     } catch (error) {
-      console.error('Failed to get cart from session:', error);
       return [];
     }
   },
@@ -18,7 +17,6 @@ export const cartService = {
     try {
       return await api.addItemToCart(productId, quantity, variationId);
     } catch (error) {
-      console.error('Failed to add item to cart:', error);
       throw error;
     }
   },
@@ -28,7 +26,6 @@ export const cartService = {
     try {
       return await api.removeItemFromCart(cartItemKey);
     } catch (error) {
-      console.error('Failed to remove item from cart:', error);
       throw error;
     }
   },
@@ -38,7 +35,6 @@ export const cartService = {
     try {
       return await api.updateCartItem(cartItemKey, quantity);
     } catch (error) {
-      console.error('Failed to update cart item:', error);
       throw error;
     }
   },
@@ -48,7 +44,6 @@ export const cartService = {
     try {
       return await api.clearCart();
     } catch (error) {
-      console.error('Failed to clear cart:', error);
       throw error;
     }
   },
@@ -68,24 +63,20 @@ export const cartService = {
       // Return the updated cart from session
       return await this.getCartFromSession();
     } catch (error) {
-      console.error('Failed to sync local cart with session:', error);
       return localCart;
     }
   },
 
   // ---------- Legacy methods (deprecated) ----------
   async syncCart(customerId: number, localCart: CartItem[]): Promise<CartItem[]> {
-    console.warn('syncCart is deprecated, use syncLocalCartWithSession instead');
     return localCart;
   },
 
   async getRemoteCart(customerId: number): Promise<CartItem[]> {
-    console.warn('getRemoteCart is deprecated, use getCartFromSession instead');
     return this.getCartFromSession();
   },
 
   async saveRemoteCart(customerId: number, cartItems: CartItem[]): Promise<boolean> {
-    console.warn('saveRemoteCart is deprecated, use syncLocalCartWithSession instead');
     try {
       await this.syncLocalCartWithSession(cartItems);
       return true;

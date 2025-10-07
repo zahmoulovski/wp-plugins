@@ -16,7 +16,17 @@ export default defineConfig({
         target: 'https://klarrion.com',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path
+        rewrite: (path) => path,
+        // Add headers to handle CORS for IP-based access
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            // Ensure proper origin handling for IP-based requests
+            const origin = req.headers.origin;
+            if (origin && (origin.includes('localhost') || origin.includes('192.168.'))) {
+              proxyReq.setHeader('Origin', 'https://klarrion.com');
+            }
+          });
+        }
       }
     }
   },

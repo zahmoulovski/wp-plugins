@@ -55,7 +55,6 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
       const mainCategories = data.filter(cat => cat && cat.id && cat.name && cat.parent === 0);
       setCategories(mainCategories);
     } catch (error) {
-      console.error('Error loading categories:', error);
     } finally {
       setLoading(false);
     }
@@ -70,7 +69,6 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
         await loadCategoryProducts(category.id, 1);
       }
     } catch (error) {
-      console.error('Error loading category by ID:', error);
     }
   };
 
@@ -99,7 +97,6 @@ export function CategoriesPage({ onProductClick }: CategoriesPageProps) {
       
       setHasMoreProducts(products.length === 10);
     } catch (error) {
-      console.error('Error loading category products:', error);
       if (page === 1) {
         setCategoryProducts([]);
         setSubcategories([]);

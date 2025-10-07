@@ -29,7 +29,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         const mainCategories = data.filter(cat => cat && cat.id && cat.name && cat.parent === 0);
         setCategories(mainCategories);
       } catch (error) {
-        console.error('Error loading categories:', error);
       }
     };
     loadCategories();
@@ -50,7 +49,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           
           setSubcategories(newSubcategories);
         } catch (error) {
-          console.error('Error preloading subcategories:', error);
         }
       };
       
@@ -102,7 +100,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             setSubcategories(prev => ({ ...prev, [categoryId]: subs }));
           }
         } catch (error) {
-          console.error('Error loading subcategories:', error);
         }
       }
     }

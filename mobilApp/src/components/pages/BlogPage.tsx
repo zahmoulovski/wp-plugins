@@ -29,7 +29,6 @@ export function BlogPage({ onPostClick }: BlogPageProps) {
       });
 
       if (blogPosts.length === 0 && retryCount < 2) {
-        console.warn('No blog posts returned, retrying...');
         setRetryCount(prev => prev + 1);
         setTimeout(() => loadPosts(), 2000); // Retry after 2 seconds
         return;
@@ -43,7 +42,6 @@ export function BlogPage({ onPostClick }: BlogPageProps) {
         setPosts([]);
       }
     } catch (err) {
-      console.error('Error loading blog posts:', err);
       setError('Impossible de charger les articles du blog. Veuillez réessayer.');
       setPosts([]);
     } finally {

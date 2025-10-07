@@ -67,7 +67,6 @@ export class EmailService {
       };
 
     } catch (error) {
-      console.error('Error sending email:', error);
       return {
         success: false,
         message: 'L\'e-mail n\'a pas pu être envoyé. Veuillez réessayer.'

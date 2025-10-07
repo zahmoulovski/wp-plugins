@@ -1,6 +1,50 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Prevent pull-to-refresh on mobile devices while allowing normal scrolling */
+html {
+  overflow-y: auto;
+  position: static;
+  width: 100%;
+  height: auto;
+  overscroll-behavior-y: contain; /* Prevent pull-to-refresh but allow normal scroll */
+}
+
+body {
+  overflow-y: auto;
+  position: static;
+  width: 100%;
+  height: auto;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  overscroll-behavior-y: contain; /* Prevent pull-to-refresh but allow normal scroll */
+}
+
+/* Prevent text selection on mobile to avoid accidental selections */
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+input, textarea {
+  -webkit-user-select: auto;
+  -moz-user-select: auto;
+  -ms-user-select: auto;
+  user-select: auto;
+}
+
+/* Improve touch responsiveness */
+* {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Prevent zoom on double tap */
+* {
+  touch-action: pan-y;
+}
 @keyframes scroll {
     0% { transform: translateX(100%); }
     100% { transform: translateX(-100%); }

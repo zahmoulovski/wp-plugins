@@ -165,7 +165,6 @@ export function ProfilePage() {
       }
 
     } catch (error) {
-      console.error('Login error:', error);
       if (error.message === 'Invalid password') {
         toast.error('Mot de passe incorrect. Veuillez réessayer.');
       } else if (error.message === 'User not found') {
@@ -241,7 +240,6 @@ export function ProfilePage() {
       toast.success('Compte créé avec succès !');
 
     } catch (error: any) {
-      console.error('Sign up error:', error);
       const errorMessage = error.message || error.toString();
       if (errorMessage?.includes('email')) {
         toast.error('Cet email est déjà utilisé');
@@ -339,7 +337,6 @@ export function ProfilePage() {
       toast.success('Profile updated successfully!');
 
     } catch (error: any) {
-      console.error('Profile update error:', error);
       if (error.message?.includes('email')) {
         toast.error('This email is already in use');
       } else {
@@ -376,7 +373,6 @@ export function ProfilePage() {
         toast.error('WordPress endpoint test failed. The plugin may not be active.');
       }
     } catch (error) {
-      console.error('Endpoint test error:', error);
       toast.error('Failed to test WordPress endpoint');
     } finally {
       setLoading(false);
@@ -428,7 +424,6 @@ export function ProfilePage() {
       toast.success('Mot de passe mis à jour avec succès !');
 
     } catch (error: any) {
-      console.error('Erreur de mise à jour du mot de passe :', error);
       
       // Handle specific error messages from the API
       if (error.message?.includes('current_password')) {
@@ -495,7 +490,6 @@ export function ProfilePage() {
       toast.success('Adresses mises à jour avec succès !');
 
     } catch (error: any) {
-      console.error('Erreur de mise à jour des adresses :', error);
       toast.error('Échec de la mise à jour des adresses');
     } finally {
       setLoading(false);
@@ -571,7 +565,6 @@ export function ProfilePage() {
       window.open(payment.payUrl, '_blank');
 
     } catch (error) {
-      console.error('Erreur lors de l\'initialisation du paiement :', error);
       toast.error('Erreur lors de l\'initialisation du paiement. Veuillez reessayer.');
     }
   };
@@ -641,7 +634,6 @@ export function ProfilePage() {
           addedItems++;
           
         } catch (error) {
-          console.error(`Error adding item ${item.name}:`, error);
           unavailableItems.push({ name: item.name, reason: 'Erreur lors de l\'ajout' });
         }
       }
@@ -673,7 +665,6 @@ export function ProfilePage() {
       }
       
     } catch (error) {
-      console.error('Error reordering items:', error);
       toast.error('Erreur lors de l\'ajout des articles au panier.');
     }
   };

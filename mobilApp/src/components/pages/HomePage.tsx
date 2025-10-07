@@ -105,7 +105,6 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
         nonFeatured: filteredNonFeatured,
       });
     } catch (err) {
-      console.error('Error loading products:', err);
       // If we have cached products from previous sessions, show them as fallback
       if (products.featured.length === 0 && products.nonFeatured.length === 0) {
         setError('Failed to load products');
@@ -134,8 +133,6 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
         setBlogPosts([]);
       }
     } catch (error) {
-      console.error('Error loading blog posts:', error);
-      // If API fails, show empty state instead of sample data
       setBlogPosts([]);
     }
   };
@@ -172,9 +169,6 @@ export function HomePage({ onProductClick, onBlogPostClick }: HomePageProps) {
       
       setCategoryProducts(filteredResults);
     } catch (err) {
-      console.error('Error loading category products:', err);
-      // Don't set error for category products - show empty state instead
-      // This allows the main products to display even if categories fail
     } finally {
       setLoading(false);
     }

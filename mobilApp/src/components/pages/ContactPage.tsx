@@ -70,7 +70,6 @@ export const ContactPage: React.FC = () => {
       }
 
     } catch (error) {
-      console.error('Form submission error:', error);
       setErrorMessage('An unexpected error occurred. Please try again later.');
     } finally {
       setIsSubmitting(false);

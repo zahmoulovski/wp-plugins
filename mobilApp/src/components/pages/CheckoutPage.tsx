@@ -213,11 +213,8 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
         // Clear the cart
         dispatch({ type: 'CLEAR_CART' });
         
-        // Navigate to thank you page with order details
         onOrderSuccess(selectedOrder, calculateSubtotal());
       } catch (error) {
-        console.error('Error updating order status:', error);
-        // Still clear cart and navigate to thank you page even if update fails
         dispatch({ type: 'CLEAR_CART' });
         onOrderSuccess(selectedOrder, calculateSubtotal());
       }

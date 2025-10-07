@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './contexts/AppContext';
+import { StatePersistenceProvider, useStatePersistenceContext } from './contexts/StatePersistenceContext';
 import { Header } from './components/Layout/Header';
 import { Sidebar } from './components/Layout/Sidebar';
 import { BottomNav } from './components/Layout/BottomNav';
@@ -29,9 +30,17 @@ import { initGA, logPageView } from './utils/analytics';
 // Removed Capacitor - web only application
 
 function AppContent() {
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { restoreState, saveState } = useStatePersistenceContext();
+  
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(() => 
+    restoreState('selectedProduct', null)
+  );
+  const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(() => 
+    restoreState('selectedBlogPost', null)
+  );
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => 
+    restoreState('isSidebarOpen', false)
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
 
@@ -41,10 +50,12 @@ function AppContent() {
 
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
+    saveState('selectedProduct', product);
   };
 
   const handleBlogPostClick = (post: BlogPost) => {
     setSelectedBlogPost(post);
+    saveState('selectedBlogPost', post);
   };
 
   const handleCheckout = () => {
@@ -81,11 +92,14 @@ function AppContent() {
   const isCheckoutPage = location.pathname === '/checkout';
 
   const handleMenuClick = () => {
-    setIsSidebarOpen(!isSidebarOpen);
+    const newState = !isSidebarOpen;
+    setIsSidebarOpen(newState);
+    saveState('isSidebarOpen', newState);
   };
 
   const handleSidebarClose = () => {
     setIsSidebarOpen(false);
+    saveState('isSidebarOpen', false);
   };
 
   // Initialize dark mode based on saved preference
@@ -237,7 +251,9 @@ function AppContent() {
 function App() {
   return (
     <AppProvider>
-      <AppContent />
+      <StatePersistenceProvider>
+        <AppContent />
+      </StatePersistenceProvider>
     </AppProvider>
   );
 }

@@ -265,7 +265,6 @@ export async function calculateDynamicShippingCosts(
       }))
     };
   } catch (error) {
-    console.error('Error calculating dynamic shipping costs:', error);
     throw error;
   }
 }

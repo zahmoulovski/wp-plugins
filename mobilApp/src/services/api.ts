@@ -327,10 +327,9 @@ export const api: APIInterface = {
         return data.customer;
       } else {
         // Fallback to standard WooCommerce API if custom endpoint fails
-        console.log('Custom endpoint failed, falling back to WooCommerce API');
       }
     } catch (error) {
-      console.log('Custom endpoint error, falling back to WooCommerce API:', error);
+      // Custom endpoint error, falling back to WooCommerce API
     }
 
     // Fallback to standard WooCommerce API and try to enhance with avatar data
@@ -649,10 +648,8 @@ export const api: APIInterface = {
       const response = await fetch(`${wpBaseUrl}/wp-json/mobile-app/v1/test`);
       const data = await response.json();
       
-      console.log('WordPress endpoint test result:', data);
       return data.success === true;
     } catch (error) {
-      console.error('WordPress endpoint test failed:', error);
       return false;
     }
   },
@@ -665,18 +662,17 @@ export const api: APIInterface = {
   async getBlogPosts(params: Record<string, string | number> = {}): Promise<BlogPost[]> {
     try {
       // Check cache first
-      const cachedPosts = cacheService.getProducts(params); // Reuse product cache for blog posts
+      const cachedPosts = cacheService.getProducts(params); 
       if (cachedPosts) {
         return cachedPosts as any;
       }
 
-      // Build query parameters with defaults
       const defaultParams = {
         per_page: 5,
         orderby: 'date',
         order: 'desc',
         status: 'publish',
-        categories: 1, // Filter by blog category (ID 1)
+        categories: 1, 
         ...params
       };
 
@@ -701,14 +697,9 @@ export const api: APIInterface = {
         
         posts = await response.json();
       } catch (apiError) {
-        console.warn('WordPress API request failed:', apiError);
-        console.warn('Attempting fallback to WooCommerce API...');
-        
-        // Fallback to WooCommerce API if WordPress API fails
         try {
           posts = await apiRequest(`/posts?${queryParams}&_embed`);
         } catch (wcError) {
-          console.error('Both APIs failed:', apiError, wcError);
           return [];
         }
       }
@@ -717,8 +708,6 @@ export const api: APIInterface = {
       cacheService.setProducts(posts, params);
       return posts;
     } catch (error) {
-      console.error('Error fetching blog posts:', error);
-      // Return empty array as fallback
       return [];
     }
   },
@@ -783,7 +772,6 @@ export const api: APIInterface = {
       // Add _embed parameter to get embedded categories
       const wpApiUrl = `${wpBaseUrl}/wp-json/wp/v2/portfolio?${queryParams}&_embed`;
       
-      console.log('API: Fetching portfolio items from:', wpApiUrl);
       const response = await fetch(wpApiUrl, {
         headers: {
           'Content-Type': 'application/json',
@@ -795,7 +783,6 @@ export const api: APIInterface = {
       }
       
       const items = await response.json();
-      console.log('API: Raw portfolio items response:', items.length, 'items');
       
       // Transform the data to match our interface
       return items.map((item: any) => {
@@ -803,8 +790,6 @@ export const api: APIInterface = {
         const portfolioCategories = item._embedded?.['wp:term']?.[0] || item.portfolio_categories || [];
         const projectCategories = item._embedded?.['wp:term']?.[1] || item['project-cat'] || [];
         
-        console.log(`API: Item ${item.id} - portfolio_categories:`, portfolioCategories);
-        console.log(`API: Item ${item.id} - project_categories:`, projectCategories);
         
         return {
           id: item.id,
@@ -829,7 +814,7 @@ export const api: APIInterface = {
       });
     } catch (error) {
       console.error('Error fetching portfolio items:', error);
-      return [];
+      throw error; // Re-throw the error so the component can handle it
     }
   },
 
@@ -838,7 +823,7 @@ export const api: APIInterface = {
       const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
       const wpApiUrl = `${wpBaseUrl}/wp-json/wp/v2/project-cat?per_page=100`;
       
-      console.log('API: Fetching project categories from:', wpApiUrl);
+      // Fetching project categories from API
       const response = await fetch(wpApiUrl, {
         headers: {
           'Content-Type': 'application/json',
@@ -850,7 +835,6 @@ export const api: APIInterface = {
       }
       
       const categories = await response.json();
-      console.log('API: Raw project categories response:', categories);
       
       // Transform the data to match our interface
       return categories.map((cat: any) => ({
@@ -865,7 +849,7 @@ export const api: APIInterface = {
       }));
     } catch (error) {
       console.error('Error fetching project categories:', error);
-      return [];
+      throw error; // Re-throw the error so the component can handle it
     }
   },
 
@@ -874,7 +858,7 @@ export const api: APIInterface = {
       const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
       const wpApiUrl = `${wpBaseUrl}/wp-json/wp/v2/portfolio_category?per_page=100`;
       
-      console.log('API: Fetching portfolio categories from:', wpApiUrl);
+      // Fetching portfolio categories from API
       const response = await fetch(wpApiUrl, {
         headers: {
           'Content-Type': 'application/json',
@@ -886,7 +870,6 @@ export const api: APIInterface = {
       }
       
       const categories = await response.json();
-      console.log('API: Raw portfolio categories response:', categories);
       
       // Transform the data to match our interface
       return categories.map((cat: any) => ({
@@ -900,7 +883,7 @@ export const api: APIInterface = {
         category_data: cat.category_data
       }));
     } catch (error) {
-      console.error('Error fetching portfolio categories:', error);
+      // Error fetching portfolio categories
       return [];
     }
   },
@@ -910,7 +893,7 @@ export const api: APIInterface = {
       const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
       const wpApiUrl = `${wpBaseUrl}/wp-json/wp/v2/portfolio/${id}?_embed`;
       
-      console.log('API: Fetching portfolio item from:', wpApiUrl);
+      // Fetching portfolio item from API
       const response = await fetch(wpApiUrl, {
         headers: {
           'Content-Type': 'application/json',
@@ -922,7 +905,6 @@ export const api: APIInterface = {
       }
       
       const item = await response.json();
-      console.log('API: Raw portfolio item response:', item);
       
       // Transform the data to match our interface
       const portfolioCategories = item._embedded?.['wp:term']?.[0] || item.portfolio_categories || [];
@@ -949,7 +931,7 @@ export const api: APIInterface = {
         _embedded: item._embedded
       };
     } catch (error) {
-      console.error('Error fetching portfolio item:', error);
+      // Error fetching portfolio item
       return null;
     }
   },

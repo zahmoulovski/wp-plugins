@@ -103,7 +103,6 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
         // Show message
         setPaymentError('Paiement annulé. Votre commande est en attente.');
       } catch (error) {
-        console.error('Error updating order status:', error);
         setPaymentError('Erreur lors de la mise à jour du statut de la commande.');
       }
     }
@@ -129,7 +128,6 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
           konnectModal.closeKonnectPayment();
           setPaymentError(''); // Clear any previous errors
         } catch (error) {
-          console.error('Error updating order status:', error);
         }
       } else if (event.data === 'payment_failed') {
         try {
@@ -139,7 +137,6 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
           konnectModal.closeKonnectPayment();
           setPaymentError('Le paiement a échoué. Votre commande est en attente.');
         } catch (error) {
-          console.error('Error updating order status:', error);
         }
       }
     };
@@ -168,7 +165,6 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
         setEmailVerificationError('Aucune commande trouvée avec cet email. Veuillez vérifier votre email et reessayer.');
       }
     } catch (error) {
-      console.error('Error verifying order by email:', error);
       setEmailVerificationError('Erreur lors de la vérification de la commande. Veuillez reessayer.');
     } finally {
       setIsLoading(false);
@@ -404,7 +400,6 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
       });
 
     } catch (error) {
-      console.error('Payment initiation error:', error);
       setPaymentError('Erreur lors de l\'initialisation du paiement. Veuillez reessayer.');
     } finally {
       setIsProcessingPayment(false);
@@ -476,7 +471,6 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
           addedItems++;
           
         } catch (error) {
-          console.error(`Error adding item ${item.name}:`, error);
           unavailableItems.push({ name: item.name, reason: 'Erreur lors de l\'ajout' });
         }
       }
@@ -505,7 +499,6 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
       }
       
     } catch (error) {
-      console.error('Error reordering items:', error);
       toast.error('Erreur lors de l\'ajout des articles au panier.');
     }
   };
