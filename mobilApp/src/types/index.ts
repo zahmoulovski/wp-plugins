@@ -53,7 +53,12 @@ export interface CartItem {
   id: number;
   product: Product;
   quantity: number;
-  attributes?: Record<string, string>;
+  attributes?: Record&lt;string, string&gt;;
+  name: string;
+  price: string;
+  image: string;
+  sku?: string;
+  variationId?: number | null;
 }
 
 export interface Customer {
@@ -263,6 +268,19 @@ export interface PortfolioItem {
   };
 }
 
+export interface Variation {
+  id: number;
+  parent_id: number;
+  price: string;
+  regular_price: string;
+  sale_price: string;
+  attributes: { id: number; name: string; option: string }[];
+  stock_quantity: number | null;
+  stock_status: string;
+  sku: string;
+  image: { src: string };
+  description: string;
+}
 
 
 // API Interface definition
@@ -287,6 +305,7 @@ export interface APIInterface {
   searchBlogPosts(query: string): Promise<BlogPost[]>;
   getBlogCategories(): Promise<Category[]>;
   filterAndSortProductsByStock(products: Product[]): Product[];
+  getProductVariations(productId: number): Promise<Variation[]>;
   
   // Portfolio functions
   getPortfolioItems(params?: Record<string, string | number>): Promise<PortfolioItem[]>;

@@ -43,7 +43,8 @@ export function ProductCard({ product, onProductClick, loading }: ProductCardPro
         image: product.images?.[0]?.src || '',
         sku: product.sku,
         attributes: {},
-        product: product
+        product: product,
+        variationId: null
       }
     });
     

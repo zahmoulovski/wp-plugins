@@ -1,10 +1,17 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { X, Cart, Heart, Plus, Dash, ChatDots } from 'react-bootstrap-icons';
 import { Link } from 'react-router-dom';
-import { Product } from '../../types';
+import { Product, Variation } from '../../types';
 import { useApp } from '../../contexts/AppContext';
 import { decodeHTMLEntities } from '../../utils/htmlUtils';
 import { ImageLightbox } from './ImageLightbox';
+import { ColorVariation } from '../variations/ColorVariation';
+import { ImageVariation } from '../variations/ImageVariation';
+import { SelectVariation } from '../variations/SelectVariation';
+import { BrandVariation } from '../variations/BrandVariation';
+import { api } from '../../services/api';
+import { colorMap } from '../../data/colorMap';
+import { imageMap } from '../../data/imageMap';
 
 
 interface ProductModalProps {
@@ -23,11 +30,51 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const [showWhatsAppEmail, setShowWhatsAppEmail] = useState(false);
   const [whatsappEmail, setWhatsappEmail] = useState('');
   const [showLightbox, setShowLightbox] = useState(false);
-
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
+  const [variations, setVariations] = useState<Variation[]>([]);
+  const [matchedVariation, setMatchedVariation] = useState<Variation | null>(null);
+  const [currentPrice, setCurrentPrice] = useState(product.price);
+  const [currentSku, setCurrentSku] = useState(product.sku);
+  const [currentDescription, setCurrentDescription] = useState(product.description);
+  const [currentRegularPrice, setCurrentRegularPrice] = useState(product.regular_price);
+  const [currentSalePrice, setCurrentSalePrice] = useState(product.sale_price);
+  const [isOnSale, setIsOnSale] = useState(product.on_sale);
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
+
+  useEffect(() => {
+    const fetchVariations = async () => {
+      try {
+        const vars = await api.getProductVariations(product.id);
+        console.log('Fetched variations:', vars);
+        console.log('First variation attributes:', vars[0]?.attributes);
+        setVariations(vars);
+      } catch (error) {
+        console.error('Failed to fetch variations:', error);
+      }
+    };
+    fetchVariations();
+  }, [product.id]);
+
+  useEffect(() => {
+    if (variations.length > 0) {
+      const matched = variations.find(v => {
+        return Object.entries(selectedAttributes).every(([name, value]) => {
+          const attr = v.attributes.find(a => a.name === name);
+          return attr && attr.option === value;
+        });
+      });
+      setMatchedVariation(matched || null);
+      setCurrentPrice(matched ? matched.price : product.price);
+      setCurrentSku(matched ? matched.sku : product.sku);
+      setCurrentDescription(matched ? matched.description : product.description);
+      setCurrentRegularPrice(matched ? matched.regular_price : product.regular_price);
+      setCurrentSalePrice(matched ? matched.sale_price : product.sale_price);
+      setIsOnSale(matched ? matched.on_sale : product.on_sale);
+    }
+  }, [selectedAttributes, variations, product.price]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -80,17 +127,21 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
     return `${numPrice.toFixed(3)} TND`;
   };
 
+  const handleAttributeSelect = (attrName: string, value: string) => {
+    setSelectedAttributes(prev => ({ ...prev, [attrName]: value }));
+  };
+
   const addToCart = () => {
     const cartItem = {
       id: product.id,
-      product: product,
-      name: product.name,
-      price: product.price,
+      name: `${product.name}${Object.keys(selectedAttributes).length > 0 ? ` - ${Object.entries(selectedAttributes).map(([key, value]) => `${key}: ${value}`).join(', ')}` : ''}`,
+      price: currentPrice,
       quantity: quantity,
-      image: product.images[0]?.src || '',
-      sku: product.sku,
-      attributes: {},
-      variationId: null
+      image: matchedVariation?.image?.src || product.images?.[0]?.src || '',
+      sku: currentSku,
+      attributes: selectedAttributes,
+      product: product,
+      variationId: matchedVariation?.id || null
     };
 
     dispatch({ type: 'ADD_TO_CART', payload: cartItem });
@@ -158,6 +209,62 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
     return images;
   }, [product.images, product.name, getThumbnail]);
 
+  const brandAttr = product.attributes?.find(attr => attr.name.toLowerCase() === 'marque' || attr.name.toLowerCase() === 'pa_marques');
+  const otherAttributes = product.attributes?.filter(attr => attr.name.toLowerCase() !== 'marque' && attr.name.toLowerCase() !== 'pa_marques') || [];
+  
+  console.log('Product attributes:', product.attributes);
+  console.log('Other attributes:', otherAttributes);
+  
+  // Debug: Show product data in UI for testing
+  const debugInfo = (
+    <div className="p-4 bg-yellow-100 border border-yellow-400 rounded-lg mb-4">
+      <h3 className="font-bold text-yellow-800 mb-2">Debug Info:</h3>
+      <p className="text-sm text-yellow-700 mb-1">
+        <strong>Product ID:</strong> {product.id}
+      </p>
+      <p className="text-sm text-yellow-700 mb-1">
+        <strong>Product Name:</strong> {product.name}
+      </p>
+      <p className="text-sm text-yellow-700 mb-1">
+        <strong>Has Attributes:</strong> {product.attributes && product.attributes.length > 0 ? 'Yes' : 'No'}
+      </p>
+      {product.attributes && product.attributes.length > 0 && (
+        <div className="text-sm text-yellow-700">
+          <strong>Attributes:</strong>
+          <ul className="ml-4 mt-1">
+            {product.attributes.map((attr, index) => (
+              <li key={index}>
+                {attr.name} (options: {attr.options?.length || 0})
+                {attr.name.toLowerCase().includes('color') && ' 🎨'}
+                {attr.name.toLowerCase().includes('couleur') && ' 🎨'}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p className="text-sm text-yellow-700 mt-2">
+        <strong>Has Variations:</strong> {variations && variations.length > 0 ? 'Yes' : 'No'}
+      </p>
+      {variations && variations.length > 0 && (
+        <div className="text-sm text-yellow-700">
+          <strong>Variations:</strong> {variations.length} total
+          {variations[0]?.attributes && (
+            <div className="ml-4 mt-1">
+              <strong>First variation attributes:</strong>
+              <ul className="ml-4">
+                {variations[0].attributes.map((attr, index) => (
+                  <li key={index}>
+                    {attr.name}: {attr.option}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   const handleBackdropClick = (e: React.MouseEvent) => {
     // Only close if clicking the backdrop and lightbox is not open
     if (e.target === e.currentTarget && !showLightbox) {
@@ -205,6 +312,11 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
               <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded-lg text-xs">
                 Cliquez pour zoomer
               </div>
+              {brandAttr && (
+                <div className="absolute bottom-2 left-2 bg-white px-2 py-1 rounded">
+                  <BrandVariation brand={brandAttr.options[0]} />
+                </div>
+              )}
             </div>
 
             {thumbnailImages.length > 1 && (
@@ -233,24 +345,24 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
           {/* Price and Sale Badge */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex flex-col">
-              {product.on_sale && product.regular_price ? (
+              {isOnSale && currentRegularPrice ? (
                 <div className="flex items-center space-x-2">
                   <span className="text-2xl font-bold text-primary-600">
-                    {formatPrice(product.sale_price || product.price)}
+                    {formatPrice(currentSalePrice || currentPrice)}
                   </span>
                   <span className="text-lg text-gray-500 line-through">
-                    {formatPrice(product.regular_price)}
+                    {formatPrice(currentRegularPrice)}
                   </span>
                 </div>
               ) : (
                 <span className="text-2xl font-bold text-primary-600">
-                  {formatPrice(product.price)}
+                  {formatPrice(currentPrice)}
                 </span>
               )}
             </div>
 
             <div className="flex items-center space-x-2">
-              {product.on_sale && (
+              {isOnSale && (
                 <div className="bg-secondary-500 text-white px-3 py-1 rounded-full text-sm font-bold">
                   Promo
                 </div>
@@ -262,10 +374,13 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
           {product.sku && (
             <div className="mb-4">
               <span className="text-sm text-gray-500 dark:text-gray-400">
-                Réf: {product.sku}
+                Réf: {currentSku}
               </span>
             </div>
           )}
+
+          {/* Debug Info */}
+          {debugInfo}
 
           {/* Categories */}
           {product.categories && product.categories.length > 0 && (
@@ -295,6 +410,85 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
                 className="text-gray-600 dark:text-gray-400"
                 dangerouslySetInnerHTML={{ __html: product.short_description }}
               />
+            </div>
+          )}
+
+          {/* Variations section */}
+          {otherAttributes.length > 0 && (
+            <div className="mb-6">
+              {otherAttributes.map(attr => {
+                const selected = selectedAttributes[attr.name] || attr.options[0];
+                console.log('Processing attribute:', attr.name, 'options:', attr.options);
+                
+                // More flexible color detection
+                const isColorAttribute = 
+                  attr.name.toLowerCase().includes('color') || 
+                  attr.name.toLowerCase().includes('couleur') ||
+                  attr.name.toLowerCase().includes('colour') ||
+                  attr.name.toLowerCase().includes('farbe') ||
+                  (attr.options && attr.options.some(opt => 
+                    colorMap[opt.toLowerCase()] || 
+                    ['rouge', 'bleu', 'vert', 'blanc', 'noir', 'orange', 'violet', 'rose', 'gris', 'marron', 'jaune'].includes(opt.toLowerCase())
+                  ));
+                
+                // More flexible image/material detection
+                const isImageAttribute = 
+                  attr.name.toLowerCase().includes('image') ||
+                  attr.name.toLowerCase().includes('material') ||
+                  attr.name.toLowerCase().includes('matériau') ||
+                  attr.name.toLowerCase().includes('texture') ||
+                  attr.name.toLowerCase().includes('finish') ||
+                  attr.name.toLowerCase().includes('finition') ||
+                  attr.name.toLowerCase().includes('pattern') ||
+                  attr.name.toLowerCase().includes('motif') ||
+                  attr.name.toLowerCase().includes('style') ||
+                  attr.name.toLowerCase().includes('wood') ||
+                  attr.name.toLowerCase().includes('bois') ||
+                  attr.name.toLowerCase().includes('metal') ||
+                  attr.name.toLowerCase().includes('acier') ||
+                  attr.name.toLowerCase().includes('fabric') ||
+                  attr.name.toLowerCase().includes('tissu') ||
+                  attr.name.toLowerCase().includes('leather') ||
+                  attr.name.toLowerCase().includes('cuir') ||
+                  (attr.options && attr.options.some(opt => 
+                    imageMap[opt.toLowerCase()] || 
+                    ['wood', 'bois', 'metal', 'acier', 'steel', 'fabric', 'tissu', 'leather', 'cuir', 'glass', 'verre', 'marble', 'marbre', 'plastic', 'plastique'].includes(opt.toLowerCase())
+                  ));
+                
+                console.log('Is color attribute:', attr.name, isColorAttribute);
+                console.log('Is image attribute:', attr.name, isImageAttribute);
+                
+                if (isColorAttribute) {
+                  return (
+                    <ColorVariation
+                      key={attr.name}
+                      attribute={attr}
+                      selected={selected}
+                      onSelect={(value) => handleAttributeSelect(attr.name, value)}
+                      hexMap={colorMap}
+                    />
+                  );
+                } else if (isImageAttribute) {
+                  return (
+                    <ImageVariation
+                      key={attr.name}
+                      attribute={attr}
+                      selected={selected}
+                      onSelect={(value) => handleAttributeSelect(attr.name, value)}
+                      imageMap={imageMap}
+                    />
+                  );
+                } else {
+                  return (
+                    <SelectVariation
+                      key={attr.name}
+                      attribute={attr}
+                      selected={selected}
+                      onSelect={(value) => handleAttributeSelect(attr.name, value)}
+                    />
+                  );
+                }
+              })}
             </div>
           )}
 
@@ -379,7 +573,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
               </h3>
               <div
                 className="text-gray-600 dark:text-gray-400"
-                dangerouslySetInnerHTML={{ __html: product.description }}
+                dangerouslySetInnerHTML={{ __html: currentDescription }}
               />
             </div>
           )}

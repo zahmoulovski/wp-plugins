@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Plus, Dash, Trash, Bag } from 'react-bootstrap-icons';
+import { Plus, Dash, Trash, Bag, X } from 'react-bootstrap-icons';
 import { useApp } from '../../contexts/AppContext';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
 
@@ -13,12 +13,14 @@ export function CartPage({ onCheckout }: CartPageProps) {
   // Scroll to top when page loads
   useScrollToTop();
 
-  const updateQuantity = (id: number, quantity: number) => {
-    dispatch({ type: 'UPDATE_CART_ITEM', payload: { id, quantity } });
+  const updateQuantity = (id: number, variationId: number | null, newQuantity: number) => {
+    if (newQuantity > 0) {
+      dispatch({ type: 'UPDATE_CART_ITEM', payload: { id, variationId, quantity: newQuantity } });
+    }
   };
 
-  const removeFromCart = (id: number) => {
-    dispatch({ type: 'REMOVE_FROM_CART', payload: id });
+  const removeFromCart = (id: number, variationId: number | null) => {
+    dispatch({ type: 'REMOVE_FROM_CART', payload: { id, variationId } });
   };
 
   const formatPrice = (price: string) => {
@@ -40,7 +42,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
 
   const calculateSubtotal = () => {
     return state.cart.reduce((total, item) => {
-      const price = parseFloat(item.product?.price || '0');
+      const price = parseFloat(item.price || item.product?.price || '0');
       return total + (price * item.quantity);
     }, 0).toFixed(3);
   };
@@ -73,53 +75,57 @@ export function CartPage({ onCheckout }: CartPageProps) {
 
       <div className="space-y-4 mb-6">
         {state.cart.map((item) => (
-          <div key={item.id} className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex space-x-4">
-              <img
-                src={item.product?.images?.[0]?.src || '/api/placeholder/150/150'}
-                alt={item.product?.name || 'Produit'}
-                className="w-20 h-20 rounded-lg object-cover"
-              />
+          <div key={`${item.id}-${item.variationId ?? 'simple'}`} className="flex items-start space-x-4 py-4 border-b dark:border-gray-700 last:border-b-0">
+            <img 
+              src={item.image || item.product?.images?.[0]?.src || '/api/placeholder/150/150'} 
+              alt={item.name || item.product?.name || 'Produit'} 
+              className="w-24 h-24 object-cover rounded-xl"
+            />
+            <div className="flex-1">
+              <h3 className="font-semibold text-gray-900 dark:text-white">{item.name || item.product?.name}</h3>
               
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
-                  {item.product?.name}
-                </h3>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3 dark:text-white">
-                    <button
-                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      className="p-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
-                    >
-                      <Dash className="h-4 w-4" />
-                    </button>
-                    
-                    <span className="font-semibold text-lg">{item.quantity}</span>
-                    
-                    <button
-                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="p-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    <span className="font-bold text-primary-600 dark:text-primary-400">
-                      {formatPrice((parseFloat(item.product?.price || '0') * item.quantity).toString())}
-                    </span>
-                    
-                    <button
-                      onClick={() => removeFromCart(item.id)}
-                      className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </button>
-                  </div>
+              {item.sku && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">Réf: {item.sku}</p>
+              )}
+              
+              {Object.entries(item.attributes || {}).map(([key, value]) => (
+                <p key={key} className="text-sm text-gray-600 dark:text-gray-300">
+                  {key}: {value}
+                </p>
+              ))}
+              
+              <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center space-x-3">
+                  <button 
+                    onClick={() => updateQuantity(item.id, item.variationId ?? null, Math.max(1, item.quantity - 1))}
+                    className="p-1 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  >
+                    <Dash className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  </button>
+                  <span className="w-8 text-center font-medium">{item.quantity}</span>
+                  <button 
+                    onClick={() => updateQuantity(item.id, item.variationId ?? null, item.quantity + 1)}
+                    className="p-1 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  >
+                    <Plus className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  </button>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {formatPrice((parseFloat(item.price) * item.quantity).toString())}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {formatPrice(item.price)} x {item.quantity}
+                  </p>
                 </div>
               </div>
             </div>
+            <button 
+              onClick={() => removeFromCart(item.id, item.variationId ?? null)}
+              className="p-1 hover:text-red-500 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
         ))}
       </div>

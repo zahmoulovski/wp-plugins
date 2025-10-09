@@ -960,4 +960,7 @@ export const api: APIInterface = {
       return null;
     }
   },
+  async getProductVariations(productId: number): Promise<Variation[]> {
+    return apiRequest(`/products/${productId}/variations?per_page=100`);
+  },
 };

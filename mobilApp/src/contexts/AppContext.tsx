@@ -18,9 +18,10 @@ type AppAction =
       sku?: string; 
       attributes?: Record<string, string>;
       product: Product;
+      variationId?: number | null;
     }}
-  | { type: 'REMOVE_FROM_CART'; payload: number }
-  | { type: 'UPDATE_CART_ITEM'; payload: { id: number; quantity: number } }
+  | { type: 'REMOVE_FROM_CART'; payload: { id: number; variationId?: number | null } }
+  | { type: 'UPDATE_CART_ITEM'; payload: { id: number; variationId?: number | null; quantity: number } }
   | { type: 'CLEAR_CART' }
   | { type: 'SET_CUSTOMER'; payload: Customer | null }
   | { type: 'TOGGLE_DARK_MODE' }
@@ -37,43 +38,45 @@ const initialState: AppState = {
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'ADD_TO_CART': {
-      const existingItem = state.cart.find(item => item.id === action.payload.id);
-      let newCart;
-      
-      if (existingItem) {
-        newCart = state.cart.map(item =>
-          item.id === action.payload.id
-            ? { ...item, quantity: item.quantity + action.payload.quantity }
-            : item
-        );
-      } else {
-        newCart = [...state.cart, {
-          id: action.payload.id,
-          product: action.payload.product,
-          quantity: action.payload.quantity,
-          attributes: action.payload.attributes
-        }];
+      const newItem = {
+        ...action.payload,
+        quantity: action.payload.quantity || 1
+      };
+  
+      const existingItemIndex = state.cart.findIndex(
+        item => item.id === newItem.id && item.variationId === newItem.variationId
+      );
+  
+      if (existingItemIndex >= 0) {
+        const updatedCart = [...state.cart];
+        updatedCart[existingItemIndex] = {
+          ...updatedCart[existingItemIndex],
+          quantity: updatedCart[existingItemIndex].quantity + newItem.quantity
+        };
+        return { ...state, cart: updatedCart };
       }
-      
-      localStorage.setItem('cart', JSON.stringify(newCart));
-      return { ...state, cart: newCart };
+  
+      return { ...state, cart: [...state.cart, newItem] };
     }
-    
+
     case 'REMOVE_FROM_CART': {
-      const newCart = state.cart.filter(item => item.id !== action.payload);
-      localStorage.setItem('cart', JSON.stringify(newCart));
-      return { ...state, cart: newCart };
+      return {
+        ...state,
+        cart: state.cart.filter(
+          item => !(item.id === action.payload.id && item.variationId === action.payload.variationId)
+        )
+      };
     }
-    
+
     case 'UPDATE_CART_ITEM': {
-      const newCart = state.cart.map(item =>
-        item.id === action.payload.id
-          ? { ...item, quantity: action.payload.quantity }
-          : item
-      ).filter(item => item.quantity > 0);
-      
-      localStorage.setItem('cart', JSON.stringify(newCart));
-      return { ...state, cart: newCart };
+      return {
+        ...state,
+        cart: state.cart.map(item =>
+          item.id === action.payload.id && item.variationId === action.payload.variationId
+            ? { ...item, quantity: action.payload.quantity }
+            : item
+        )
+      };
     }
     
     case 'CLEAR_CART':
@@ -127,3 +130,14 @@ export function useApp() {
 }
 
 export type { AppContextValue };
+export interface CartItem {
+  id: number;
+  name: string;
+  price: string;
+  quantity: number;
+  image: string;
+  sku?: string;
+  attributes?: Record<string, string>;
+  product: Product;
+  variationId?: number | null;
+}

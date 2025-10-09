@@ -21,6 +21,7 @@ export function HorizontalProductCard({ product, onProductClick, loading }: Hori
 
   const addToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
+    
     dispatch({ 
       type: 'ADD_TO_CART', 
       payload: { 
@@ -31,9 +32,13 @@ export function HorizontalProductCard({ product, onProductClick, loading }: Hori
         image: product.images?.[0]?.src || '',
         sku: product.sku,
         attributes: {},
-        product: product
+        product: product,
+        variationId: null
       }
     });
+    
+    // Track add to cart event
+    logAddToCart(product.id.toString(), product.name, parseFloat(product.price));
   };
 
   const formatPrice = (price: string) => {

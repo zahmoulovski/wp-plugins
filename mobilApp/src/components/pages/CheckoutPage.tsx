@@ -754,10 +754,13 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
                         <img src={i.product.images[0]?.src} alt={i.product.name} className="w-16 h-16 object-cover rounded-lg mr-4" />
                         <div>
                           <h4 className="font-medium text-gray-900 dark:text-white">{i.product.name}</h4>
+                          {i.attributes && Object.entries(i.attributes).map(([key, value]) => (
+                            <p key={key} className="text-sm text-gray-600 dark:text-gray-400">{`${key}: ${value}`}</p>
+                          ))}
                           <p className="text-sm text-gray-500 dark:text-gray-400">Qté: {i.quantity}</p>
                         </div>
                       </div>
-                      <span className="font-semibold text-gray-900 dark:text-white">{(parseFloat(i.product.price) * i.quantity).toFixed(3)} TND</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">{(parseFloat(i.price || i.product.price) * i.quantity).toFixed(3)} TND</span>
                     </div>
                   ))}
                 </div>
