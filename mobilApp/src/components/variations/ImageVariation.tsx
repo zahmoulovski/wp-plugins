@@ -1,79 +1,91 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { imageMap } from '../../data/imageMap';
 
 interface ImageVariationProps {
-  attribute: { name: string; options: string[] };
+  attribute: any;
   selected: string;
   onSelect: (value: string) => void;
-  imageMap: Record<string, string>;
 }
 
-export function ImageVariation({ attribute, selected, onSelect, imageMap }: ImageVariationProps) {
-  // Map of common image variations to placeholder images
-  const placeholderImages: Record<string, string> = {
-    'wood': 'https://via.placeholder.com/100x100/8B4513/FFFFFF?text=Wood',
-    'bois': 'https://via.placeholder.com/100x100/8B4513/FFFFFF?text=Bois',
-    'metal': 'https://via.placeholder.com/100x100/C0C0C0/000000?text=Metal',
-    'acier': 'https://via.placeholder.com/100x100/A0A0A0/000000?text=Acier',
-    'steel': 'https://via.placeholder.com/100x100/A0A0A0/000000?text=Steel',
-    'fabric': 'https://via.placeholder.com/100x100/F5F5DC/000000?text=Fabric',
-    'tissu': 'https://via.placeholder.com/100x100/F5F5DC/000000?text=Tissu',
-    'leather': 'https://via.placeholder.com/100x100/8B4513/FFFFFF?text=Leather',
-    'cuir': 'https://via.placeholder.com/100x100/8B4513/FFFFFF?text=Cuir',
-    'plastic': 'https://via.placeholder.com/100x100/F0F0F0/000000?text=Plastic',
-    'plastique': 'https://via.placeholder.com/100x100/F0F0F0/000000?text=Plastique',
-    'glass': 'https://via.placeholder.com/100x100/E6F3FF/000000?text=Glass',
-    'verre': 'https://via.placeholder.com/100x100/E6F3FF/000000?text=Verre',
-    'marble': 'https://via.placeholder.com/100x100/F8F8FF/000000?text=Marble',
-    'marbre': 'https://via.placeholder.com/100x100/F8F8FF/000000?text=Marbre',
-    'concrete': 'https://via.placeholder.com/100x100/808080/FFFFFF?text=Concrete',
-    'béton': 'https://via.placeholder.com/100x100/808080/FFFFFF?text=Béton',
-    'ceramic': 'https://via.placeholder.com/100x100/FAFAFA/000000?text=Ceramic',
-    'céramique': 'https://via.placeholder.com/100x100/FAFAFA/000000?text=Céramique',
-    'rattan': 'https://via.placeholder.com/100x100/D2691E/FFFFFF?text=Rattan',
-    'wicker': 'https://via.placeholder.com/100x100/D2691E/FFFFFF?text=Wicker',
-    'osier': 'https://via.placeholder.com/100x100/D2691E/FFFFFF?text=Osier'
+export function ImageVariation({ attribute, selected, onSelect }: ImageVariationProps) {
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+
+  const handleImageError = (option: string) => {
+    setImageErrors(prev => ({ ...prev, [option]: true }));
+  };
+
+  const getImageUrl = (option: string): string => {
+    // Try exact match first (case-sensitive)
+    if (imageMap[option]) {
+      return imageMap[option];
+    }
+    
+    // Try lowercase version
+    if (imageMap[option.toLowerCase()]) {
+      return imageMap[option.toLowerCase()];
+    }
+    
+    // Try case variations
+    const variations = [
+      option.toUpperCase(),
+      option.charAt(0).toUpperCase() + option.slice(1).toLowerCase(),
+      option.replace(/\s+/g, ''), // Remove spaces
+      option.replace(/\s+/g, '-'), // Replace spaces with dashes
+      option.replace(/\s+/g, '_'), // Replace spaces with underscores
+      option.toLowerCase().replace(/\s+/g, ''), // Lowercase + remove spaces
+      option.toLowerCase().replace(/\s+/g, '-'), // Lowercase + replace spaces with dashes
+      option.toLowerCase().replace(/\s+/g, '_'), // Lowercase + replace spaces with underscores
+    ];
+    
+    for (const variation of variations) {
+      if (imageMap[variation]) {
+        return imageMap[variation];
+      }
+    }
+    
+    return ''; // Return empty string to indicate no image found
   };
 
   return (
     <div className="mb-4">
-      <h4 className="font-semibold text-sm mb-2">{attribute.name}:</h4>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        {attribute.name}
+      </label>
       <div className="flex flex-wrap gap-2">
-        {attribute.options.map((option) => {
-          const imgUrl = imageMap[option.toLowerCase()] || '';
-          const placeholderUrl = placeholderImages[option.toLowerCase()];
-          const finalUrl = imgUrl || placeholderUrl;
-          
-          console.log('Image option:', option, 'URL found:', imgUrl, 'placeholder:', placeholderUrl);
+        {attribute.options.map((option: string) => {
+          const imageUrl = getImageUrl(option);
+          const hasError = imageErrors[option];
+          const isSelected = selected === option;
           
           return (
             <button
               key={option}
               onClick={() => onSelect(option)}
-              className={`w-10 h-10 rounded-lg border-2 overflow-hidden flex items-center justify-center ${
-                selected === option 
-                  ? 'border-primary-600 ring-2 ring-primary-200' 
-                  : 'border-gray-300 hover:border-gray-400'
-              } transition-all duration-200 hover:scale-105`}
+              className={`
+                relative p-2 rounded-lg border-2 transition-all duration-200
+                ${isSelected 
+                  ? 'border-primary-500 shadow-lg scale-105' 
+                  : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                }
+                ${!imageUrl ? 'bg-gray-100 dark:bg-gray-800 flex items-center justify-center' : ''}
+              `}
               title={option}
             >
-              {finalUrl ? (
-                <img 
-                  src={finalUrl} 
-                  alt={option} 
-                  className="w-8 h-8 object-cover rounded-md shadow-sm"
-                  onError={(e) => {
-                    // Fallback to text if image fails to load
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    target.parentElement!.innerHTML = `<span class="text-xs font-medium text-gray-700 dark:text-gray-300">${option.charAt(0).toUpperCase()}</span>`;
-                  }}
+              {imageUrl && !hasError ? (
+                <img
+                  src={imageUrl}
+                  alt={option}
+                  className="w-16 h-16 object-cover rounded-md"
+                  onError={() => handleImageError(option)}
                 />
               ) : (
-                // Fallback to text with first letter if no image found
-                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  {option.charAt(0).toUpperCase()}
-                </span>
+                <div className="text-xs text-gray-700 dark:text-gray-300 text-center px-1 leading-tight">
+                  {option}
+                </div>
               )}
+              <span className="block text-xs text-center mt-1 text-gray-700 dark:text-gray-300">
+                {option}
+              </span>
             </button>
           );
         })}

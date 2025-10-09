@@ -8,41 +8,14 @@ interface ColorVariationProps {
 }
 
 export function ColorVariation({ attribute, selected, onSelect, hexMap }: ColorVariationProps) {
-  // Map of color names to emoji squares for fallback display
-  const colorEmojiMap: Record<string, string> = {
-    'blanc': '⬜',
-    'white': '⬜',
-    'noir': '⬛',
-    'black': '⬛',
-    'rouge': '🟥',
-    'red': '🟥',
-    'bleu': '🟦',
-    'blue': '🟦',
-    'vert': '🟩',
-    'green': '🟩',
-    'jaune': '🟨',
-    'yellow': '🟨',
-    'orange': '🟧',
-    'violet': '🟪',
-    'purple': '🟪',
-    'rose': '🩷',
-    'pink': '🩷',
-    'gris': '⬛',
-    'gray': '⬛',
-    'grey': '⬛',
-    'marron': '🟫',
-    'brown': '🟫'
-  };
 
   return (
     <div className="mb-4">
       <h4 className="font-semibold text-sm mb-2">{attribute.name}:</h4>
       <div className="flex flex-wrap gap-2">
         {attribute.options.map((option) => {
-          const hex = hexMap[option.toLowerCase()];
-          const emoji = colorEmojiMap[option.toLowerCase()];
-          
-          console.log('Color option:', option, 'hex found:', hex, 'emoji found:', emoji);
+          const hex = hexMap[option.toLowerCase()] || hexMap[option] || hexMap[option.charAt(0).toUpperCase() + option.slice(1).toLowerCase()];
+          console.log('Color option:', option, 'hex found:', hex);
           
           return (
             <button
@@ -62,11 +35,8 @@ export function ColorVariation({ attribute, selected, onSelect, hexMap }: ColorV
                   className="w-8 h-8 rounded-md border border-gray-200 shadow-sm"
                   style={{ backgroundColor: hex }}
                 />
-              ) : emoji ? (
-                // Show emoji square as fallback
-                <span className="text-lg">{emoji}</span>
               ) : (
-                // Show text as last resort fallback
+                // Fallback to text with first letter if no hex color found
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                   {option.charAt(0).toUpperCase()}
                 </span>

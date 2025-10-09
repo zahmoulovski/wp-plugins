@@ -394,10 +394,6 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
       
       // Open payment in modal instead of new tab
       konnectModal.openKonnectPayment(payment.payUrl);
-      console.log('Konnect modal state after opening:', {
-        showKonnectIframe: konnectModal.showKonnectIframe,
-        konnectPayUrl: konnectModal.konnectPayUrl
-      });
 
     } catch (error) {
       setPaymentError('Erreur lors de l\'initialisation du paiement. Veuillez reessayer.');

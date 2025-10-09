@@ -9,7 +9,6 @@ const PortfolioPage: React.FC = () => {
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (isLoading) {
-        console.log('Fallback timeout: forcing skeleton hide');
         setIsLoading(false);
       }
     }, 8000); // 8 second timeout

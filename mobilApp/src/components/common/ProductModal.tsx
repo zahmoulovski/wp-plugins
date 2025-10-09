@@ -48,8 +48,6 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
     const fetchVariations = async () => {
       try {
         const vars = await api.getProductVariations(product.id);
-        console.log('Fetched variations:', vars);
-        console.log('First variation attributes:', vars[0]?.attributes);
         setVariations(vars);
       } catch (error) {
         console.error('Failed to fetch variations:', error);
@@ -211,59 +209,6 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
 
   const brandAttr = product.attributes?.find(attr => attr.name.toLowerCase() === 'marque' || attr.name.toLowerCase() === 'pa_marques');
   const otherAttributes = product.attributes?.filter(attr => attr.name.toLowerCase() !== 'marque' && attr.name.toLowerCase() !== 'pa_marques') || [];
-  
-  console.log('Product attributes:', product.attributes);
-  console.log('Other attributes:', otherAttributes);
-  
-  // Debug: Show product data in UI for testing
-  const debugInfo = (
-    <div className="p-4 bg-yellow-100 border border-yellow-400 rounded-lg mb-4">
-      <h3 className="font-bold text-yellow-800 mb-2">Debug Info:</h3>
-      <p className="text-sm text-yellow-700 mb-1">
-        <strong>Product ID:</strong> {product.id}
-      </p>
-      <p className="text-sm text-yellow-700 mb-1">
-        <strong>Product Name:</strong> {product.name}
-      </p>
-      <p className="text-sm text-yellow-700 mb-1">
-        <strong>Has Attributes:</strong> {product.attributes && product.attributes.length > 0 ? 'Yes' : 'No'}
-      </p>
-      {product.attributes && product.attributes.length > 0 && (
-        <div className="text-sm text-yellow-700">
-          <strong>Attributes:</strong>
-          <ul className="ml-4 mt-1">
-            {product.attributes.map((attr, index) => (
-              <li key={index}>
-                {attr.name} (options: {attr.options?.length || 0})
-                {attr.name.toLowerCase().includes('color') && ' 🎨'}
-                {attr.name.toLowerCase().includes('couleur') && ' 🎨'}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <p className="text-sm text-yellow-700 mt-2">
-        <strong>Has Variations:</strong> {variations && variations.length > 0 ? 'Yes' : 'No'}
-      </p>
-      {variations && variations.length > 0 && (
-        <div className="text-sm text-yellow-700">
-          <strong>Variations:</strong> {variations.length} total
-          {variations[0]?.attributes && (
-            <div className="ml-4 mt-1">
-              <strong>First variation attributes:</strong>
-              <ul className="ml-4">
-                {variations[0].attributes.map((attr, index) => (
-                  <li key={index}>
-                    {attr.name}: {attr.option}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     // Only close if clicking the backdrop and lightbox is not open
@@ -379,9 +324,6 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
             </div>
           )}
 
-          {/* Debug Info */}
-          {debugInfo}
-
           {/* Categories */}
           {product.categories && product.categories.length > 0 && (
             <div className="mb-4">
@@ -418,7 +360,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
             <div className="mb-6">
               {otherAttributes.map(attr => {
                 const selected = selectedAttributes[attr.name] || attr.options[0];
-                console.log('Processing attribute:', attr.name, 'options:', attr.options);
+
                 
                 // More flexible color detection
                 const isColorAttribute = 
@@ -450,14 +392,28 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
                   attr.name.toLowerCase().includes('tissu') ||
                   attr.name.toLowerCase().includes('leather') ||
                   attr.name.toLowerCase().includes('cuir') ||
+                  attr.name.toLowerCase().includes('height') ||
+                  attr.name.toLowerCase().includes('hauteur') ||
+                  attr.name.toLowerCase().includes('size') ||
+                  attr.name.toLowerCase().includes('taille') ||
+                  attr.name.toLowerCase().includes('dimension') ||
+                  attr.name.toLowerCase().includes('length') ||
+                  attr.name.toLowerCase().includes('longueur') ||
+                  attr.name.toLowerCase().includes('width') ||
+                  attr.name.toLowerCase().includes('largeur') ||
                   (attr.options && attr.options.some(opt => 
                     imageMap[opt.toLowerCase()] || 
                     ['wood', 'bois', 'metal', 'acier', 'steel', 'fabric', 'tissu', 'leather', 'cuir', 'glass', 'verre', 'marble', 'marbre', 'plastic', 'plastique'].includes(opt.toLowerCase())
+                  )) ||
+                  (attr.options && attr.options.some(opt => 
+                    // Check for size patterns like "TC3 = 250mm", "250mm", "TC3", etc.
+                    /^[A-Z]{1,3}\d+\s*=.*\d+mm$/i.test(opt) || // Pattern like "TC3 = 250mm"
+                    /^\d+mm$/i.test(opt) || // Pattern like "250mm"
+                    /^[A-Z]{1,3}\d+$/i.test(opt) || // Pattern like "TC3"
+                    /size|taille|dimension|height|hauteur|length|longueur|width|largeur/i.test(opt)
                   ));
                 
-                console.log('Is color attribute:', attr.name, isColorAttribute);
-                console.log('Is image attribute:', attr.name, isImageAttribute);
-                
+               
                 if (isColorAttribute) {
                   return (
                     <ColorVariation
