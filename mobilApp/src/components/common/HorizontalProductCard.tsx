@@ -19,6 +19,20 @@ export function HorizontalProductCard({ product, onProductClick, loading }: Hori
     return <HorizontalProductCardSkeleton />;
   }
 
+  const isVariableProduct = product.attributes && product.attributes.length > 0;
+
+  const handleAddToCartClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (isVariableProduct) {
+      // For variable products, open the modal instead of adding to cart
+      onProductClick(product);
+    } else {
+      // For simple products, add to cart directly
+      addToCart(e);
+    }
+  };
+
   const addToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
     
@@ -119,9 +133,9 @@ export function HorizontalProductCard({ product, onProductClick, loading }: Hori
           {/* Add to Cart Button - Icon Only */}
           <div className="flex justify-start mt-auto">
             <button
-              onClick={addToCart}
+              onClick={handleAddToCartClick}
               className="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-full transition-colors duration-200 shadow-lg hover:shadow-xl"
-              title="Ajouter au panier"
+              title={isVariableProduct ? "Sélectionner les options" : "Ajouter au panier"}
             >
               <Cart className="h-4 w-4" />
             </button>

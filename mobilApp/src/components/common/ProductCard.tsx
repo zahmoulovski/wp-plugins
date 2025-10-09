@@ -30,6 +30,27 @@ export function ProductCard({ product, onProductClick, loading }: ProductCardPro
     }
   }, [product.name]);
 
+  const isVariableProduct = product.attributes && product.attributes.length > 0;
+  
+  // Debug log to verify variable product detection
+  useEffect(() => {
+    if (isVariableProduct) {
+      console.log(`Variable product detected: ${product.name} (ID: ${product.id}) - Attributes:`, product.attributes);
+    }
+  }, [isVariableProduct, product]);
+
+  const handleAddToCartClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (isVariableProduct) {
+      // For variable products, open the modal instead of adding to cart
+      handleProductClick();
+    } else {
+      // For simple products, add to cart directly
+      addToCart(e);
+    }
+  };
+
   const addToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
     
@@ -143,8 +164,9 @@ export function ProductCard({ product, onProductClick, loading }: ProductCardPro
           </div>
           
           <button
-            onClick={addToCart}
+            onClick={handleAddToCartClick}
             className="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors duration-200"
+            title={isVariableProduct ? "Sélectionner les options" : "Ajouter au panier"}
           >
             <Cart className="h-4 w-4" />
           </button>

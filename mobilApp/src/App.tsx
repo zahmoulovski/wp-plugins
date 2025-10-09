@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AppProvider, useApp } from './contexts/AppContext';
 import { StatePersistenceProvider, useStatePersistenceContext } from './contexts/StatePersistenceContext';
 import { Header } from './components/Layout/Header';
@@ -25,6 +26,7 @@ import { Product, BlogPost } from './types';
 import { api } from './services/api';
 import PaymentCallback from './components/pages/PaymentCallback';
 import { initGA, logPageView } from './utils/analytics';
+
 
 
 // Removed Capacitor - web only application
@@ -226,6 +228,7 @@ function AppContent() {
             } />
             <Route path="/payment-success" element={<PaymentCallback success={true} />} />
             <Route path="/payment-failed" element={<PaymentCallback success={false} />} />
+
   
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
@@ -244,6 +247,17 @@ function AppContent() {
           onClose={() => setSelectedBlogPost(null)}
         />
       </div>
+      
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+        }}
+      />
     </>
   );
 }

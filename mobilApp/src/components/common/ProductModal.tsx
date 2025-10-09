@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { X, Cart, Heart, Plus, Dash, ChatDots } from 'react-bootstrap-icons';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { Product, Variation } from '../../types';
 import { useApp } from '../../contexts/AppContext';
 import { decodeHTMLEntities } from '../../utils/htmlUtils';
@@ -18,9 +19,10 @@ interface ProductModalProps {
   product: Product;
   isOpen: boolean;
   onClose: () => void;
+  variations?: Variation[]; // Optional prop for testing
 }
 
-export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
+export function ProductModal({ product, isOpen, onClose, variations: externalVariations }: ProductModalProps) {
   // Early return before any hooks are called to maintain consistent hook order
   if (!isOpen) return null;
   
@@ -45,34 +47,54 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const [isOverflowing, setIsOverflowing] = useState(false);
 
   useEffect(() => {
-    const fetchVariations = async () => {
-      try {
-        const vars = await api.getProductVariations(product.id);
-        setVariations(vars);
-      } catch (error) {
-        console.error('Failed to fetch variations:', error);
-      }
-    };
-    fetchVariations();
-  }, [product.id]);
+    // Use external variations if provided, otherwise fetch from API
+    if (externalVariations) {
+      setVariations(externalVariations);
+    } else {
+      const fetchVariations = async () => {
+        try {
+          const vars = await api.getProductVariations(product.id);
+          setVariations(vars);
+        } catch (error) {
+          console.error('Failed to fetch variations:', error);
+        }
+      };
+      fetchVariations();
+    }
+  }, [product.id, externalVariations]);
 
   useEffect(() => {
     if (variations.length > 0) {
-      const matched = variations.find(v => {
-        return Object.entries(selectedAttributes).every(([name, value]) => {
-          const attr = v.attributes.find(a => a.name === name);
-          return attr && attr.option === value;
+      // Only try to match variations if attributes are selected
+      if (Object.keys(selectedAttributes).length > 0) {
+        const matched = variations.find(v => {
+          return Object.entries(selectedAttributes).every(([name, value]) => {
+            const attr = v.attributes.find(a => a.name === name);
+            return attr && attr.option === value;
+          });
         });
-      });
-      setMatchedVariation(matched || null);
-      setCurrentPrice(matched ? matched.price : product.price);
-      setCurrentSku(matched ? matched.sku : product.sku);
-      setCurrentDescription(matched ? matched.description : product.description);
-      setCurrentRegularPrice(matched ? matched.regular_price : product.regular_price);
-      setCurrentSalePrice(matched ? matched.sale_price : product.sale_price);
-      setIsOnSale(matched ? matched.on_sale : product.on_sale);
+        setMatchedVariation(matched || null);
+        setCurrentPrice(matched ? matched.price : product.price);
+        setCurrentSku(matched ? matched.sku : product.sku);
+        setCurrentDescription(matched ? matched.description : product.description);
+        setCurrentRegularPrice(matched ? matched.regular_price : product.regular_price);
+        setCurrentSalePrice(matched ? matched.sale_price : product.sale_price);
+        setIsOnSale(matched ? matched.on_sale : product.on_sale);
+      } else {
+        // If no attributes selected, use default product values
+        setMatchedVariation(null);
+        setCurrentPrice(product.price);
+        setCurrentSku(product.sku);
+        setCurrentDescription(product.description);
+        setCurrentRegularPrice(product.regular_price);
+        setCurrentSalePrice(product.sale_price);
+        setIsOnSale(product.on_sale);
+      }
+      
+      // Reset image index to 0 when attributes change to show the variation image first
+      setSelectedImageIndex(0);
     }
-  }, [selectedAttributes, variations, product.price]);
+  }, [selectedAttributes, variations, product.price, product.sku, product.description, product.regular_price, product.sale_price, product.on_sale]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -116,6 +138,8 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
     if (!isOpen) {
       setShowLightbox(false);
       setSelectedImageIndex(0);
+      // Clear attribute selections when modal closes
+      setSelectedAttributes({});
     }
   }, [isOpen]);
 
@@ -129,21 +153,8 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
     setSelectedAttributes(prev => ({ ...prev, [attrName]: value }));
   };
 
-  const addToCart = () => {
-    const cartItem = {
-      id: product.id,
-      name: `${product.name}${Object.keys(selectedAttributes).length > 0 ? ` - ${Object.entries(selectedAttributes).map(([key, value]) => `${key}: ${value}`).join(', ')}` : ''}`,
-      price: currentPrice,
-      quantity: quantity,
-      image: matchedVariation?.image?.src || product.images?.[0]?.src || '',
-      sku: currentSku,
-      attributes: selectedAttributes,
-      product: product,
-      variationId: matchedVariation?.id || null
-    };
-
-    dispatch({ type: 'ADD_TO_CART', payload: cartItem });
-    onClose();
+  const clearAllSelections = () => {
+    setSelectedAttributes({});
   };
 
   const handleWhatsAppOrder = () => {
@@ -185,30 +196,107 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
 
   // Thumbnail images for modal display (300x300)
   const thumbnailImages = useMemo(() => {
-    const images = product.images && product.images.length > 0
-      ? product.images.map((img) => ({
-          ...img,
-          src: getThumbnail(img.src, 'thumbnail'),
-        }))
-      : [{ id: 0, src: '/api/placeholder/600/600', alt: product.name }];
+    let images = [];
+    
+    // If we have a matched variation with an image, use that as the primary image
+    if (matchedVariation?.image?.src) {
+      images.push({
+        id: matchedVariation.id,
+        src: getThumbnail(matchedVariation.image.src, 'thumbnail'),
+        alt: `${product.name} - ${Object.entries(selectedAttributes).map(([key, value]) => value).join(', ')}`,
+      });
+    }
+    
+    // Add the rest of the product images
+    if (product.images && product.images.length > 0) {
+      const productImages = product.images.map((img) => ({
+        ...img,
+        src: getThumbnail(img.src, 'thumbnail'),
+      }));
+      
+      // Only add product images that aren't already included from variation
+      const variationImageUrl = matchedVariation?.image?.src;
+      const filteredProductImages = productImages.filter(img => 
+        !variationImageUrl || img.src !== getThumbnail(variationImageUrl, 'thumbnail')
+      );
+      
+      images = [...images, ...filteredProductImages];
+    }
+    
+    // Fallback if no images
+    if (images.length === 0) {
+      images = [{ id: 0, src: '/api/placeholder/600/600', alt: product.name }];
+    }
 
     return images;
-  }, [product.images, product.name, getThumbnail]);
+  }, [product.images, product.name, getThumbnail, matchedVariation, selectedAttributes]);
 
   // Full resolution images for lightbox
   const fullImages = useMemo(() => {
-    const images = product.images && product.images.length > 0
-      ? product.images.map((img) => ({
-          ...img,
-          src: getThumbnail(img.src, 'full'),
-        }))
-      : [{ id: 0, src: '/api/placeholder/600/600', alt: product.name }];
+    let images = [];
+    
+    // If we have a matched variation with an image, use that as the primary image
+    if (matchedVariation?.image?.src) {
+      images.push({
+        id: matchedVariation.id,
+        src: getThumbnail(matchedVariation.image.src, 'full'),
+        alt: `${product.name} - ${Object.entries(selectedAttributes).map(([key, value]) => value).join(', ')}`,
+      });
+    }
+    
+    // Add the rest of the product images
+    if (product.images && product.images.length > 0) {
+      const productImages = product.images.map((img) => ({
+        ...img,
+        src: getThumbnail(img.src, 'full'),
+      }));
+      
+      // Only add product images that aren't already included from variation
+      const variationImageUrl = matchedVariation?.image?.src;
+      const filteredProductImages = productImages.filter(img => 
+        !variationImageUrl || img.src !== getThumbnail(variationImageUrl, 'full')
+      );
+      
+      images = [...images, ...filteredProductImages];
+    }
+    
+    // Fallback if no images
+    if (images.length === 0) {
+      images = [{ id: 0, src: '/api/placeholder/600/600', alt: product.name }];
+    }
 
     return images;
-  }, [product.images, product.name, getThumbnail]);
+  }, [product.images, product.name, getThumbnail, matchedVariation, selectedAttributes]);
 
   const brandAttr = product.attributes?.find(attr => attr.name.toLowerCase() === 'marque' || attr.name.toLowerCase() === 'pa_marques');
   const otherAttributes = product.attributes?.filter(attr => attr.name.toLowerCase() !== 'marque' && attr.name.toLowerCase() !== 'pa_marques') || [];
+
+  const addToCart = () => {
+    // Check if all attributes are selected
+    if (otherAttributes.length > 0 && Object.keys(selectedAttributes).length !== otherAttributes.length) {
+      toast.error('vous devez sélectionner les options avant d\'ajouter au panier');
+      return;
+    }
+
+    const cartItem = {
+      id: product.id,
+      name: `${product.name}${Object.keys(selectedAttributes).length > 0 ? ` - ${Object.entries(selectedAttributes).map(([key, value]) => `${key}: ${value}`).join(', ')}` : ''}`,
+      price: currentPrice,
+      quantity: quantity,
+      image: matchedVariation?.image?.src || product.images?.[0]?.src || '',
+      sku: currentSku,
+      attributes: selectedAttributes,
+      product: product,
+      variationId: matchedVariation?.id || null
+    };
+
+    dispatch({ type: 'ADD_TO_CART', payload: cartItem });
+    toast.success('Produit ajouté au panier !');
+    
+    // Clear selections when modal closes
+    setSelectedAttributes({});
+    onClose();
+  };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     // Only close if clicking the backdrop and lightbox is not open
@@ -358,8 +446,19 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
           {/* Variations section */}
           {otherAttributes.length > 0 && (
             <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900 dark:text-white">Options</h3>
+                {Object.keys(selectedAttributes).length > 0 && (
+                  <button
+                    onClick={clearAllSelections}
+                    className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 underline"
+                  >
+                    Effacer la sélection
+                  </button>
+                )}
+              </div>
               {otherAttributes.map(attr => {
-                const selected = selectedAttributes[attr.name] || attr.options[0];
+                const selected = selectedAttributes[attr.name];
 
                 
                 // More flexible color detection
@@ -485,7 +584,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
             <div className="flex space-x-3">
               <button
                 onClick={addToCart}
-                disabled={product.stock_status === 'outofstock'}
+                disabled={product.stock_status === 'outofstock' || (otherAttributes.length > 0 && Object.keys(selectedAttributes).length !== otherAttributes.length)}
                 className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white py-3 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-colors duration-200"
               >
                 <Cart className="h-5 w-5" />
