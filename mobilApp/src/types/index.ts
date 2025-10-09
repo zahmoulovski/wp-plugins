@@ -263,6 +263,8 @@ export interface PortfolioItem {
   };
 }
 
+
+
 // API Interface definition
 export interface APIInterface {
   // WooCommerce functions

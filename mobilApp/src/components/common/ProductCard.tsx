@@ -32,6 +32,7 @@ export function ProductCard({ product, onProductClick, loading }: ProductCardPro
 
   const addToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
+    
     dispatch({ 
       type: 'ADD_TO_CART', 
       payload: { 
@@ -130,19 +131,13 @@ export function ProductCard({ product, onProductClick, loading }: ProductCardPro
 
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            {product.on_sale && product.regular_price ? (
-              <div className="flex flex-col">
-                <span className="text-xs text-red-500 line-through">
-                  {formatPrice(product.regular_price)}
-                </span>
-                <span className="text-base font-bold text-primary-600 dark:text-primary-400">
-                  {formatPrice(product.sale_price || product.price)}
-                </span>
+            <div className="text-lg font-bold text-gray-900 dark:text-white">
+              {formatPrice(product.price)}
+            </div>
+            {product.on_sale && product.sale_price && product.regular_price !== product.sale_price && (
+              <div className="text-sm text-gray-500 dark:text-gray-400 line-through">
+                {formatPrice(product.regular_price)}
               </div>
-            ) : (
-              <span className="text-base font-bold text-primary-600 dark:text-primary-400">
-                {formatPrice(product.price)}
-              </span>
             )}
           </div>
           

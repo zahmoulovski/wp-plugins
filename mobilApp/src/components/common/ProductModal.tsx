@@ -83,7 +83,7 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
   const addToCart = () => {
     const cartItem = {
       id: product.id,
-      product: product, // Ajouter cette ligne
+      product: product,
       name: product.name,
       price: product.price,
       quantity: quantity,
@@ -234,26 +234,28 @@ export function ProductModal({ product, isOpen, onClose }: ProductModalProps) {
           <div className="flex items-center justify-between mb-4">
             <div className="flex flex-col">
               {product.on_sale && product.regular_price ? (
-                <>
-                  <span className="text-sm text-red-500 line-through">
-                    {formatPrice(product.regular_price)}
-                  </span>
-                  <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
+                <div className="flex items-center space-x-2">
+                  <span className="text-2xl font-bold text-primary-600">
                     {formatPrice(product.sale_price || product.price)}
                   </span>
-                </>
+                  <span className="text-lg text-gray-500 line-through">
+                    {formatPrice(product.regular_price)}
+                  </span>
+                </div>
               ) : (
-                <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
+                <span className="text-2xl font-bold text-primary-600">
                   {formatPrice(product.price)}
                 </span>
               )}
             </div>
 
-            {product.on_sale && (
-              <div className="bg-secondary-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                Promo
-              </div>
-            )}
+            <div className="flex items-center space-x-2">
+              {product.on_sale && (
+                <div className="bg-secondary-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                  Promo
+                </div>
+              )}
+            </div>
           </div>
 
           {/* SKU */}

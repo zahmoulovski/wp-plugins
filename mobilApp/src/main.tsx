@@ -30,7 +30,7 @@ document.addEventListener('touchmove', (e) => {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename="/react-vite_app">
       <App />
     </BrowserRouter>
   </StrictMode>
