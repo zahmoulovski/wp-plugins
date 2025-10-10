@@ -57,7 +57,6 @@ export function ProductModal({ product, isOpen, onClose, variations: externalVar
           const vars = await api.getProductVariations(product.id);
           setVariations(vars);
         } catch (error) {
-          toast.error('Failed to load product variations');
         }
       };
       fetchVariations();
@@ -359,7 +358,7 @@ export function ProductModal({ product, isOpen, onClose, variations: externalVar
                   <img 
                     src={brandImage} 
                     alt={brandAttribute?.options?.[0] || 'Brand'}
-                    className="h-12 w-12 object-contain"
+                    className="h-20 w-20 object-contain"
                   />
                 </div>
               )}
@@ -443,6 +442,32 @@ export function ProductModal({ product, isOpen, onClose, variations: externalVar
                     {decodeHTMLEntities(category.name)}
                   </Link>
                 ))}
+              </div>
+            )}
+            
+            {/* Brand/Marques */}
+            {brandAttribute && brandAttribute.options && brandAttribute.options.length > 0 && (
+              <div className="mt-2">
+                <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Marque:</div>
+                <div className="flex flex-wrap gap-2">
+                  {brandAttribute.options.map((brand, index) => (
+                    <Link
+                      key={index}
+                      to={`/brands/${encodeURIComponent(brand)}`}
+                      onClick={onClose}
+                      className="flex items-center gap-2 px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors inline-block"
+                    >
+                      {imageMap[brand.toLowerCase()] && (
+                        <img 
+                          src={imageMap[brand.toLowerCase()]} 
+                          alt={brand}
+                          className="h-4 w-4 object-contain"
+                        />
+                      )}
+                      {decodeHTMLEntities(brand)}
+                    </Link>
+                  ))}
+                </div>
               </div>
             )}
           </div>

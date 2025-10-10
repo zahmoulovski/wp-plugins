@@ -3,6 +3,7 @@ import { BlogPost } from '../../types';
 import { api } from '../../services/api';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { Calendar, Person, JournalText } from 'react-bootstrap-icons';
+import { useScrollToTop } from '../../hooks/useScrollToTop';
 
 
 
@@ -15,6 +16,9 @@ export function BlogPage({ onPostClick }: BlogPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+
+  // Scroll to top when page loads
+  useScrollToTop();
 
   const loadPosts = async () => {
     try {

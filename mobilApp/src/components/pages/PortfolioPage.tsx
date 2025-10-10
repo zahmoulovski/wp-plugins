@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import Portfolio from '../common/Portfolio';
 import PortfolioSkeleton from '../common/PortfolioSkeleton';
+import { useScrollToTop } from '../../hooks/useScrollToTop';
 
 const PortfolioPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
+
+  // Scroll to top when page loads
+  useScrollToTop();
 
   // Fallback timeout to ensure skeleton doesn't stay forever
   useEffect(() => {

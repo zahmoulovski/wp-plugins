@@ -293,6 +293,7 @@ export interface APIInterface {
   searchCustomers(query: string): Promise<Customer[]>;
   authenticateUser(username: string, password: string): Promise<{ user: Customer; token: string } | null>;
   getCategories(): Promise<Category[]>;
+  getAttributeTerms(attributeSlug: string): Promise<Array<{id: number; name: string; slug: string; count: number}>>;
   getShippingMethods(): Promise<ShippingMethod[]>;
   getShippingZones(): Promise<ShippingZone[]>;
   getShippingMethodInstances(zoneId: number): Promise<ShippingMethodInstance[]>;
@@ -312,4 +313,14 @@ export interface APIInterface {
   getProjectCategories(): Promise<PortfolioCategory[]>;
   getPortfolioCategories(): Promise<PortfolioCategory[]>;
   getPortfolioItem(id: number): Promise<PortfolioItem | null>;
+  
+  // Custom brand products endpoint
+  getBrandProducts(brandSlug: string, params?: { per_page?: number; page?: number }): Promise<{
+    success: boolean;
+    brand: { name: string; slug: string; id: number };
+    found_products: number;
+    current_page: number;
+    per_page: number;
+    products: Product[];
+  }>;
 }

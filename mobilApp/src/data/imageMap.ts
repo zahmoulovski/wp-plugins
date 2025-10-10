@@ -21,7 +21,7 @@ export const imageMap: Record<string, string> = {
   "L = 200cm": "https://klarrion.com/wp-content/uploads/2022/06/L200-150x150.png",
   // Brands
   '3B SCIENTIFIC':'https://klarrion.com/wp-content/uploads/2025/03/ea615fc9dcc0582903bb49b0d41c52ea.w1280.h720.png',
-  'ARCO':'https://klarrion.com/wp-content/uploads/2025/03/ea615fc9dcc0582903bb49b0d41c52ea.w1280.h720.png',
+  'ARCO':'https://klarrion.com/wp-content/uploads/2025/04/arco-logo.webp',
   'ARDUINO':'https://klarrion.com/wp-content/uploads/2025/05/arduino@2x.webp',
   'ASSISTENT':'https://klarrion.com/wp-content/uploads/2025/04/assistent.webp',
   'BAXTRAN':'https://klarrion.com/wp-content/uploads/2025/02/baxtran-.webp',

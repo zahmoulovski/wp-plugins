@@ -14,6 +14,7 @@ import { CheckoutPage } from './components/pages/CheckoutPage';
 import { ThankYouPage } from './components/pages/ThankYouPage';
 import { ProfilePage } from './components/pages/ProfilePage';
 import { ContactPage } from './components/pages/ContactPage';
+import { BrandPage } from './components/pages/BrandPage';
 import { ProductModal } from './components/common/ProductModal';
 import { BlogPage } from './components/pages/BlogPage';
 import { BlogModal } from './components/common/BlogModal';
@@ -176,6 +177,11 @@ function AppContent() {
             <Route path="/categories/:categorySlug" element={
               <PageWrapper>
                 <CategoriesPage onProductClick={handleProductClick} />
+              </PageWrapper>
+            } />
+            <Route path="/brands/:brandName" element={
+              <PageWrapper>
+                <BrandPage onProductClick={handleProductClick} />
               </PageWrapper>
             } />
             <Route path="/search" element={

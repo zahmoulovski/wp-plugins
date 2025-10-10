@@ -314,6 +314,35 @@ export const api: APIInterface = {
     return apiRequest(`/products/categories/${id}`);
   },
 
+  async getAttributeTerms(attributeSlug: string): Promise<Array<{id: number; name: string; slug: string; count: number}>> {
+    try {
+      let attributeId: number;
+      
+      // Hardcode known attribute IDs for better performance
+      if (attributeSlug === 'pa_marques') {
+        attributeId = 22; // Known ID for pa_marques
+      } else {
+        // For other attributes, find the ID dynamically
+        const attributes = await apiRequest('/products/attributes?per_page=100');
+        const attribute = attributes.find((attr: any) => attr.slug === attributeSlug);
+        
+        if (!attribute) {
+          console.error(`Attribute ${attributeSlug} not found`);
+          return [];
+        }
+        attributeId = attribute.id;
+      }
+
+      // Now get the terms for this attribute using its ID
+      const terms = await apiRequest(`/products/attributes/${attributeId}/terms?per_page=100`);
+      console.log(`Found ${terms.length} terms for attribute ${attributeSlug} (ID: ${attributeId})`);
+      return terms;
+    } catch (error) {
+      console.error(`Failed to get attribute terms for ${attributeSlug}:`, error);
+      return [];
+    }
+  },
+
   async getProductsByCategory(
     categoryId: number,
     params: Record<string, string | number> = {}
@@ -951,5 +980,203 @@ export const api: APIInterface = {
   },
   async getProductVariations(productId: number): Promise<Variation[]> {
     return apiRequest(`/products/${productId}/variations?per_page=100`);
+  },
+
+  // Custom endpoint for brand products (more reliable than WooCommerce's attribute filtering)
+  async getBrandProducts(brandSlug: string, params: { per_page?: number; page?: number } = {}): Promise<{
+    success: boolean;
+    brand: { name: string; slug: string; id: number };
+    found_products: number;
+    current_page: number;
+    per_page: number;
+    products: Product[];
+  }> {
+    const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
+    const queryParams = new URLSearchParams({
+      per_page: params.per_page ? String(params.per_page) : '100',
+      page: params.page ? String(params.page) : '1',
+    }).toString();
+    
+    // Try the direct endpoint first (bypasses WordPress authentication)
+    try {
+      console.log(`Trying direct endpoint for brand: ${brandSlug}`);
+      const directResponse = await fetch(`${wpBaseUrl}/wp-content/plugins/brand-products-endpoint/direct-brand-products.php?brand=${brandSlug}&${queryParams}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+      });
+      
+      if (directResponse.ok) {
+        const data = await directResponse.json();
+        if (data.success) {
+          console.log(`Direct endpoint succeeded for brand: ${brandSlug}`);
+          
+          // Transform the products to match our Product interface
+          const transformedProducts: Product[] = data.products.map((product: any) => ({
+            id: product.id,
+            name: product.name,
+            slug: product.slug,
+            price: product.price,
+            regular_price: product.regular_price,
+            sale_price: product.sale_price,
+            description: product.description,
+            short_description: product.short_description,
+            sku: product.sku,
+            stock_quantity: product.stock_quantity,
+            stock_status: product.stock_status,
+            images: product.images || [],
+            categories: product.categories || [],
+            attributes: product.attributes || [],
+            permalink: product.permalink || `https://klarrion.com/product/${product.slug}/`,
+            average_rating: '0',
+            rating_count: 0,
+            total_sales: 0,
+            tags: [],
+            type: 'simple',
+            status: 'publish',
+            catalog_visibility: 'visible',
+            date_created: new Date().toISOString(),
+            date_modified: new Date().toISOString(),
+            date_on_sale_from: null,
+            date_on_sale_to: null,
+            on_sale: false,
+            purchasable: true,
+            virtual: false,
+            downloadable: false,
+            downloads: [],
+            download_limit: -1,
+            download_expiry: -1,
+            external_url: '',
+            button_text: '',
+            tax_status: 'taxable',
+            tax_class: '',
+            manage_stock: product.stock_quantity !== null,
+            backorders: 'no',
+            backorders_allowed: false,
+            backordered: false,
+            sold_individually: false,
+            weight: '',
+            dimensions: { length: '', width: '', height: '' },
+            shipping_required: true,
+            shipping_taxable: true,
+            shipping_class: '',
+            shipping_class_id: 0,
+            reviews_allowed: true,
+            parent_id: 0,
+            purchase_note: '',
+            menu_order: 0,
+            meta_data: [],
+            _links: {}
+          }));
+          
+          return {
+            success: data.success,
+            brand: data.brand,
+            found_products: data.found_products,
+            current_page: data.current_page,
+            per_page: data.per_page,
+            products: transformedProducts
+          };
+        }
+      }
+      console.log(`Direct endpoint failed, trying REST API for brand: ${brandSlug}`);
+    } catch (error) {
+      console.log(`Direct endpoint error for brand ${brandSlug}:`, error);
+    }
+    
+    // Fallback to REST API endpoint
+    try {
+      const response = await fetch(`${wpBaseUrl}/wp-json/mobile-app/v1/brand-products/${brandSlug}?${queryParams}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(`Brand products API request failed: ${response.status} ${response.statusText} - ${errorData.message}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to get brand products');
+      }
+      
+      console.log(`REST API succeeded for brand: ${brandSlug}`);
+      
+      // Transform the products to match our Product interface
+      const transformedProducts: Product[] = data.products.map((product: any) => ({
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        price: product.price,
+        regular_price: product.regular_price,
+        sale_price: product.sale_price,
+        description: product.description,
+        short_description: product.short_description,
+        sku: product.sku,
+        stock_quantity: product.stock_quantity,
+        stock_status: product.stock_status,
+        images: product.images || [],
+        categories: product.categories || [],
+        attributes: product.attributes || [],
+        permalink: product.permalink || `https://klarrion.com/product/${product.slug}/`,
+        average_rating: '0',
+        rating_count: 0,
+        total_sales: 0,
+        tags: [],
+        type: 'simple',
+        status: 'publish',
+        catalog_visibility: 'visible',
+        date_created: new Date().toISOString(),
+        date_modified: new Date().toISOString(),
+        date_on_sale_from: null,
+        date_on_sale_to: null,
+        on_sale: false,
+        purchasable: true,
+        virtual: false,
+        downloadable: false,
+        downloads: [],
+        download_limit: -1,
+        download_expiry: -1,
+        external_url: '',
+        button_text: '',
+        tax_status: 'taxable',
+        tax_class: '',
+        manage_stock: product.stock_quantity !== null,
+        backorders: 'no',
+        backorders_allowed: false,
+        backordered: false,
+        sold_individually: false,
+        weight: '',
+        dimensions: { length: '', width: '', height: '' },
+        shipping_required: true,
+        shipping_taxable: true,
+        shipping_class: '',
+        shipping_class_id: 0,
+        reviews_allowed: true,
+        parent_id: 0,
+        purchase_note: '',
+        menu_order: 0,
+        meta_data: [],
+        _links: {}
+      }));
+      
+      return {
+        success: data.success,
+        brand: data.brand,
+        found_products: data.found_products,
+        current_page: data.current_page,
+        per_page: data.per_page,
+        products: transformedProducts
+      };
+      
+    } catch (error) {
+      console.error('Error in getBrandProducts:', error);
+      throw error;
+    }
   },
 };

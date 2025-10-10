@@ -1,11 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../contexts/AppContext';
+import { useScrollToTop } from '../../hooks/useScrollToTop';
+import lightImage from '../assets/404-light.png';
+import darkImage from '../assets/404-dark.png';
 
 const NotFoundPage: React.FC = () => {
   const navigate = useNavigate();
   const { state } = useApp();
   const isDarkMode = state.darkMode;
+
+  // Scroll to top when page loads
+  useScrollToTop();
 
   const handleGoHome = () => {
     navigate('/');
@@ -16,27 +22,24 @@ const NotFoundPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 py-12 transition-colors duration-200">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 py-12 transition-colors duration-200 mb-12">
       <div className="max-w-md w-full text-center">
         {/* 404 Image */}
-        <div className="mb-8">
+        <div>
           <img
-            src={isDarkMode ? '/src/components/assets/404-light.png' : '/src/components/assets/404-dark.png'}
-            alt="404 Page Not Found"
-            className="w-full max-w-sm mx-auto h-auto"
-          />
+      src={isDarkMode ? lightImage : darkImage}
+      alt="404 Page Not Found"
+      className="w-full max-w-sm mx-auto h-auto"
+    />
         </div>
 
         {/* Error Text */}
         <div className="mb-8">
-          <h1 className="text-6xl font-bold text-gray-900 dark:text-white mb-4">
-            404
-          </h1>
           <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
-            Page Not Found
+            Page non trouvée
           </h2>
           <p className="text-gray-600 dark:text-gray-400">
-            Sorry, the page you're looking for doesn't exist or has been moved.
+            Désolé, la page que vous recherchez n'existe pas ou a été déplacée.
           </p>
         </div>
 
@@ -46,27 +49,27 @@ const NotFoundPage: React.FC = () => {
             onClick={handleGoHome}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
           >
-            Go to Homepage
+            Retourner à la page d'accueil
           </button>
           
           <button
             onClick={handleGoBack}
             className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-medium py-3 px-6 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
           >
-            Go Back
+            Retour
           </button>
         </div>
 
         {/* Search Suggestion */}
         <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Or try searching for what you're looking for:
+            Ou essayez de rechercher ce que vous cherchez :
           </p>
           <button
             onClick={() => navigate('/search')}
             className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium text-sm transition-colors duration-200"
           >
-            Search Products →
+            Rechercher des produits →
           </button>
         </div>
       </div>
