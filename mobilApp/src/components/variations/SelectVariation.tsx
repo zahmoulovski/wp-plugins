@@ -9,7 +9,7 @@ interface SelectVariationProps {
 export function SelectVariation({ attribute, selected, onSelect }: SelectVariationProps) {
   return (
     <div className="mb-4">
-      <h4 className="font-semibold text-sm mb-2">{attribute.name}:</h4>
+      <h4 className="font-semibold dark:text-white text-sm mb-2">{attribute.name}:</h4>
       <div className="flex flex-wrap gap-2">
         {attribute.options.map((option) => (
           <button

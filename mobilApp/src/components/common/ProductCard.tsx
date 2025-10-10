@@ -4,6 +4,7 @@ import { Product } from '../../types';
 import { useApp } from '../../contexts/AppContext';
 import { ProductCardSkeleton } from './SkeletonLoader';
 import { logViewItem, logAddToCart } from '../../utils/analytics';
+import { imageMap } from '../../data/imageMap';
 
 interface ProductCardProps {
   product: Product;
@@ -30,14 +31,13 @@ export function ProductCard({ product, onProductClick, loading }: ProductCardPro
     }
   }, [product.name]);
 
-  const isVariableProduct = product.attributes && product.attributes.length > 0;
+  // Filter out brand attributes (pa_marques) from variable product detection
+  const isVariableProduct = product.attributes && product.attributes.some(attr => attr.slug !== 'pa_marques');
   
-  // Debug log to verify variable product detection
-  useEffect(() => {
-    if (isVariableProduct) {
-      console.log(`Variable product detected: ${product.name} (ID: ${product.id}) - Attributes:`, product.attributes);
-    }
-  }, [isVariableProduct, product]);
+  // Get brand attribute for display
+  const brandAttribute = product.attributes?.find(attr => attr.slug === 'pa_marques');
+  const brandImage = brandAttribute && brandAttribute.options.length > 0 ? 
+    imageMap[brandAttribute.options[0]] : null;
 
   const handleAddToCartClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -142,6 +142,17 @@ export function ProductCard({ product, onProductClick, loading }: ProductCardPro
             {product.name}
           </div>
         </div>
+        
+        {/* Brand image display */}
+        {brandImage && (
+          <div className="mb-3">
+            <img 
+              src={brandImage} 
+              alt={brandAttribute?.options[0] || 'Brand'}
+              className="h-8 w-auto object-contain"
+            />
+          </div>
+        )}
         
         {product.sku && (
           <div className="mb-4">

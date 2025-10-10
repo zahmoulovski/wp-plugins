@@ -3,6 +3,7 @@ import { Cart } from 'react-bootstrap-icons';
 import { Product } from '../../types';
 import { useApp } from '../../contexts/AppContext';
 import { HorizontalProductCardSkeleton } from './SkeletonLoader';
+import { imageMap } from '../../data/imageMap';
 
 interface HorizontalProductCardProps {
   product: Product;
@@ -19,7 +20,13 @@ export function HorizontalProductCard({ product, onProductClick, loading }: Hori
     return <HorizontalProductCardSkeleton />;
   }
 
-  const isVariableProduct = product.attributes && product.attributes.length > 0;
+  // Filter out brand attributes (pa_marques) from variable product detection
+  const isVariableProduct = product.attributes && product.attributes.some(attr => attr.slug !== 'pa_marques');
+  
+  // Get brand attribute for display
+  const brandAttribute = product.attributes?.find(attr => attr.slug === 'pa_marques');
+  const brandImage = brandAttribute && brandAttribute.options.length > 0 ? 
+    imageMap[brandAttribute.options[0]] : null;
 
   const handleAddToCartClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -101,6 +108,17 @@ export function HorizontalProductCard({ product, onProductClick, loading }: Hori
             <h3 className="font-semibold text-gray-900 dark:text-white mb-2 leading-tight text-truncate-2">
               {product.name}
             </h3>
+            
+            {/* Brand image display */}
+            {brandImage && (
+              <div className="mb-2">
+                <img 
+                  src={brandImage} 
+                  alt={brandAttribute?.options[0] || 'Brand'}
+                  className="h-6 w-auto object-contain"
+                />
+              </div>
+            )}
             
             {/* SKU */}
             {product.sku && (

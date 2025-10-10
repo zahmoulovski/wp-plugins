@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { X, Cart, Heart, Plus, Dash, ChatDots } from 'react-bootstrap-icons';
+import { X, Cart, Plus, Dash, ChatDots } from 'react-bootstrap-icons';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Product, Variation } from '../../types';
@@ -9,10 +9,11 @@ import { ImageLightbox } from './ImageLightbox';
 import { ColorVariation } from '../variations/ColorVariation';
 import { ImageVariation } from '../variations/ImageVariation';
 import { SelectVariation } from '../variations/SelectVariation';
-import { BrandVariation } from '../variations/BrandVariation';
+
 import { api } from '../../services/api';
-import { colorMap } from '../../data/colorMap';
 import { imageMap } from '../../data/imageMap';
+import { colorMap } from '../../data/colorMap';
+import { getAttributeType } from '../../data/attributeTypes';
 
 
 interface ProductModalProps {
@@ -56,7 +57,7 @@ export function ProductModal({ product, isOpen, onClose, variations: externalVar
           const vars = await api.getProductVariations(product.id);
           setVariations(vars);
         } catch (error) {
-          console.error('Failed to fetch variations:', error);
+          toast.error('Failed to load product variations');
         }
       };
       fetchVariations();
@@ -170,9 +171,8 @@ export function ProductModal({ product, isOpen, onClose, variations: externalVar
     const whatsappNumber = '+21698134873';
     const productName = product.name;
     const productSku = product.sku || 'N/A';
-    const productUrl = window.location.href;
-    
-    const message = `3asléma, n7éb n3adi commande fi : ${productName} (RÉF : ${productSku}) - ${productUrl} Quantité: ${quantity} Email : ${whatsappEmail}`;
+
+    const message = `3asléma, n7éb n3adi commande fi : ${productName} (RÉF : ${productSku}) - Quantité: ${quantity} Email : ${whatsappEmail}`;
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
     
@@ -268,24 +268,35 @@ export function ProductModal({ product, isOpen, onClose, variations: externalVar
     return images;
   }, [product.images, product.name, getThumbnail, matchedVariation, selectedAttributes]);
 
-  const brandAttr = product.attributes?.find(attr => attr.name.toLowerCase() === 'marque' || attr.name.toLowerCase() === 'pa_marques');
-  const otherAttributes = product.attributes?.filter(attr => attr.name.toLowerCase() !== 'marque' && attr.name.toLowerCase() !== 'pa_marques') || [];
+  const brandAttribute = product.attributes?.find(attr => attr.slug === 'pa_marques');
+  const otherAttributes = product.attributes?.filter(attr => attr.slug !== 'pa_marques') || [];
+  const brandImage = brandAttribute?.options?.[0] ? imageMap[brandAttribute.options[0].toLowerCase()] : null;
+  
 
   const addToCart = () => {
-    // Check if all attributes are selected
-    if (otherAttributes.length > 0 && Object.keys(selectedAttributes).length !== otherAttributes.length) {
+    // Check if all NON-BRAND attributes are selected
+    const nonBrandSelectedAttributes = Object.keys(selectedAttributes).filter(key => 
+      key !== 'pa_marques'
+    );
+    
+    if (otherAttributes.length > 0 && nonBrandSelectedAttributes.length !== otherAttributes.length) {
       toast.error('vous devez sélectionner les options avant d\'ajouter au panier');
       return;
     }
 
+    // Filter out brand attributes from cart item name
+    const nonBrandAttributes = Object.fromEntries(
+      Object.entries(selectedAttributes).filter(([key]) => key !== 'pa_marques')
+    );
+
     const cartItem = {
       id: product.id,
-      name: `${product.name}${Object.keys(selectedAttributes).length > 0 ? ` - ${Object.entries(selectedAttributes).map(([key, value]) => `${key}: ${value}`).join(', ')}` : ''}`,
+      name: `${product.name}${Object.keys(nonBrandAttributes).length > 0 ? ` - ${Object.entries(nonBrandAttributes).map(([key, value]) => `${key}: ${value}`).join(', ')}` : ''}`,
       price: currentPrice,
       quantity: quantity,
       image: matchedVariation?.image?.src || product.images?.[0]?.src || '',
       sku: currentSku,
-      attributes: selectedAttributes,
+      attributes: nonBrandAttributes,
       product: product,
       variationId: matchedVariation?.id || null
     };
@@ -310,7 +321,7 @@ export function ProductModal({ product, isOpen, onClose, variations: externalVar
       <div ref={modalRef} className="bg-white dark:bg-gray-900 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
 
         {/* Modal Header */}
-        <div className="sticky top-0 bg-white dark:bg-gray-900 p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <div className="sticky top-0 bg-white dark:bg-gray-900 p-4 border-b z-10 border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <div ref={containerRef} className="overflow-hidden flex-1 mr-4">
             <div
               ref={textRef}
@@ -342,14 +353,19 @@ export function ProductModal({ product, isOpen, onClose, variations: externalVar
                 className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => setShowLightbox(true)}
               />
+              {/* Brand Image Overlay */}
+              {brandImage && (
+                <div className="absolute top-2 left-2 bg-white bg-opacity-90 rounded-lg p-2 shadow-lg z-20">
+                  <img 
+                    src={brandImage} 
+                    alt={brandAttribute?.options?.[0] || 'Brand'}
+                    className="h-12 w-12 object-contain"
+                  />
+                </div>
+              )}
               <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded-lg text-xs">
                 Cliquez pour zoomer
               </div>
-              {brandAttr && (
-                <div className="absolute bottom-2 left-2 bg-white px-2 py-1 rounded">
-                  <BrandVariation brand={brandAttr.options[0]} />
-                </div>
-              )}
             </div>
 
             {thumbnailImages.length > 1 && (
@@ -375,46 +391,47 @@ export function ProductModal({ product, isOpen, onClose, variations: externalVar
             )}
           </div>
 
-          {/* Price and Sale Badge */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex flex-col">
-              {isOnSale && currentRegularPrice ? (
-                <div className="flex items-center space-x-2">
+          {/* Price, SKU and Categories */}
+          <div className="space-y-3 mb-4">
+            {/* Price and Sale Badge */}
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                {isOnSale && currentRegularPrice ? (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-2xl font-bold text-primary-600">
+                      {formatPrice(currentSalePrice || currentPrice)}
+                    </span>
+                    <span className="text-lg text-gray-500 line-through">
+                      {formatPrice(currentRegularPrice)}
+                    </span>
+                  </div>
+                ) : (
                   <span className="text-2xl font-bold text-primary-600">
-                    {formatPrice(currentSalePrice || currentPrice)}
+                    {formatPrice(currentPrice)}
                   </span>
-                  <span className="text-lg text-gray-500 line-through">
-                    {formatPrice(currentRegularPrice)}
-                  </span>
-                </div>
-              ) : (
-                <span className="text-2xl font-bold text-primary-600">
-                  {formatPrice(currentPrice)}
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                {isOnSale && (
+                  <div className="bg-secondary-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                    Promo
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* SKU */}
+            {product.sku && (
+              <div>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  Réf: {currentSku}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div className="flex items-center space-x-2">
-              {isOnSale && (
-                <div className="bg-secondary-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                  Promo
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* SKU */}
-          {product.sku && (
-            <div className="mb-4">
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                Réf: {currentSku}
-              </span>
-            </div>
-          )}
-
-          {/* Categories */}
-          {product.categories && product.categories.length > 0 && (
-            <div className="mb-4">
+            {/* Categories */}
+            {product.categories && product.categories.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {product.categories.map((category) => (
                   <Link
@@ -427,8 +444,8 @@ export function ProductModal({ product, isOpen, onClose, variations: externalVar
                   </Link>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Descriptions */}
           {product.short_description && (
@@ -459,61 +476,9 @@ export function ProductModal({ product, isOpen, onClose, variations: externalVar
               </div>
               {otherAttributes.map(attr => {
                 const selected = selectedAttributes[attr.name];
-
+                const attributeType = getAttributeType(attr.name);
                 
-                // More flexible color detection
-                const isColorAttribute = 
-                  attr.name.toLowerCase().includes('color') || 
-                  attr.name.toLowerCase().includes('couleur') ||
-                  attr.name.toLowerCase().includes('colour') ||
-                  attr.name.toLowerCase().includes('farbe') ||
-                  (attr.options && attr.options.some(opt => 
-                    colorMap[opt.toLowerCase()] || 
-                    ['rouge', 'bleu', 'vert', 'blanc', 'noir', 'orange', 'violet', 'rose', 'gris', 'marron', 'jaune'].includes(opt.toLowerCase())
-                  ));
-                
-                // More flexible image/material detection
-                const isImageAttribute = 
-                  attr.name.toLowerCase().includes('image') ||
-                  attr.name.toLowerCase().includes('material') ||
-                  attr.name.toLowerCase().includes('matériau') ||
-                  attr.name.toLowerCase().includes('texture') ||
-                  attr.name.toLowerCase().includes('finish') ||
-                  attr.name.toLowerCase().includes('finition') ||
-                  attr.name.toLowerCase().includes('pattern') ||
-                  attr.name.toLowerCase().includes('motif') ||
-                  attr.name.toLowerCase().includes('style') ||
-                  attr.name.toLowerCase().includes('wood') ||
-                  attr.name.toLowerCase().includes('bois') ||
-                  attr.name.toLowerCase().includes('metal') ||
-                  attr.name.toLowerCase().includes('acier') ||
-                  attr.name.toLowerCase().includes('fabric') ||
-                  attr.name.toLowerCase().includes('tissu') ||
-                  attr.name.toLowerCase().includes('leather') ||
-                  attr.name.toLowerCase().includes('cuir') ||
-                  attr.name.toLowerCase().includes('height') ||
-                  attr.name.toLowerCase().includes('hauteur') ||
-                  attr.name.toLowerCase().includes('size') ||
-                  attr.name.toLowerCase().includes('taille') ||
-                  attr.name.toLowerCase().includes('dimension') ||
-                  attr.name.toLowerCase().includes('length') ||
-                  attr.name.toLowerCase().includes('longueur') ||
-                  attr.name.toLowerCase().includes('width') ||
-                  attr.name.toLowerCase().includes('largeur') ||
-                  (attr.options && attr.options.some(opt => 
-                    imageMap[opt.toLowerCase()] || 
-                    ['wood', 'bois', 'metal', 'acier', 'steel', 'fabric', 'tissu', 'leather', 'cuir', 'glass', 'verre', 'marble', 'marbre', 'plastic', 'plastique'].includes(opt.toLowerCase())
-                  )) ||
-                  (attr.options && attr.options.some(opt => 
-                    // Check for size patterns like "TC3 = 250mm", "250mm", "TC3", etc.
-                    /^[A-Z]{1,3}\d+\s*=.*\d+mm$/i.test(opt) || // Pattern like "TC3 = 250mm"
-                    /^\d+mm$/i.test(opt) || // Pattern like "250mm"
-                    /^[A-Z]{1,3}\d+$/i.test(opt) || // Pattern like "TC3"
-                    /size|taille|dimension|height|hauteur|length|longueur|width|largeur/i.test(opt)
-                  ));
-                
-               
-                if (isColorAttribute) {
+                if (attributeType === 'color') {
                   return (
                     <ColorVariation
                       key={attr.name}
@@ -523,7 +488,7 @@ export function ProductModal({ product, isOpen, onClose, variations: externalVar
                       hexMap={colorMap}
                     />
                   );
-                } else if (isImageAttribute) {
+                } else if (attributeType === 'image') {
                   return (
                     <ImageVariation
                       key={attr.name}

@@ -204,7 +204,6 @@ export const api: APIInterface = {
 
       // Try to use the custom WordPress authentication endpoint first
       try {
-        console.log('Attempting authentication with email:', email);
         const wpBaseUrl = isDevelopment ? '' : (import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com');
         const response = await fetch(`${wpBaseUrl}/wp-json/mobile-app/v1/authenticate`, {
           method: 'POST',
@@ -217,9 +216,7 @@ export const api: APIInterface = {
           })
         });
 
-        console.log('Authentication response status:', response.status);
         const data = await response.json();
-        console.log('Authentication response data:', data);
 
         if (!response.ok || !data.success) {
           if (response.status === 401) {
@@ -233,7 +230,6 @@ export const api: APIInterface = {
 
         // Ensure avatar_url is included in the customer data
         if (data.customer && !data.customer.avatar_url) {
-          console.log('No avatar_url in authentication response, trying to fetch from WordPress API');
           try {
             const wpBaseUrl = import.meta.env.VITE_WORDPRESS_URL || 'https://klarrion.com';
             const avatarResponse = await fetch(`${wpBaseUrl}/wp-json/wp/v2/users/${data.customer.id}?_fields=avatar_urls`, {
@@ -245,13 +241,11 @@ export const api: APIInterface = {
             
             if (avatarResponse.ok) {
               const avatarData = await avatarResponse.json();
-              console.log('Avatar data from WordPress API:', avatarData);
               if (avatarData.avatar_urls && avatarData.avatar_urls['96']) {
                 data.customer.avatar_url = avatarData.avatar_urls['96'];
               }
             }
           } catch (avatarError) {
-            console.log('Failed to fetch avatar from WordPress API:', avatarError);
           }
         }
 
@@ -372,13 +366,11 @@ export const api: APIInterface = {
         
         if (avatarResponse.ok) {
           const avatarData = await avatarResponse.json();
-          console.log('Avatar data from WordPress API for customer', id, ':', avatarData);
           if (avatarData.avatar_urls && avatarData.avatar_urls['96']) {
             customer.avatar_url = avatarData.avatar_urls['96'];
           }
         }
       } catch (avatarError) {
-        console.log('Failed to fetch avatar from WordPress API:', avatarError);
       }
       
       return customer;
@@ -475,11 +467,8 @@ export const api: APIInterface = {
       if (!data.success) {
         throw new Error(data.message || data.error || 'Password update failed');
       }
-
-      console.log('Password updated successfully');
       
     } catch (error: any) {
-      console.error('Password update error:', error);
       
       // Provide more detailed error messages
       if (error.message.includes('Failed to fetch')) {

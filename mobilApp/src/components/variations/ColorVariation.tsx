@@ -15,7 +15,6 @@ export function ColorVariation({ attribute, selected, onSelect, hexMap }: ColorV
       <div className="flex flex-wrap gap-2">
         {attribute.options.map((option) => {
           const hex = hexMap[option.toLowerCase()] || hexMap[option] || hexMap[option.charAt(0).toUpperCase() + option.slice(1).toLowerCase()];
-          console.log('Color option:', option, 'hex found:', hex);
           
           return (
             <button
