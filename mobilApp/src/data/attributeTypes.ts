@@ -19,23 +19,27 @@ export const attributeTypeMap: Record<string, 'text' | 'color' | 'image'> = {
 };
 
 export function getAttributeType(attributeName: string): 'text' | 'color' | 'image' {
+  // Check for brand attributes first - these should not be treated as selectable variations
+  const lowerName = attributeName.toLowerCase();
+  if (lowerName === 'marques' || lowerName === 'brand') {
+    return 'image'; // Return text but these will be filtered out anyway
+  }
+  
   // Direct mapping first
   if (attributeTypeMap[attributeName]) {
     return attributeTypeMap[attributeName];
   }
   
   // Fallback detection based on name patterns
-  const lowerName = attributeName.toLowerCase();
-  
   // Color detection
   if (lowerName.includes('couleur') || lowerName.includes('color')) {
     return 'color';
   }
   
-  // Image detection
-  if (lowerName.includes('hauteur') || lowerName.includes('largeur') || 
-      lowerName.includes('marque') || lowerName.includes('brand') ||
-      lowerName.includes('height') || lowerName.includes('width')) {
+  // Image detection (excluding brand attributes)
+  if ((lowerName.includes('hauteur') || lowerName.includes('largeur') || 
+       lowerName.includes('height') || lowerName.includes('width')) &&
+      !lowerName.includes('marque') && !lowerName.includes('brand')) {
     return 'image';
   }
   

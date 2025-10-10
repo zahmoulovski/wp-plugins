@@ -27,6 +27,7 @@ import { Product, BlogPost } from './types';
 import { api } from './services/api';
 import PaymentCallback from './components/pages/PaymentCallback';
 import { initGA, logPageView } from './utils/analytics';
+import { ProductPage } from './components/pages/ProductPage';
 
 
 
@@ -35,9 +36,6 @@ import { initGA, logPageView } from './utils/analytics';
 function AppContent() {
   const { restoreState, saveState } = useStatePersistenceContext();
   
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(() => 
-    restoreState('selectedProduct', null)
-  );
   const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(() => 
     restoreState('selectedBlogPost', null)
   );
@@ -52,8 +50,7 @@ function AppContent() {
   const { state } = useApp();
 
   const handleProductClick = (product: Product) => {
-    setSelectedProduct(product);
-    saveState('selectedProduct', product);
+    navigate(`/product/${product.slug}`);
   };
 
   const handleBlogPostClick = (post: BlogPost) => {
@@ -184,6 +181,7 @@ function AppContent() {
                 <BrandPage onProductClick={handleProductClick} />
               </PageWrapper>
             } />
+            <Route path="/product/:productSlug" element={<ProductPage />} />
             <Route path="/search" element={
               <PageWrapper>
                 <SearchPage onProductClick={handleProductClick} />
@@ -241,12 +239,6 @@ function AppContent() {
         </main>
         {!isCheckoutPage && <BottomNav />}
         
-        <ProductModal
-          product={selectedProduct}
-          isOpen={!!selectedProduct}
-          onClose={() => setSelectedProduct(null)}
-        />
-
         <BlogModal
           post={selectedBlogPost}
           isOpen={!!selectedBlogPost}

@@ -134,6 +134,29 @@ export const api: APIInterface = {
     return product;
   },
 
+  async getProductBySlug(slug: string): Promise<Product> {
+    try {
+      // First try to search by slug to get the product ID
+      const searchResults = await apiRequest(`/products?slug=${encodeURIComponent(slug)}`);
+      if (searchResults.length > 0 && searchResults[0].id) {
+        // Found product by slug, now fetch full details by ID
+        return await this.getProduct(searchResults[0].id);
+      }
+      
+      // If not found by exact slug, try searching by name
+      const nameResults = await this.searchProducts(slug);
+      if (nameResults.length > 0 && nameResults[0].id) {
+        // Found product by name, now fetch full details by ID
+        return await this.getProduct(nameResults[0].id);
+      }
+      
+      throw new Error(`Produit avec le slug "${slug}" non trouvé`);
+    } catch (error) {
+      console.error('Error in getProductBySlug:', error);
+      throw error;
+    }
+  },
+
   async searchProducts(query: string): Promise<Product[]> {
     const searchResults = await apiRequest(`/products?search=${encodeURIComponent(query)}`);
     if (searchResults.length === 0) {
