@@ -6,6 +6,7 @@ import { Category } from '../../types';
 import { api } from '../../services/api';
 import { cacheService } from '../../services/cache';
 import { useApp } from '../../contexts/AppContext';
+import { imageMap } from '../../data/imageMap';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   const [subcategories, setSubcategories] = useState<{ [key: number]: Category[] }>({});
   const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [expandedBrands, setExpandedBrands] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   // Load main categories
@@ -248,6 +250,69 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Catégories</h3>
             {renderCategoryTree()}
+          </div>
+
+          {/* Brands Accordion */}
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Marques</h3>
+              <button
+                onClick={() => setExpandedBrands(!expandedBrands)}
+                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                aria-label={expandedBrands ? "Masquer les marques" : "Afficher les marques"}
+              >
+                {expandedBrands ? (
+                  <ChevronDown className="h-4 w-4 text-gray-400 transition-transform duration-200" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-gray-400 transition-transform duration-200" />
+                )}
+              </button>
+            </div>
+            
+            {expandedBrands && (
+              <div className="space-y-1">
+                {Object.entries(imageMap)
+                  .filter(([brandName]) => {
+                    // Exclude image attributes and measurements
+                    const exclusions = [
+                      'TC3 = 250mm', 'TC4 = 350mm', 'TC5 = 450mm',
+                      '180cm', '200cm',
+                      'T1 = 300mm', 'T1 = 350mm', 'T1 = 450mm',
+                      'T2 = 340mm', 'T2 = 460mm', 'T2 = 550mm',
+                      'T3 = 380mm', 'T3 = 600mm', 'T6 = 750mm',
+                      'L = 180cm', 'L = 120cm', 'L = 160cm', 'L = 200cm'
+                    ];
+                    return !exclusions.includes(brandName);
+                  })
+                  .map(([brandName, logoUrl]) => (
+                    <Link
+                      key={brandName}
+                      to={`/brands/${encodeURIComponent(brandName)}`}
+                      onClick={onClose}
+                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+                    >
+                      <img
+                        src={logoUrl}
+                        alt={brandName}
+                        className="w-10 h-10 rounded object-contain bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                      <div className="w-10 h-10 rounded bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hidden flex items-center justify-center">
+                        <span className="text-gray-600 dark:text-gray-400 text-sm font-bold">
+                          {brandName.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <span className="flex-1 text-gray-900 dark:text-white font-medium group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                        {decodeHTMLEntities(brandName)}
+                      </span>
+                    </Link>
+                  ))
+                }
+              </div>
+            )}
           </div>
 
           {/* Secondary Menu 
