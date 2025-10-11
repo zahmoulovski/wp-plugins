@@ -9,6 +9,7 @@ import { ImageLightbox } from '../common/ImageLightbox';
 import { ColorVariation } from '../variations/ColorVariation';
 import { ImageVariation } from '../variations/ImageVariation';
 import { SelectVariation } from '../variations/SelectVariation';
+import { StyleShare } from '../common/StyleShare';
 import { api } from '../../services/api';
 import { imageMap } from '../../data/imageMap';
 import { colorMap } from '../../data/colorMap';
@@ -138,14 +139,19 @@ export function ProductPage() {
     dispatch({ 
       type: 'ADD_TO_CART', 
       payload: { 
-        product, 
-        quantity, 
-        variation: matchedVariation || undefined,
-        selectedAttributes: otherAttributes.length > 0 ? selectedAttributes : undefined
+        id: product.id,
+        name: product.name,
+        price: matchedVariation?.price || product.price,
+        quantity: quantity,
+        image: matchedVariation?.image?.src || product.images?.[0]?.src || '',
+        sku: matchedVariation?.sku || product.sku,
+        attributes: otherAttributes.length > 0 ? selectedAttributes : {},
+        product: product,
+        variationId: matchedVariation?.id || null
       } 
     });
     
-    toast.success('Produit ajouté au panier');
+    //toast.success('Produit ajouté au panier');
   };
 
   const handleWhatsAppOrder = () => {
@@ -289,10 +295,10 @@ export function ProductPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header with back button */}
-      <div className="w-full bg-white dark:bg-gray-800 shadow-sm fixed top-17 z-10">
+      {/* Header with back button and share */}
+      <div className="w-full bg-white dark:bg-gray-800 shadow-sm fixed top-16 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center py-4">
+          <div className="flex items-center justify-between py-3">
             <button
               onClick={() => navigate(-1)}
               className="flex items-center text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
@@ -300,11 +306,21 @@ export function ProductPage() {
               <ArrowLeft className="h-5 w-5 mr-2" />
               Retour
             </button>
+            
+            {/* Style Share Button */}
+            {product && (
+              <StyleShare
+                productName={product.name}
+                productId={product.id}
+                currentPrice={formatPrice(currentPrice)}
+                productUrl={`https://klarrion.com/react-vite_app/product/${productSlug}`}
+              />
+            )}
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-5rem">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-28 pb-32">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Product Images */}
           <div className="space-y-4">
@@ -445,7 +461,7 @@ export function ProductPage() {
                     </button>
                   )}
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-4 dark:text-white">
                   {otherAttributes.map(attr => {
                     const selected = selectedAttributes[attr.name];
                     const attributeType = getAttributeType(attr.name);

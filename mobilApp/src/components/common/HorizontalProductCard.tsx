@@ -54,7 +54,9 @@ export function HorizontalProductCard({ product, onProductClick, loading }: Hori
         sku: product.sku,
         attributes: {},
         product: product,
-        variationId: null
+        variationId: null,
+        tax_status: product.tax_status,
+        tax_class: product.tax_class
       }
     });
     

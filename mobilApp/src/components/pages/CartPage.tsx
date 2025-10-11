@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Plus, Dash, Trash, Bag, X } from 'react-bootstrap-icons';
 import { useApp } from '../../contexts/AppContext';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
+import { getProductTaxInfo, parsePrice, formatPrice as formatTaxPrice } from '../../utils/taxUtils';
 
 interface CartPageProps {
   onCheckout: () => void;
@@ -23,27 +24,55 @@ export function CartPage({ onCheckout }: CartPageProps) {
     dispatch({ type: 'REMOVE_FROM_CART', payload: { id, variationId } });
   };
 
-  const formatPrice = (price: string) => {
+  const formatPrice = (price: string, isHT = false) => {
     const numPrice = parseFloat(price);
     if (numPrice === 0) {
       return 'Prix : Sur Demande';
     }
-    return `${numPrice.toFixed(3)} TND`;
+    const suffix = isHT ? ' TND HT' : ' TND';
+    return `${numPrice.toFixed(3)}${suffix}`;
   };
 
   const calculateTotal = () => {
-    const subtotal = state.cart.reduce((total, item) => {
+    const subtotalHT = state.cart.reduce((total, item) => {
       const price = parseFloat(item.product?.price || '0');
+      const taxInfo = getProductTaxInfo(item.price || item.product?.price || '0', item.tax_class, item.tax_status);
+      if (taxInfo) {
+        // Calculate HT price from TTC price
+        const htPrice = price / (1 + taxInfo.rate / 100);
+        return total + (htPrice * item.quantity);
+      }
       return total + (price * item.quantity);
     }, 0);
+    const tax = parseFloat(calculateTotalTax());
     const timbre = 1.0; // Fixed Timbre fee
-    return (subtotal + timbre).toFixed(3);
+    return (subtotalHT + tax + timbre).toFixed(3);
   };
 
   const calculateSubtotal = () => {
     return state.cart.reduce((total, item) => {
       const price = parseFloat(item.price || item.product?.price || '0');
+      const taxInfo = getProductTaxInfo(item.price || item.product?.price || '0', item.tax_class, item.tax_status);
+      if (taxInfo) {
+        // Calculate HT price from TTC price
+        const htPrice = price / (1 + taxInfo.rate / 100);
+        return total + (htPrice * item.quantity);
+      }
       return total + (price * item.quantity);
+    }, 0).toFixed(3);
+  };
+
+  const calculateTotalTax = () => {
+    return state.cart.reduce((totalTax, item) => {
+      const taxInfo = getProductTaxInfo(item.price || item.product?.price || '0', item.tax_class, item.tax_status);
+      if (taxInfo) {
+        const itemTotal = parseFloat(item.price || item.product?.price || '0') * item.quantity;
+        // Since prices are tax-inclusive, extract the tax amount from the total
+        const htAmount = itemTotal / (1 + taxInfo.rate / 100);
+        const itemTax = itemTotal - htAmount;
+        return totalTax + itemTax;
+      }
+      return totalTax;
     }, 0).toFixed(3);
   };
 
@@ -102,7 +131,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
                   >
                     <Dash className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                   </button>
-                  <span className="w-8 text-center font-medium">{item.quantity}</span>
+                  <span className="w-8 text-center dark:text-white font-medium">{item.quantity}</span>
                   <button 
                     onClick={() => updateQuantity(item.id, item.variationId ?? null, item.quantity + 1)}
                     className="p-1 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
@@ -112,11 +141,35 @@ export function CartPage({ onCheckout }: CartPageProps) {
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-gray-900 dark:text-white">
-                    {formatPrice((parseFloat(item.price) * item.quantity).toString())}
+                    {(() => {
+                      const price = parseFloat(item.price);
+                      const taxInfo = getProductTaxInfo(item.price, item.tax_class, item.tax_status);
+                      if (taxInfo) {
+                        const htPrice = price / (1 + taxInfo.rate / 100);
+                        return formatPrice((htPrice * item.quantity).toString(), true);
+                      }
+                      return formatPrice((price * item.quantity).toString(), true);
+                    })()}
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {formatPrice(item.price)} x {item.quantity}
+                    {(() => {
+                      const price = parseFloat(item.price);
+                      const taxInfo = getProductTaxInfo(item.price, item.tax_class, item.tax_status);
+                      if (taxInfo) {
+                        const htPrice = price / (1 + taxInfo.rate / 100);
+                        return `${formatPrice(htPrice.toString(), true)} x ${item.quantity}`;
+                      }
+                      return `${formatPrice(item.price, true)} x ${item.quantity}`;
+                    })()}
                   </p>
+                  {(item.tax_status !== 'none' && item.tax_class !== 'zero-rate') && (
+                    <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                      {(() => {
+                        const taxInfo = getProductTaxInfo(item.price, item.tax_class, item.tax_status);
+                        return taxInfo ? taxInfo.label : '';
+                      })()}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -124,7 +177,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
               onClick={() => removeFromCart(item.id, item.variationId ?? null)}
               className="p-1 hover:text-red-500 transition-colors"
             >
-              <X className="h-5 w-5" />
+              <Trash className="h-5 w-5 text-red-500 dark:text-red-400" />
             </button>
           </div>
         ))}
@@ -137,7 +190,7 @@ export function CartPage({ onCheckout }: CartPageProps) {
               Sous-total
             </span>
             <span className="font-semibold text-gray-900 dark:text-white">
-              {calculateSubtotal()} <sup>TND TTC</sup>
+              {calculateSubtotal()} <sup>TND HT</sup>
             </span>
           </div>
           <div className="flex justify-between items-center">
@@ -146,6 +199,14 @@ export function CartPage({ onCheckout }: CartPageProps) {
             </span>
             <span className="font-semibold text-gray-900 dark:text-white">
               1.00 TND
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-600 dark:text-gray-400">
+              Taxe
+            </span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {calculateTotalTax()} TND
             </span>
           </div>
           <div className="border-t border-gray-200 dark:border-gray-600 pt-3">

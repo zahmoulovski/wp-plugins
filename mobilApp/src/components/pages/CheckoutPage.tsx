@@ -13,6 +13,7 @@ import { useScrollToTop } from '../../hooks/useScrollToTop';
 import { useNavigate } from 'react-router-dom';
 import { KonnectPaymentModal, useKonnectPayment } from '../../hooks/useKonnectPayment';
 import { logBeginCheckout, logPaymentInfo, logPurchase } from '../../utils/analytics';
+import { getProductTaxInfo, parsePrice } from '../../utils/taxUtils';
 
 interface CheckoutPageProps {
   onBack: () => void;
@@ -244,14 +245,37 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
   }, [konnectModal.showKonnectIframe, konnectModal.konnectPayUrl, selectedOrder]);
 
   /* -------  HANDLERS  ------- */
-  const calculateSubtotal = () =>
-    state.cart
-      .reduce((t, i) => t + parseFloat(i.product.price) * i.quantity, 0)
-      .toFixed(3);
+  const calculateSubtotal = () => {
+    return state.cart.reduce((total, item) => {
+      const price = parseFloat(item.product.price);
+      const taxInfo = getProductTaxInfo(item.product.price, item.tax_class, item.tax_status);
+      if (taxInfo) {
+        // Calculate HT price from TTC price
+        const htPrice = price / (1 + taxInfo.rate / 100);
+        return total + (htPrice * item.quantity);
+      }
+      return total + (price * item.quantity);
+    }, 0).toFixed(3);
+  };
+
+  const calculateTotalTax = () => {
+    return state.cart.reduce((totalTax, item) => {
+      const taxInfo = getProductTaxInfo(item.product.price, item.tax_class, item.tax_status);
+      if (taxInfo) {
+        const itemTotal = parseFloat(item.product.price) * item.quantity;
+        // Since prices are tax-inclusive, extract the tax amount from the total
+        const htAmount = itemTotal / (1 + taxInfo.rate / 100);
+        const itemTax = itemTotal - htAmount;
+        return totalTax + itemTax;
+      }
+      return totalTax;
+    }, 0).toFixed(3);
+  };
 
   const calculateTotal = () => {
     const s = parseFloat(calculateSubtotal());
-    return (s + shippingCost + 1.0).toFixed(3);
+    const tax = parseFloat(calculateTotalTax());
+    return (s + shippingCost + 1.0 + tax).toFixed(3);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -428,7 +452,10 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
         },
         line_items: state.cart.map(i => ({
           product_id: i.product.id,
-          quantity: i.quantity
+          quantity: i.quantity,
+          ...(i.variationId && { variation_id: i.variationId })
+          // Note: Do NOT add attributes to meta_data when using variation_id
+          // WooCommerce automatically handles variation attributes
         })),
         shipping_lines: selectedShipping
           ? [
@@ -461,7 +488,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
       // Track payment method selection
       logPaymentInfo(formData.paymentMethod);
       
-      const codMethods = ['cheque', 'cod', 'bacs'];
+      const codMethods = ['Paiement par chéque', 'Paiement en éspece', 'Virement bancaire direct'];
       if (codMethods.includes(formData.paymentMethod))
         await api.updateOrder(order.id, { status: 'processing' });
 
@@ -760,7 +787,17 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
                           <p className="text-sm text-gray-500 dark:text-gray-400">Qté: {i.quantity}</p>
                         </div>
                       </div>
-                      <span className="font-semibold text-gray-900 dark:text-white">{(parseFloat(i.price || i.product.price) * i.quantity).toFixed(3)} TND</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                      {(() => {
+                        const price = parseFloat(i.price || i.product.price);
+                        const taxInfo = getProductTaxInfo(i.price || i.product.price, i.tax_class, i.tax_status);
+                        if (taxInfo) {
+                          const htPrice = price / (1 + taxInfo.rate / 100);
+                          return `${(htPrice * i.quantity).toFixed(3)} TND HT`;
+                        }
+                        return `${(price * i.quantity).toFixed(3)} TND HT`;
+                      })()}
+                    </span>
                     </div>
                   ))}
                 </div>
@@ -769,7 +806,7 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
                   <div className="flex justify-between text-base">
                     <span className="text-gray-600 dark:text-gray-400">Sous-total</span>
                     <span className="text-gray-900 dark:text-white">
-                      {calculateSubtotal()} TND
+                      {calculateSubtotal()} TND HT
                     </span>
                   </div>
                   <div className="flex justify-between text-base">
@@ -781,6 +818,10 @@ export function CheckoutPage({ onBack, onOrderSuccess }: CheckoutPageProps) {
                   <div className="flex justify-between text-base">
                     <span className="text-gray-600 dark:text-gray-400">Timbre</span>
                     <span className="text-gray-900 dark:text-white">1.00 TND</span>
+                  </div>
+                  <div className="flex justify-between text-base">
+                    <span className="text-gray-600 dark:text-gray-400">Taxe ({calculateTotalTax()} TND)</span>
+                    <span className="text-gray-900 dark:text-white">{calculateTotalTax()} TND</span>
                   </div>
                   <div className="flex justify-between text-lg font-semibold border-t border-gray-200 dark:border-gray-700 pt-4">
                     <span className="text-gray-900 dark:text-white">Total</span>

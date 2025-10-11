@@ -34,6 +34,8 @@ export interface Product {
   on_sale: boolean;
   featured: boolean;
   attributes?: ProductAttribute[];
+  tax_status?: string;
+  tax_class?: string;
 }
 
 export interface Category {
@@ -53,12 +55,14 @@ export interface CartItem {
   id: number;
   product: Product;
   quantity: number;
-  attributes?: Record&lt;string, string&gt;;
+  attributes?: Record<string, string>;
   name: string;
   price: string;
   image: string;
   sku?: string;
   variationId?: number | null;
+  tax_status?: string;
+  tax_class?: string;
 }
 
 export interface Customer {
@@ -109,6 +113,12 @@ export interface Order {
     product_id: number;
     quantity: number;
     total: string;
+    sku?: string;
+    variation_id?: number;
+    meta_data?: Array<{
+      key: string;
+      value: string;
+    }>;
   }>;
 }
 

@@ -3,11 +3,12 @@ import { Person, BoxArrowRight, Calendar, Key, PersonPlus, Eye, EyeSlash, Pencil
 import { useApp } from '../../contexts/AppContext';
 import { api } from '../../services/api';
 import { Order } from '../../types';
-import { Toaster, toast } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import paymentLogo from '../../components/assets/payment-logo.png';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
 import logoKLARRION from'../../components/assets/klarrionLogo.png';
 import { useNavigate } from 'react-router-dom';
+import { KonnectPaymentModal, useKonnectPayment } from '../../hooks/useKonnectPayment';
 
 
 export function ProfilePage() {
@@ -70,9 +71,65 @@ export function ProfilePage() {
     newPassword: '',
     confirmPassword: ''
   });
+  const konnectModal = useKonnectPayment();
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
 
   // Scroll to top when page loads or when switching between views
   useScrollToTop([showLoginForm, showSignUpForm, showOrderDetails], 'smooth');
+
+  /* -------  KONNECT MODAL LISTENER  ------- */
+  useEffect(() => {
+    if (!konnectModal.showKonnectIframe || !konnectModal.konnectPayUrl || !selectedOrder) return;
+
+    const handleMessage = async (event: MessageEvent) => {
+      if (!event.origin.includes('konnect.network')) return;
+      if (event.data === 'payment_success') {
+        try {
+          await api.updateOrder(selectedOrder.id, { status: 'completed' });
+          
+          // Refresh order details
+          const updatedOrder = await api.getOrder(selectedOrder.id);
+          setSelectedOrder(updatedOrder);
+          
+          // Update the orders list
+          setOrders(prevOrders => 
+            prevOrders.map(order => 
+              order.id === selectedOrder.id ? updatedOrder : order
+            )
+          );
+          
+          konnectModal.closeKonnectPayment();
+          setPaymentError(''); // Clear any previous errors
+          toast.success('Paiement réussi ! Votre commande est confirmée.');
+        } catch (error) {
+          setPaymentError('Erreur lors de la mise à jour du statut de la commande.');
+        }
+      } else if (event.data === 'payment_failed') {
+        try {
+          await api.updateOrder(selectedOrder.id, { status: 'on-hold' });
+          
+          // Refresh order details
+          const updatedOrder = await api.getOrder(selectedOrder.id);
+          setSelectedOrder(updatedOrder);
+          
+          // Update the orders list
+          setOrders(prevOrders => 
+            prevOrders.map(order => 
+              order.id === selectedOrder.id ? updatedOrder : order
+            )
+          );
+          
+          konnectModal.closeKonnectPayment();
+          setPaymentError('Le paiement a échoué. Votre commande est en attente.');
+        } catch (error) {
+          setPaymentError('Erreur lors de la mise à jour du statut de la commande.');
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [konnectModal.showKonnectIframe, konnectModal.konnectPayUrl, selectedOrder]);
 
   const loadOrders = async () => {
     if (!state.customer) return;
@@ -528,8 +585,8 @@ export function ProfilePage() {
   };
 
   const handleOrderClick = (order: Order) => {
-    setSelectedOrder(order);
-    setShowOrderDetails(true);
+    // Redirect to ThankYouPage instead of showing modal
+    navigate(`/thank-you?order_id=${order.id}&from_profile=true`);
   };
 
   const handleCloseOrderDetails = () => {
@@ -543,6 +600,9 @@ export function ProfilePage() {
 
   const handlePayOrder = async () => {
     if (!selectedOrder) return;
+
+    setIsProcessingPayment(true);
+    setPaymentError('');
 
     try {
       const amount = Math.round(parseFloat(selectedOrder.total) * 1000);
@@ -562,118 +622,50 @@ export function ProfilePage() {
 
       await api.updateOrderMeta(selectedOrder.id, { konnect_payment_id: payment.paymentRef });
 
-      window.open(payment.payUrl, '_blank');
+      // Store order details for potential return
+      const orderDetails = { order: selectedOrder, subtotal: selectedOrder.line_items.reduce((sum, item) => sum + parseFloat(item.total), 0).toFixed(3) };
+      sessionStorage.setItem(`order_${selectedOrder.id}`, JSON.stringify(orderDetails));
+
+      // Open payment in modal instead of new tab
+      konnectModal.openKonnectPayment(payment.payUrl);
 
     } catch (error) {
+      setPaymentError('Erreur lors de l\'initialisation du paiement. Veuillez reessayer.');
       toast.error('Erreur lors de l\'initialisation du paiement. Veuillez reessayer.');
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
   const handleOrderAgain = async () => {
-    if (!selectedOrder) return;
-
-    try {
-      // Clear current cart first
-      dispatch({ type: 'CLEAR_CART' });
-
-      // Track items that couldn't be added due to stock issues
-      const unavailableItems = [];
-      let addedItems = 0;
-
-      // Add all items from the order to cart with stock validation
-      for (const item of selectedOrder.line_items) {
-        try {
-          // Fetch current product data to check stock status
-          const product = await api.getProduct(item.product_id);
-          
-          if (!product) {
-            unavailableItems.push({ name: item.name, reason: 'Produit introuvable' });
-            continue;
-          }
-
-          // Check if product is in stock or allows backorders
-          const isInStock = product.stock_status === 'instock' || product.stock_status === 'onbackorder';
-          const hasStock = product.stock_quantity === null || product.stock_quantity >= item.quantity;
-          
-          if (!isInStock && product.stock_status !== 'onbackorder') {
-            unavailableItems.push({ name: item.name, reason: 'Rupture de stock' });
-            continue;
-          }
-
-          if (!hasStock && product.stock_status !== 'onbackorder') {
-            const availableQty = product.stock_quantity || 0;
-            unavailableItems.push({ 
-              name: item.name, 
-              reason: `Stock insuffisant (${availableQty} disponible${availableQty > 1 ? 's' : ''})`
-            });
-            continue;
-          }
-
-          // Add to cart with current product data
-          const productData = {
-            id: item.product_id,
-            name: item.name,
-            price: parseFloat(item.price),
-            images: product.images || [],
-            sku: item.sku,
-            stock_quantity: product.stock_quantity,
-            type: product.type || 'simple',
-            status: product.status || 'publish',
-            stock_status: product.stock_status
-          };
-
-          dispatch({
-            type: 'ADD_TO_CART',
-            payload: {
-              product: productData,
-              quantity: item.quantity,
-              variationId: item.variation_id || null
-            }
-          });
-          
-          addedItems++;
-          
-        } catch (error) {
-          unavailableItems.push({ name: item.name, reason: 'Erreur lors de l\'ajout' });
-        }
-      }
-
-      // Close modal
-      setShowOrderDetails(false);
-
-      // Show appropriate messages
-      if (addedItems === 0) {
-        // No items were added
-        toast.error('Aucun article n\'a pu être ajouté au panier.');
-        if (unavailableItems.length > 0) {
-          unavailableItems.forEach(item => {
-            toast.error(`${item.name}: ${item.reason}`);
-          });
-        }
-      } else if (unavailableItems.length > 0) {
-        // Some items were added, some were not
-        toast.success(`${addedItems} article${addedItems > 1 ? 's' : ''} ajouté${addedItems > 1 ? 's' : ''} au panier !`);
-        unavailableItems.forEach(item => {
-          toast.error(`${item.name}: ${item.reason}`);
-        });
-        // Still redirect to cart for the items that were added
-        navigate('/cart');
-      } else {
-        // All items were added successfully
-        toast.success('Tous les articles ont été ajoutés au panier ! Redirection vers le paiement...');
-        navigate('/cart');
-      }
-      
-    } catch (error) {
-      toast.error('Erreur lors de l\'ajout des articles au panier.');
+    // Feature disabled - show French info message
+    console.log('Order again button clicked - showing toast');
+    
+    // Prevent multiple rapid clicks
+    if ((window as any).__orderAgainClicked) {
+      return;
     }
+    
+    (window as any).__orderAgainClicked = true;
+    
+    toast('Cette fonctionnalité sera bientôt disponible !', {
+      icon: 'ℹ️',
+      duration: 4000,
+      position: 'top-right',
+      style: {
+        background: '#3b82f6',
+        color: '#fff',
+      },
+      onDismiss: () => {
+        (window as any).__orderAgainClicked = false;
+      }
+    });
   };
 
 
 
   return (
     <>
-      <Toaster position="top-center" />
       <div className="p-4 pb-20 relative min-h-screen mb-8">
         {/* Klarrion Logo Background */}
         <div
@@ -1393,12 +1385,38 @@ export function ProfilePage() {
                       <div className="flex-1">
                         <h4 className="font-medium text-gray-900 dark:text-white">{item.name}</h4>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Quantité: {item.quantity}
+                          Quantité: {item.quantity} - Réf: {item.sku}
+                          {item.meta_data && item.meta_data.length > 0 && (
+                            <>
+                              <br />
+                              {item.meta_data
+                                .filter(meta => 
+                                  meta.key && 
+                                  meta.value && 
+                                  !meta.key.startsWith('_') && 
+                                  meta.key !== 'konnect_payment_id' && 
+                                  meta.key !== 'is_vat_exempt'
+                                )
+                                .map((meta, index) => (
+                                  <span key={index}>
+                                    {meta.key.replace('pa_', '')}: {meta.value}
+                                    {index < item.meta_data.filter(meta => 
+                                      meta.key && 
+                                      meta.value && 
+                                      !meta.key.startsWith('_') && 
+                                      meta.key !== 'konnect_payment_id' && 
+                                      meta.key !== 'is_vat_exempt'
+                                    ).length - 1 && <br />}
+                                  </span>
+                                ))
+                              }
+                            </>
+                          )}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="font-semibold text-gray-900 dark:text-white">
-                          {item.total} <sup>{selectedOrder.currency} HT</sup>
+                          {parseFloat(item.total || '0').toFixed(3)} <sup>{selectedOrder.currency} HT</sup>
                         </p>
                       </div>
                     </div>
@@ -1473,11 +1491,23 @@ export function ProfilePage() {
                 </div>
               </div>
               
+              {/* Payment Error */}
+              {paymentError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <p className="text-sm font-medium">{paymentError}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="space-y-3 mt-4">
                 <button
                   onClick={handleOrderAgain}
-                  className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors duration-200"
+                  className="w-full bg-gray-400 text-white py-3 rounded-lg font-medium cursor-not-allowed opacity-60"
                 >
                   Commander à nouveau !
                 </button>
@@ -1485,10 +1515,20 @@ export function ProfilePage() {
                 {['pending', 'on-hold', 'processing'].includes(selectedOrder.status) && (
                   <button
                     onClick={handlePayOrder}
-                    className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200 flex flex-col items-center justify-center"
+                    disabled={isProcessingPayment}
+                    className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors duration-200 flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Payer En ligne
-                    <img src={paymentLogo} alt="Payment methods" className="h-6 mt-2" />
+                    {isProcessingPayment ? (
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Traitement...
+                      </div>
+                    ) : (
+                      <>
+                        Payer En ligne
+                        <img src={paymentLogo} alt="Payment methods" className="h-6 mt-2" />
+                      </>
+                    )}
                   </button>
                 )}
               </div>
@@ -1496,6 +1536,9 @@ export function ProfilePage() {
           </div>
         </div>
       )}
+      
+      {/* Konnect Payment Modal */}
+      <KonnectPaymentModal />
     </>
   );
 }

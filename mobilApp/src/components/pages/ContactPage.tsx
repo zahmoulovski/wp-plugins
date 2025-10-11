@@ -136,19 +136,27 @@ export const ContactPage: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex items-center">
                       <Telephone className="w-4 h-4 text-blue-600 mr-2" />
-                      <span className="text-gray-600 dark:text-gray-300">+216 31 401 103</span>
+                      <a href="tel:+21631401103" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                        +216 31 401 103
+                      </a>
                     </div>
                     <div className="flex items-center">
                       <Telephone className="w-4 h-4 text-blue-600 mr-2" />
-                      <span className="text-gray-600 dark:text-gray-300">+216 98 128 782</span>
+                      <a href="tel:+21698128782" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                        +216 98 128 782
+                      </a>
                     </div>
                     <div className="flex items-center">
                       <Telephone className="w-4 h-4 text-blue-600 mr-2" />
-                      <span className="text-gray-600 dark:text-gray-300">+216 98 128 778</span>
+                      <a href="tel:+21698128778" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                        +216 98 128 778
+                      </a>
                     </div>
                     <div className="flex items-center">
                       <Telephone className="w-4 h-4 text-blue-600 mr-2" />
-                      <span className="text-gray-600 dark:text-gray-300">+216 98 134 873</span>
+                      <a href="tel:+21698134873" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                        +216 98 134 873
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -172,10 +180,40 @@ export const ContactPage: React.FC = () => {
 
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                     <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Horaires</h3>
-                    <p className="text-gray-600 dark:text-gray-300">
-                      Lundi – Vendredi: 8h00 – 17h00<br />
-                      Samedi: 8h00 – 12h00
-                    </p>
+                    <div className="space-y-2">
+                      {[
+                        { day: 'Lundi', hours: '8h00 – 17h00' },
+                        { day: 'Mardi', hours: '8h00 – 17h00' },
+                        { day: 'Mercredi', hours: '8h00 – 17h00' },
+                        { day: 'Jeudi', hours: '8h00 – 17h00' },
+                        { day: 'Vendredi', hours: '8h00 – 17h00' },
+                        { day: 'Samedi', hours: '8h00 – 12h00' },
+                        { day: 'Dimanche', hours: 'Fermé' }
+                      ].map((item, index) => {
+                        const today = new Date().getDay();
+                        const dayIndex = index === 6 ? 0 : index + 1; // Sunday is 0 in JS
+                        const isToday = today === dayIndex;
+                        
+                        return (
+                          <div key={item.day} className={`flex justify-between items-center ${
+                            isToday ? 'bg-primary-50 dark:bg-primary-900/20 p-2 rounded-lg border-l-4 border-primary-500' : ''
+                          }`}>
+                            <span className={`font-medium ${
+                              isToday ? 'text-primary-600 dark:text-primary-400' : 'text-gray-700 dark:text-gray-300'
+                            }`}>
+                              {item.day}{isToday && ' (Aujourd\'hui)'}
+                            </span>
+                            <span className={`${
+                              item.hours === 'Fermé' 
+                                ? 'text-red-600 dark:text-red-400 font-medium' 
+                                : 'text-gray-600 dark:text-gray-300'
+                            }`}>
+                              {item.hours}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>

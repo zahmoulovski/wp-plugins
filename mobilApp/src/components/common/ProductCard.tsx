@@ -5,6 +5,7 @@ import { useApp } from '../../contexts/AppContext';
 import { ProductCardSkeleton } from './SkeletonLoader';
 import { logViewItem, logAddToCart } from '../../utils/analytics';
 import { imageMap } from '../../data/imageMap';
+import { getTaxRateFromClass } from '../../utils/taxUtils';
 
 interface ProductCardProps {
   product: Product;
@@ -65,7 +66,9 @@ export function ProductCard({ product, onProductClick, loading }: ProductCardPro
         sku: product.sku,
         attributes: {},
         product: product,
-        variationId: null
+        variationId: null,
+        tax_status: product.tax_status,
+        tax_class: product.tax_class
       }
     });
     
@@ -78,8 +81,10 @@ export function ProductCard({ product, onProductClick, loading }: ProductCardPro
     if (numPrice === 0) {
       return 'Prix : Sur Demande';
     }
-    return `${numPrice.toFixed(3)} TND`;
+    return `${numPrice.toFixed(3)} TND TTC`;
   };
+
+
 
   const mainImage = product.images?.[0]?.src || '/api/placeholder/600/600';
 
@@ -98,7 +103,7 @@ export function ProductCard({ product, onProductClick, loading }: ProductCardPro
         <img 
           src={mainImage} 
           alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+          className="w-full h-auto aspect-square object-cover group-hover:scale-105 transition-transform duration-200"
         />
         
         {product.on_sale && (
@@ -163,15 +168,18 @@ export function ProductCard({ product, onProductClick, loading }: ProductCardPro
         )}
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="text-lg font-bold text-gray-900 dark:text-white">
-              {formatPrice(product.price)}
-            </div>
-            {product.on_sale && product.sale_price && product.regular_price !== product.sale_price && (
-              <div className="text-sm text-gray-500 dark:text-gray-400 line-through">
-                {formatPrice(product.regular_price)}
+          <div className="flex flex-col items-start space-y-1">
+            <div className="flex items-center space-x-2">
+              <div className="text-lg font-bold text-gray-900 dark:text-white">
+                {formatPrice(product.price)}
               </div>
-            )}
+              {product.on_sale && product.sale_price && product.regular_price !== product.sale_price && (
+                <div className="text-sm text-gray-500 dark:text-gray-400 line-through">
+                  {formatPrice(product.regular_price)}
+                </div>
+              )}
+            </div>
+
           </div>
           
           <button

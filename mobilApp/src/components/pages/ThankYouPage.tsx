@@ -8,6 +8,7 @@ import { logPurchase } from '../../utils/analytics';
 import { useScrollToTop } from '../../hooks/useScrollToTop';
 import { useApp } from '../../contexts/AppContext';
 import { toast } from 'react-hot-toast';
+import { getProductTaxInfo, calculateTotalTax } from '../../utils/taxUtils';
 
 interface OrderProduct {
   id: string;
@@ -84,6 +85,9 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
   const [emailVerificationError, setEmailVerificationError] = useState<string>('');
   const [paymentError, setPaymentError] = useState<string>('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [fromProfile, setFromProfile] = useState(false);
+  const [isOrderOld, setIsOrderOld] = useState(false);
+  const [allOrders, setAllOrders] = useState<OrderDetails[]>([]);
   const location = useLocation();
   const navigate = useNavigate();
   const konnectModal = useKonnectPayment();
@@ -96,13 +100,17 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
         // Update order status to on-hold
         await api.updateOrder(orderData.id, { status: 'on-hold' });
         
-        // Refresh order details
-        const updatedOrder = await api.getOrder(orderData.id);
-        setOrderData(updatedOrder);
+        // Refresh order details with a small delay to ensure server update
+        setTimeout(async () => {
+          const updatedOrder = await api.getOrder(orderData.id);
+          console.log('Order status after refresh:', updatedOrder.status);
+          setOrderData(updatedOrder);
+        }, 1000);
         
         // Show message
         setPaymentError('Paiement annulé. Votre commande est en attente.');
       } catch (error) {
+        console.error('Error refreshing order status:', error);
         setPaymentError('Erreur lors de la mise à jour du statut de la commande.');
       }
     }
@@ -119,8 +127,13 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
       if (event.data === 'payment_success') {
         try {
           await api.updateOrder(orderData.id, { status: 'completed' });
-          const updatedOrder = await api.getOrder(orderData.id);
-          setOrderData(updatedOrder);
+          
+          // Refresh order details with a small delay to ensure server update
+          setTimeout(async () => {
+            const updatedOrder = await api.getOrder(orderData.id);
+            console.log('Order status after payment success:', updatedOrder.status);
+            setOrderData(updatedOrder);
+          }, 1000);
           
           // Track successful purchase for Konnect payments
           logPurchase(orderData.id, parseFloat(orderData.total));
@@ -128,15 +141,23 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
           konnectModal.closeKonnectPayment();
           setPaymentError(''); // Clear any previous errors
         } catch (error) {
+          console.error('Error handling payment success:', error);
         }
       } else if (event.data === 'payment_failed') {
         try {
           await api.updateOrder(orderData.id, { status: 'on-hold' });
-          const updatedOrder = await api.getOrder(orderData.id);
-          setOrderData(updatedOrder);
+          
+          // Refresh order details with a small delay to ensure server update
+          setTimeout(async () => {
+            const updatedOrder = await api.getOrder(orderData.id);
+            console.log('Order status after payment failure:', updatedOrder.status);
+            setOrderData(updatedOrder);
+          }, 1000);
+          
           konnectModal.closeKonnectPayment();
           setPaymentError('Le paiement a échoué. Votre commande est en attente.');
         } catch (error) {
+          console.error('Error handling payment failure:', error);
         }
       }
     };
@@ -154,6 +175,12 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
       if (order.billing && order.billing.email === email) {
         setOrderData(order);
         setSubtotal(order.line_items.reduce((sum, item) => sum + parseFloat(item.total), 0).toFixed(3));
+
+        // Check if order is older than 24 hours
+        const orderDate = new Date(order.date_created);
+        const now = new Date();
+        const hoursDiff = (now.getTime() - orderDate.getTime()) / (1000 * 60 * 60);
+        setIsOrderOld(hoursDiff > 24);
 
         sessionStorage.setItem(`order_${orderId}`, JSON.stringify({
           order: order,
@@ -178,9 +205,55 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
     }
   };
 
+  const loadAllOrders = async () => {
+    if (!state.customer) return;
+    
+    try {
+      const orders = await api.getAllOrdersForCustomer(state.customer.id);
+      setAllOrders(orders);
+    } catch (error) {
+      console.error('Error loading orders:', error);
+    }
+  };
+
+  const handleOrderSelect = async (orderId: number) => {
+    try {
+      setIsLoading(true);
+      const order = await api.getOrder(orderId);
+      setOrderData(order);
+      setSubtotal(order.line_items.reduce((sum, item) => sum + parseFloat(item.total), 0).toFixed(3));
+      
+      // Check if order is older than 24 hours
+      const orderDate = new Date(order.date_created);
+      const now = new Date();
+      const hoursDiff = (now.getTime() - orderDate.getTime()) / (1000 * 60 * 60);
+      setIsOrderOld(hoursDiff > 24);
+      
+      // Update URL
+      navigate(`/thank-you?order_id=${orderId}&from_profile=true`);
+    } catch (error) {
+      console.error('Error loading order:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     const hash = window.location.hash.substring(1);
     if (hash) setOrderId(hash);
+    
+    // Check if coming from profile page
+    const searchParams = new URLSearchParams(location.search);
+    const fromProfileParam = searchParams.get('from_profile');
+    if (fromProfileParam === 'true') {
+      setFromProfile(true);
+    }
+    
+    // Load order ID from URL parameter if available
+    const orderIdParam = searchParams.get('order_id');
+    if (orderIdParam) {
+      setOrderId(orderIdParam);
+    }
 
     if (location.state?.error) {
       setPaymentError(location.state.error);
@@ -209,10 +282,13 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
         setShowEmailForm(true);
       }
       setIsLoading(false);
+    } else if (orderIdParam && fromProfileParam === 'true') {
+      // Auto-load order when coming from profile page
+      handleOrderSelect(parseInt(orderIdParam));
     } else {
       setIsLoading(false);
     }
-  }, [orderDetails, location.state]);
+  }, [orderDetails, location.state, location.search]);
 
   const order = orderData;
 
@@ -366,6 +442,37 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
     return order.fee_lines.reduce((total, fee) => total + parseFloat(fee.total), 0);
   };
 
+  const calculateSubtotalHT = () => {
+    if (!orderData) return '0.000';
+    
+    const subtotalHT = orderData.line_items.reduce((total, item) => {
+      const itemTotal = parseFloat(item.total || '0');
+      // Since item.total is TTC (tax-inclusive), we need to extract HT
+      // For simplicity, we'll assume standard 19% tax rate for order items
+      // In a real implementation, you'd need to get the actual tax class from the product
+      const taxRate = 19; // Default tax rate
+      const htAmount = itemTotal / (1 + taxRate / 100);
+      return total + htAmount;
+    }, 0);
+    
+    return subtotalHT.toFixed(3);
+  };
+
+  const calculateTaxAmount = () => {
+    if (!orderData) return '0.000';
+    
+    const taxAmount = orderData.line_items.reduce((total, item) => {
+      const itemTotal = parseFloat(item.total || '0');
+      // Extract tax from TTC price
+      const taxRate = 19; // Default tax rate
+      const htAmount = itemTotal / (1 + taxRate / 100);
+      const tax = itemTotal - htAmount;
+      return total + tax;
+    }, 0);
+    
+    return taxAmount.toFixed(3);
+  };
+
   const handlePayOrder = async () => {
     if (!orderData) return;
 
@@ -403,100 +510,28 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
   };
 
   const handleOrderAgain = async () => {
-    if (!orderData) return;
-
-    try {
-      // Clear current cart first
-      dispatch({ type: 'CLEAR_CART' });
-
-      // Track items that couldn't be added due to stock issues
-      const unavailableItems = [];
-      let addedItems = 0;
-
-      // Add all items from the order to cart with stock validation
-      for (const item of orderData.line_items) {
-        try {
-          // Fetch current product data to check stock status
-          const product = await api.getProduct(item.product_id);
-          
-          if (!product) {
-            unavailableItems.push({ name: item.name, reason: 'Produit introuvable' });
-            continue;
-          }
-
-          // Check if product is in stock or allows backorders
-          const isInStock = product.stock_status === 'instock' || product.stock_status === 'onbackorder';
-          const hasStock = product.stock_quantity === null || product.stock_quantity >= item.quantity;
-          
-          if (!isInStock && product.stock_status !== 'onbackorder') {
-            unavailableItems.push({ name: item.name, reason: 'Rupture de stock' });
-            continue;
-          }
-
-          if (!hasStock && product.stock_status !== 'onbackorder') {
-            const availableQty = product.stock_quantity || 0;
-            unavailableItems.push({ 
-              name: item.name, 
-              reason: `Stock insuffisant (${availableQty} disponible${availableQty > 1 ? 's' : ''})`
-            });
-            continue;
-          }
-
-          // Add to cart with current product data
-          const productData = {
-            id: item.product_id,
-            name: item.name,
-            price: parseFloat(item.price),
-            images: product.images || [],
-            sku: item.sku,
-            stock_quantity: product.stock_quantity,
-            type: product.type || 'simple',
-            status: product.status || 'publish',
-            stock_status: product.stock_status
-          };
-
-          dispatch({
-            type: 'ADD_TO_CART',
-            payload: {
-              product: productData,
-              quantity: item.quantity,
-              variationId: item.variation_id || null
-            }
-          });
-          
-          addedItems++;
-          
-        } catch (error) {
-          unavailableItems.push({ name: item.name, reason: 'Erreur lors de l\'ajout' });
-        }
-      }
-
-      // Show appropriate messages
-      if (addedItems === 0) {
-        // No items were added
-        toast.error('Aucun article n\'a pu être ajouté au panier.');
-        if (unavailableItems.length > 0) {
-          unavailableItems.forEach(item => {
-            toast.error(`${item.name}: ${item.reason}`);
-          });
-        }
-      } else if (unavailableItems.length > 0) {
-        // Some items were added, some were not
-        toast.success(`${addedItems} article${addedItems > 1 ? 's' : ''} ajouté${addedItems > 1 ? 's' : ''} au panier !`);
-        unavailableItems.forEach(item => {
-          toast.error(`${item.name}: ${item.reason}`);
-        });
-        // Still redirect to cart for the items that were added
-        navigate('/cart');
-      } else {
-        // All items were added successfully
-        toast.success('Tous les articles ont été ajoutés au panier ! Redirection vers le paiement...');
-        navigate('/cart');
-      }
-      
-    } catch (error) {
-      toast.error('Erreur lors de l\'ajout des articles au panier.');
+    // Feature disabled - show French info message
+    console.log('Order again button clicked - showing toast');
+    
+    // Prevent multiple rapid clicks
+    if ((window as any).__orderAgainClicked) {
+      return;
     }
+    
+    (window as any).__orderAgainClicked = true;
+    
+    toast('Cette fonctionnalité sera bientôt disponible !', {
+      icon: 'ℹ️',
+      duration: 4000,
+      position: 'top-right',
+      style: {
+        background: '#3b82f6',
+        color: '#fff',
+      },
+      onDismiss: () => {
+        (window as any).__orderAgainClicked = false;
+      }
+    });
   };
 
   return (
@@ -504,11 +539,17 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
       <div className="text-center mb-8">
         <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          Commande Confirmée !
+          {isOrderOld ? 'Détails de la Commande' : 'Commande Confirmée !'}
         </h1>
-        <p className="text-lg text-gray-600 dark:text-gray-400">
-          Votre commande #{orderData.id} a été placée avec succès
-        </p>
+        {isOrderOld ? (
+          <p className="text-lg text-gray-600 dark:text-gray-400">
+            La commande #{orderData.id} a été passée le {new Date(orderData.date_created).toLocaleDateString('fr-FR')} et est actuellement {orderData.status}.
+          </p>
+        ) : (
+          <p className="text-lg text-gray-600 dark:text-gray-400">
+            Votre commande #{orderData.id} a été placée avec succès
+          </p>
+        )}
         <div className="mt-4">
           <span className={`px-4 py-2 rounded-full text-sm font-medium ${
             orderData.status === 'completed' ? 'bg-green-100 text-green-800' :
@@ -520,6 +561,22 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
           }`}>
             Statut: {orderData.status}
           </span>
+          <button
+            onClick={async () => {
+              try {
+                console.log('Refreshing order status...');
+                const refreshedOrder = await api.getOrder(orderData.id);
+                console.log('Refreshed order status:', refreshedOrder.status);
+                setOrderData(refreshedOrder);
+              } catch (error) {
+                console.error('Error refreshing order status:', error);
+              }
+            }}
+            className="ml-2 px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-full transition-colors duration-200"
+            title="Actualiser le statut"
+          >
+            Actualiser
+          </button>
         </div>
       </div>
 
@@ -544,10 +601,42 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
                     Quantité: {item.quantity}
                     <br />
                     Réf : {item.sku}
+                    {item.meta_data && item.meta_data.length > 0 && (
+                      <>
+                        <br />
+                        {item.meta_data
+                          .filter(meta => 
+                            meta.key && 
+                            meta.value && 
+                            !meta.key.startsWith('_') && 
+                            meta.key !== 'konnect_payment_id' && 
+                            meta.key !== 'is_vat_exempt'
+                          )
+                          .map((meta, index) => (
+                            <span key={index}>
+                              {meta.key.replace('pa_', '')}: {meta.value}
+                              {index < item.meta_data.filter(meta => 
+                                meta.key && 
+                                meta.value && 
+                                !meta.key.startsWith('_') && 
+                                meta.key !== 'konnect_payment_id' && 
+                                meta.key !== 'is_vat_exempt'
+                              ).length - 1 && <br />}
+                            </span>
+                          ))
+                        }
+                      </>
+                    )}
                   </p>
                 </div>
                 <p className="font-semibold text-gray-900 dark:text-white">
-                  {parseFloat(item.total).toFixed(3)} TND
+                  {(() => {
+                    const itemTotal = parseFloat(item.total || '0');
+                    // Extract HT from TTC price (assuming 19% tax rate)
+                    const taxRate = 19; // Default tax rate
+                    const htAmount = itemTotal / (1 + taxRate / 100);
+                    return `${htAmount.toFixed(3)} TND HT`;
+                  })()}
                 </p>
               </div>
             ))}
@@ -555,8 +644,12 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
 
           <div className="mt-4 pt-4 border-t border-gray-200 dark:text-white dark:border-gray-600 space-y-2">
             <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Sous-total</span>
-              <span className="font-semibold">{subtotal} TND</span>
+              <span className="text-gray-600 dark:text-gray-400">Sous-total HT</span>
+              <span className="font-semibold">{calculateSubtotalHT()} TND HT</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Taxe</span>
+              <span className="font-semibold">{calculateTaxAmount()} TND</span>
             </div>
             {orderData.shipping_lines && orderData.shipping_lines.length > 0 && (
               <div className="flex justify-between">
@@ -617,11 +710,11 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
           ) : null}
 
           <button
-            onClick={handleOrderAgain}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-xl font-semibold transition-colors duration-200"
-          >
-            Commander à nouveau !
-          </button>
+                  onClick={handleOrderAgain}
+                  className="w-full bg-gray-400 text-white py-3 px-4 rounded-xl font-semibold cursor-not-allowed opacity-60"
+                >
+                  Commander à nouveau !
+                </button>
 
           </div>
         </div>
@@ -633,6 +726,65 @@ export function ThankYouPage({ orderDetails, onBackToHome, onContinueShopping }:
               <XCircle className="h-5 w-5" />
               <p className="text-sm font-medium">{paymentError}</p>
             </div>
+          </div>
+        )}
+
+        {/* Navigation and Order Selection */}
+        {(fromProfile || isOrderOld) && (
+          <div className="space-y-4">
+            {fromProfile && (
+              <button
+                onClick={() => navigate('/profile')}
+                className="w-full bg-gray-600 hover:bg-gray-700 text-white py-3 px-4 rounded-xl font-semibold transition-colors duration-200 flex items-center justify-center gap-2"
+              >
+                <House className="h-5 w-5" />
+                Retour au profil
+              </button>
+            )}
+            
+            {state.customer && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={loadAllOrders}
+                  className="w-full text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 font-medium mb-3"
+                >
+                  Voir mes commandes précédentes
+                </button>
+                
+                {allOrders.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Sélectionner une autre commande :</p>
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {allOrders.map((order) => (
+                        <button
+                          key={order.id}
+                          onClick={() => handleOrderSelect(order.id)}
+                          className={`w-full text-left p-2 rounded-lg text-sm transition-colors ${
+                            order.id === orderData.id 
+                              ? 'bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200' 
+                              : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span>Commande #{order.id}</span>
+                            <span className="text-xs">{new Date(order.date_created).toLocaleDateString('fr-FR')}</span>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {(() => {
+                              const orderTotal = parseFloat(order.total || '0');
+                              // Extract HT from TTC price (assuming 19% tax rate)
+                              const taxRate = 19; // Default tax rate
+                              const htAmount = orderTotal / (1 + taxRate / 100);
+                              return `${htAmount.toFixed(3)} TND HT`;
+                            })()} • {order.status}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
